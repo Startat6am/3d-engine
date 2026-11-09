@@ -38,3 +38,11 @@ Official references reviewed for this draft:
 - [KTX 2.0 / Basis Universal guide](https://github.com/KhronosGroup/3D-Formats-Guidelines/blob/main/KTXDeveloperGuide.md): KTX2 is the container, Basis Universal ETC1S/UASTC are transmission encodings, and runtime transcoding targets GPU-native compressed formats.
 
 Exact package versions are intentionally **not pinned** in this architecture-only iteration. Foundation must verify current stable releases, peer dependency ranges, browser support, licensing, and reproducible build compatibility before adding dependencies. Do not interpret this snapshot as a complete compatibility matrix.
+
+Additional official tooling checks:
+- [React version page](https://react.dev/versions) lists React 19.3 as latest (released 2026-09-09); use stable React 19.3 for editor UI unless ecosystem compatibility testing identifies a blocker.
+- [Vitest releases](https://vitest.dev/releases.html) lists 5.1 as the current minor receiving regular patches; [Vitest 5 migration requirements](https://vitest.dev/guide/migration) require Vite >=6.4.0 and Node >=22.12.0.
+- [Playwright installation guide](https://playwright.dev/docs/intro) currently supports latest Node 22.x, 24.x, and 26.x; selected Node 22.x satisfies the shared minimum with Vite/Vitest.
+- [TypeScript download page](https://www.typescriptlang.org/download/) currently lists 7.0 as latest. Treat this as a candidate, not an automatic selection: Foundation must run compiler compatibility checks against Vite, React type packages, editor tooling, and all chosen dependencies before pinning.
+
+The compatibility snapshot is a point-in-time review, not a substitute for lockfile-based CI. Versions are pinned only after the Foundation spike and then updated through controlled dependency PRs.
