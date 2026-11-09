@@ -1,30 +1,37 @@
 # Foundation milestone status
 
-**Status:** in progress — implementation scaffold exists; exit gate is not yet signed off.
+**Status:** complete — Foundation exit gate passed in GitHub Actions.
 
-## Implemented in this iteration
+## Implemented in this milestone
 
 - pnpm workspace with strict TypeScript project references and a committed lockfile.
-- ESLint and Prettier configuration; Vitest unit-test runner; Playwright Chromium E2E configuration; GitHub Actions verification workflow.
-- `@engine/core`: lifecycle host with ordered startup, reverse shutdown, rollback after startup failure, idempotent disposal, and monotonically generation-tagged entity registry.
-- `@engine/geometry`: renderer-independent CPU mesh contract and box primitive.
+- ESLint and Prettier; Vitest unit-test runner; Playwright Chromium E2E; GitHub Actions verification workflow.
+- `@engine/core`: lifecycle host with ordered startup, reverse shutdown, rollback after startup failure, idempotent disposal, and generation-tagged entity registry.
+- `@engine/geometry`: CPU-side mesh contract and box primitive.
 - `@engine/renderer`: Three.js WebGL2 adapter isolated behind engine-owned interfaces; resize, mesh submission, render, and disposal.
-- `@engine/editor`: React application shell with hierarchy, inspector, and a live canvas viewport.
+- `@engine/editor`: React application shell with hierarchy, inspector, and live canvas viewport.
 - `@engine/player`: separate non-React runtime shell using shared core/geometry/renderer packages.
 
-## Verification observed
+## Verification
 
-- Frozen install is the intended CI path; local dependency resolution completed and lockfile was generated.
-- Prettier check, ESLint, TypeScript project build/typecheck, and Vitest passed in the implementation environment.
-- Editor and player production builds passed with Vite 7.3.8.
-- Unit tests currently cover engine startup/rollback/shutdown/disposal and stale entity handles.
+GitHub Actions CI run [#2](https://github.com/Startat6am/3d-engine/actions/runs/42709412738) passed on commit `087e9b531171575e90a4557e40e20804994bebc4`:
 
-## Remaining gate items
+- frozen pnpm install;
+- Prettier check and ESLint;
+- TypeScript project typecheck;
+- 6 unit tests;
+- production builds for Editor and Player;
+- Playwright Chromium editor E2E.
 
-- Playwright Chromium E2E smoke test passed in a browser-enabled Linux environment, including a live editor-shell navigation check. The CI job installs Chromium and OS dependencies with `playwright install --with-deps chromium`; GitHub Actions CI run #4 also completed successfully on the PR head.
-- Production bundles currently emit a >500 kB chunk warning due to the initial Three.js integration; measure and split/lazy-load renderer/editor code in a later optimization pass.
-- Vercel preview build is READY for the PR head, but the preview alias requires Vercel SSO; production-domain routing and public access are not yet validated.
-- Add package-boundary checks, browser WebGL2 smoke coverage, and dependency/licensing review.
+Vercel preview deployment completed successfully: [open Editor preview](https://3d-engine-fnmna5hk4-planbnba-2567s-projects.vercel.app). Preview access follows the project's Vercel authentication settings.
+
+The Playwright browser could not launch in the implementation container because its Chromium installation lacked `libglib-2.0.so.0`; CI installed Chromium and its OS dependencies and passed the E2E test.
+
+## Known limitations
+
+- Editor and Player production bundles currently emit a greater-than-500 kB minified chunk warning due to the initial Three.js integration. Gzip sizes are approximately 201 kB and 131 kB respectively; splitting/lazy-loading is a follow-up optimization.
+- The current viewport is a primitive-scene foundation, not a complete camera-navigation or editing toolset.
+- Dependency-boundary automation, WebGL2 visual regression, browser compatibility matrix, and licensing review remain hardening tasks.
 
 ## Explicit non-claims
 
