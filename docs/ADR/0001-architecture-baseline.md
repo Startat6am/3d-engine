@@ -28,3 +28,13 @@ The design adds explicit adapters and package boundaries, but allows backend rep
 
 ## Validation required before acceptance
 Confirm current stable versions and compatibility of TypeScript, Three.js, Vite, React, Vitest, Playwright, Rapier, glTF tooling and KTX2 transcoding; build small spikes for WebGL2 renderer lifecycle, Rapier WASM loading, and GLB import. Record exact versions and browser matrix in Foundation ADRs.
+
+## Compatibility research snapshot (2026-11-09)
+Official references reviewed for this draft:
+- [Three.js WebGPURenderer manual](https://threejs.org/manual/pages/webgpurenderer): WebGPU renderer offers WebGL 2 fallback, but the manual still describes it as experimental and notes feature differences. Keep it isolated; WebGLRenderer remains the recommended path for pure WebGL 2 applications.
+- [Vite guide](https://vite.dev/guide/): current guide states Node.js 20.19+ or 22.12+; use Node 22.x LTS for the initial deployment environment, then pin package versions in the Foundation lockfile.
+- [Rapier JavaScript guide](https://rapier.rs/docs/user_guides/javascript/getting_started_js/): the JS package is WASM-backed and initialization is asynchronous; adapter lifecycle must account for async init and bundler/WASM packaging.
+- [Khronos glTF Registry](https://registry.khronos.org/glTF/): current registry identifies glTF 2.0 (specification patch 2.0.1); it is a runtime asset delivery standard, not an authoring/project format.
+- [KTX 2.0 / Basis Universal guide](https://github.com/KhronosGroup/3D-Formats-Guidelines/blob/main/KTXDeveloperGuide.md): KTX2 is the container, Basis Universal ETC1S/UASTC are transmission encodings, and runtime transcoding targets GPU-native compressed formats.
+
+Exact package versions are intentionally **not pinned** in this architecture-only iteration. Foundation must verify current stable releases, peer dependency ranges, browser support, licensing, and reproducible build compatibility before adding dependencies. Do not interpret this snapshot as a complete compatibility matrix.
