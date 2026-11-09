@@ -46,11 +46,11 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Status
 
-Foundation is an in-progress scaffold, not a feature-complete engine. ECS component storage/query scheduling, transform hierarchy, world serialization, asset pipeline, physics, animation, audio, input, editor commands/undo and AI authoring remain future gated milestones. A passing local unit/build check does not mark Foundation complete; the browser E2E gate and CI result are still required.
+Foundation is an in-progress scaffold, not a feature-complete engine. ECS component storage/query scheduling, transform hierarchy, world serialization, asset pipeline, physics, animation, audio, input, editor commands/undo and AI authoring remain future gated milestones. The browser E2E smoke test and GitHub Actions CI pass on PR #2. Foundation remains in progress until the remaining package-boundary, renderer, lifecycle and integration acceptance gates are implemented and measured.
 
 ## Deployment
 
-A Vercel project is connected to this GitHub repository. The project settings must be revalidated against the monorepo's editor root before publishing a usable editor URL. No hosted editor/player is claimed by this scaffold iteration.
+A Vercel preview deployment for PR #2 built successfully. Preview access is protected by Vercel SSO, so it is not a public demo URL. Production-domain routing and deployment access still need owner verification before publishing a public editor URL.
 
 ## License
 
