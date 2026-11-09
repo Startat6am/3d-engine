@@ -63,11 +63,24 @@ export class EngineHost {
       }
       this.#state = 'running';
     } catch (cause) {
-      for (const service of started.reverse()) await service.stop?.();
+      const rollbackErrors: unknown[] = [];
+      for (const service of started.reverse()) {
+        try {
+          await service.stop?.();
+        } catch (error) {
+          rollbackErrors.push(error);
+        }
+      }
       this.#state = 'idle';
-      throw new EngineLifecycleError('Engine startup failed; initialized services were stopped', {
-        cause,
-      });
+      const failure = rollbackErrors.length
+        ? new AggregateError([cause, ...rollbackErrors], 'Startup and rollback both failed')
+        : cause;
+      throw new EngineLifecycleError(
+        'Engine startup failed; initialized services were rolled back',
+        {
+          cause: failure,
+        },
+      );
     }
   }
 
