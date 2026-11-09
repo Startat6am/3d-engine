@@ -14,9 +14,11 @@ export function EditorApp() {
     try {
       renderer = new ThreeWebGLRendererAdapter(canvas);
     } catch (error) {
+      canvas.dataset.rendererError = error instanceof Error ? error.message : String(error);
       console.error('WebGL2 renderer initialization failed', error);
       return;
     }
+    canvas.dataset.renderer = renderer.capabilities.backend;
     rendererRef.current = renderer;
     renderer.setMeshes([{ geometry: createBoxGeometry(), color: 0x6ea8fe }]);
     const resize = () => {
