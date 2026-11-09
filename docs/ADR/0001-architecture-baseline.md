@@ -1,6 +1,6 @@
 # ADR-0001: Modular browser-first engine architecture
 
-- **Status:** Proposed — awaiting project owner approval
+- **Status:** Accepted — project owner approval received
 - **Date:** 2026-11-09
 
 ## Context
@@ -46,3 +46,8 @@ Additional official tooling checks:
 - [TypeScript download page](https://www.typescriptlang.org/download/) currently lists 7.0 as latest. Treat this as a candidate, not an automatic selection: Foundation must run compiler compatibility checks against Vite, React type packages, editor tooling, and all chosen dependencies before pinning.
 
 The compatibility snapshot is a point-in-time review, not a substitute for lockfile-based CI. Versions are pinned only after the Foundation spike and then updated through controlled dependency PRs.
+
+## Follow-up decision: prompt-driven authoring
+The project owner confirmed that AI agents must be able to create objects and worlds from natural-language prompts. This capability is specified in [AI_AGENT_SPEC.md](../AI_AGENT_SPEC.md) and integrated as the `engine-agent-authoring` package boundary and a gated roadmap milestone.
+
+The adopted safety boundary is: natural language -> structured declarative plan -> validation -> preview -> explicit approval -> atomic editor transaction with undo. Model output is never executable code and never mutates runtime/core state directly. Provider SDKs remain optional editor-side adapters.
