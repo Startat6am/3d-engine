@@ -21,9 +21,9 @@
 
 ## Remaining gate items
 
-- Playwright Chromium E2E smoke test passed in a browser-enabled Linux environment, including a live editor-shell navigation check. The CI job installs Chromium and OS dependencies with `playwright install --with-deps chromium`; the GitHub Actions result remains pending until the PR workflow completes.
+- Playwright Chromium E2E smoke test passed in a browser-enabled Linux environment, including a live editor-shell navigation check. The CI job installs Chromium and OS dependencies with `playwright install --with-deps chromium`; GitHub Actions CI run #4 also completed successfully on the PR head.
 - Production bundles currently emit a >500 kB chunk warning due to the initial Three.js integration; measure and split/lazy-load renderer/editor code in a later optimization pass.
-- Verify Vercel deployment from the monorepo root strategy before advertising a hosted editor URL.
+- Vercel preview build is READY for the PR head, but the preview alias requires Vercel SSO; production-domain routing and public access are not yet validated.
 - Add package-boundary checks, browser WebGL2 smoke coverage, and dependency/licensing review.
 
 ## Explicit non-claims
