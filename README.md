@@ -1,48 +1,57 @@
 # Universal 3D Engine
 
-An extensible, browser-first 3D engine for interactive scenes, voxel and mesh worlds, simulations, and games.
+A modular, browser-first 3D engine for conventional geometry, voxels, procedural worlds, simulations and games. The editor and player are separate applications over shared engine packages.
 
-> **Status:** architecture baseline approved by project owner; implementation has not started.
+## Foundation workspace
 
-## Project goals
+- `packages/engine-core` — renderer-independent engine lifecycle and generation-safe entity handles.
+- `packages/engine-geometry` — CPU-side mesh contracts and primitive geometry.
+- `packages/engine-renderer` — Three.js WebGL2 implementation behind an engine-owned adapter.
+- `apps/editor` — React authoring shell with hierarchy, inspector and live 3D viewport.
+- `apps/player` — minimal runtime host; no React or editor dependency.
 
-- A reusable engine, independent of any one game or content type.
-- Modular TypeScript packages with explicit public contracts.
-- ECS for data-oriented simulation and a transform hierarchy for spatial relationships.
-- Renderer abstraction with WebGL 2 as the initial compatibility baseline and WebGPU as a separately validated backend.
-- Standard asset interchange (glTF 2.0/GLB, KTX2) and a versioned `.world` project format.
-- Editor and player applications built on top of the same runtime contracts.
-- Prompt-driven AI authoring of objects and worlds through validated, previewable, undoable scene operations.
+## Requirements and commands
+
+Node.js 22.12+ and pnpm 12.18.0.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm --filter @engine/editor dev
+pnpm --filter @engine/player dev
+pnpm check
+pnpm e2e
+```
 
 ## Documentation
 
-Start with [ENGINE_SPEC.md](docs/ENGINE_SPEC.md), then read [ARCHITECTURE.md](docs/ARCHITECTURE.md) and [ROADMAP.md](docs/ROADMAP.md).
+Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCHITECTURE.md), and [Roadmap](docs/ROADMAP.md).
 
-| Document | Purpose |
-| --- | --- |
-| [Engine specification](docs/ENGINE_SPEC.md) | Product scope, requirements, non-goals, acceptance |
-| [Architecture](docs/ARCHITECTURE.md) | Package boundaries and dependency direction |
-| [Roadmap](docs/ROADMAP.md) | Gated implementation sequence |
-| [API specification](docs/API_SPEC.md) | Public contracts and compatibility policy |
-| [Data format](docs/DATA_FORMAT.md) | Versioned project/world serialization |
-| [Rendering](docs/RENDERING_SPEC.md) | Renderer abstraction and graphics capabilities |
-| [ECS](docs/ECS_SPEC.md) | Entity, component, system, and transform model |
-| [Asset pipeline](docs/ASSET_PIPELINE.md) | Import, identity, caching, and disposal |
-| [Physics](docs/PHYSICS_SPEC.md) | Physics integration contract |
-| [Editor](docs/EDITOR_SPEC.md) | Authoring application |
-| [Runtime](docs/RUNTIME_SPEC.md) | Player lifecycle and frame scheduling |
-| [AI agent authoring](docs/AI_AGENT_SPEC.md) | Prompt-to-object/world workflow, operation protocol, validation and approval |
-| [Testing](docs/TESTING_SPEC.md) | Quality gates and benchmark methodology |
-| [ADRs](docs/ADR/) | Accepted and proposed architecture decisions |
+| Document                                       | Purpose                                                  |
+| ---------------------------------------------- | -------------------------------------------------------- |
+| [Engine specification](docs/ENGINE_SPEC.md)    | Product scope, requirements, non-goals and acceptance    |
+| [Architecture](docs/ARCHITECTURE.md)           | Package boundaries and dependency direction              |
+| [Roadmap](docs/ROADMAP.md)                     | Gated implementation sequence                            |
+| [Foundation status](docs/FOUNDATION_STATUS.md) | Implemented scaffold, verification and remaining gates   |
+| [API specification](docs/API_SPEC.md)          | Public contracts and compatibility policy                |
+| [Data format](docs/DATA_FORMAT.md)             | Versioned project/world serialization                    |
+| [Rendering](docs/RENDERING_SPEC.md)            | Renderer abstraction and graphics capabilities           |
+| [ECS](docs/ECS_SPEC.md)                        | Entity, component, system and transform model            |
+| [Asset pipeline](docs/ASSET_PIPELINE.md)       | Import, identity, caching and disposal                   |
+| [Physics](docs/PHYSICS_SPEC.md)                | Physics integration contract                             |
+| [Editor](docs/EDITOR_SPEC.md)                  | Authoring application                                    |
+| [Runtime](docs/RUNTIME_SPEC.md)                | Player lifecycle and frame scheduling                    |
+| [AI agent authoring](docs/AI_AGENT_SPEC.md)    | Prompt-to-object/world workflow, validation and approval |
+| [Testing](docs/TESTING_SPEC.md)                | Quality gates and benchmark methodology                  |
+| [ADRs](docs/ADR/)                              | Accepted and proposed architecture decisions             |
 
-## Current state
+## Status
 
-The repository was initially empty. The architecture baseline and AI authoring contract are documented. Implementation starts in gated milestones; documentation does not imply that runtime features are already available.
+Foundation is an in-progress scaffold, not a feature-complete engine. ECS component storage/query scheduling, transform hierarchy, world serialization, asset pipeline, physics, animation, audio, input, editor commands/undo and AI authoring remain future gated milestones. A passing local unit/build check does not mark Foundation complete; the browser E2E gate and CI result are still required.
 
 ## Deployment
 
-A Vercel project named `3d-engine` is connected to this GitHub repository. Node.js 22.x is selected and root/framework settings use automatic detection. A successful deployment currently verifies repository integration only; a functioning editor/player application requires the Foundation milestone.
+A Vercel project is connected to this GitHub repository. The project settings must be revalidated against the monorepo's editor root before publishing a usable editor URL. No hosted editor/player is claimed by this scaffold iteration.
 
 ## License
 
-Not decided yet. Do not assume this project is open-source licensed until a LICENSE file is added.
+Not decided yet. Do not assume this project is open-source licensed until a `LICENSE` file is added.

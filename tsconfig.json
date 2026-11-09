@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/engine-core" },
+    { "path": "packages/engine-geometry" },
+    { "path": "packages/engine-renderer" },
+    { "path": "apps/editor" },
+    { "path": "apps/player" }
+  ]
+}

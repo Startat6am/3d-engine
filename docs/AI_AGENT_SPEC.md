@@ -6,6 +6,7 @@
 ## 1. Purpose
 
 Define a safe, provider-independent interface through which an AI agent can create, inspect, and modify engine content from natural-language prompts. The target workflows include:
+
 - creating a single object or reusable prefab;
 - creating a group of related objects;
 - generating or editing a complete world/scene;
@@ -28,6 +29,7 @@ Flow:
 `User Prompt -> Agent Orchestrator -> Intent/Plan -> Typed World Operations -> Policy + Schema Validation -> Preview/Diff -> User Approval -> Transactional Apply -> Save/Undo -> Validation Feedback`
 
 Responsibilities:
+
 - **AI Provider Adapter:** sends prompts/context and receives structured output; provider-specific SDKs stay outside engine-core.
 - **Agent Orchestrator:** manages task state, context budget, tool permissions, retries, cancellation, and audit trail.
 - **Scene Context Provider:** supplies a bounded, read-only snapshot: selected entities, hierarchy, relevant components, asset catalog, world settings, and capability summary.
@@ -52,6 +54,7 @@ The user prompt is natural language, but the model output is never applied as fr
 ## 5. Prompt contract
 
 Each task request includes:
+
 - `taskId`, `projectId`, `worldId`, and current document revision;
 - user prompt verbatim;
 - mode (create/modify/extend/refactor/inspect);
@@ -115,6 +118,7 @@ The plan MUST NOT contain executable JavaScript, TypeScript, WASM, shader source
 ## 7. Validation and policy
 
 Before preview and again immediately before apply:
+
 - validate protocol version and JSON schema;
 - verify base revision has not changed; reject or re-plan on conflict;
 - verify operation types and component schemas against engine registry;
@@ -132,6 +136,7 @@ Unknown optional component payloads may be preserved but cannot be authored by t
 ## 8. Approval, transactions, undo, and provenance
 
 Default policy:
+
 - Read-only inspection can run without mutation approval.
 - All mutations are previewed before application.
 - Delete, overwrite, broad scene edits, project setting changes, and asset replacement require explicit approval.
@@ -145,6 +150,7 @@ Record task ID, timestamp, provider/model identifier where available, prompt has
 ## 9. Iterative generation and quality loop
 
 After applying a plan, run deterministic validators:
+
 - missing asset/reference check;
 - transform/hierarchy integrity;
 - component schema validation;
@@ -174,7 +180,7 @@ interface AgentAuthoringService {
   apply(
     plan: AgentPlan,
     approval: AgentApproval,
-    context: AgentApplyContext
+    context: AgentApplyContext,
   ): Promise<AgentApplyResult>;
   cancel(taskId: AgentTaskId): Promise<void>;
 }

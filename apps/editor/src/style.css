@@ -1,0 +1,249 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #e6eaf1;
+  background: #10141c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 760px;
+  min-height: 100vh;
+}
+.editor-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #10141c;
+}
+.topbar,
+.bottombar {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  gap: 12px;
+  background: #171d27;
+  border-bottom: 1px solid #29313e;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+.brand-mark {
+  font-size: 24px;
+  color: #83b6ff;
+}
+.crumb {
+  color: #8a96a8;
+  letter-spacing: 0;
+}
+.spacer {
+  flex: 1;
+}
+.status,
+.bottombar {
+  font:
+    10px 'DM Mono',
+    monospace;
+  color: #98a5b7;
+}
+.status i {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6bd3a2;
+  margin-right: 7px;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 230px minmax(300px, 1fr) 260px;
+  flex: 1;
+  min-height: 0;
+}
+.panel {
+  background: #171d27;
+  position: relative;
+  font-size: 12px;
+}
+.hierarchy {
+  border-right: 1px solid #29313e;
+}
+.inspector {
+  border-left: 1px solid #29313e;
+}
+.panel-heading {
+  height: 43px;
+  padding: 14px 15px;
+  border-bottom: 1px solid #29313e;
+  color: #9aa7b9;
+  font:
+    10px 'DM Mono',
+    monospace;
+  letter-spacing: 0.1em;
+  display: flex;
+  justify-content: space-between;
+}
+.panel-heading button {
+  background: none;
+  border: 0;
+  color: #9eb5d4;
+  font-size: 18px;
+}
+.tree-row {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 14px;
+  color: #bdc8d7;
+  background: none;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font: 12px Manrope;
+}
+.tree-row.active {
+  margin-top: 9px;
+  color: #e5ebf4;
+}
+.tree-row.selected {
+  padding-left: 34px;
+  background: #26364b;
+  color: #a9ccff;
+}
+.tree-row.muted {
+  padding-left: 34px;
+  color: #8290a3;
+}
+.panel-foot {
+  position: absolute;
+  bottom: 0;
+  height: 35px;
+  border-top: 1px solid #29313e;
+  width: 100%;
+  padding: 12px 14px;
+  color: #6f7d90;
+  font:
+    9px 'DM Mono',
+    monospace;
+  letter-spacing: 0.05em;
+}
+.viewport {
+  position: relative;
+  min-width: 0;
+  background: radial-gradient(ellipse at center, #202a38 0, #111722 72%);
+  overflow: hidden;
+}
+.viewport-label {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  z-index: 1;
+  color: #8998ac;
+  font:
+    10px 'DM Mono',
+    monospace;
+  letter-spacing: 0.1em;
+}
+.viewport-label span {
+  margin-left: 12px;
+  color: #70cba1;
+}
+.viewport canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.axis {
+  position: absolute;
+  right: 20px;
+  top: 16px;
+  font:
+    11px 'DM Mono',
+    monospace;
+  color: #f18c8c;
+}
+.axis b {
+  color: #8dd6a7;
+  margin: 0 5px;
+}
+.viewport-help {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  color: #a2afc0;
+  font:
+    10px 'DM Mono',
+    monospace;
+}
+.viewport-help span {
+  margin-left: 16px;
+  color: #6c7b8e;
+}
+.inspector-title {
+  padding: 19px 16px 24px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+.inspector label {
+  display: block;
+  padding: 12px 15px;
+  border-top: 1px solid #29313e;
+  color: #8492a5;
+  font:
+    9px 'DM Mono',
+    monospace;
+  letter-spacing: 0.1em;
+}
+.property {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 15px;
+  color: #aab5c4;
+  font-size: 11px;
+}
+.property code {
+  font:
+    10px 'DM Mono',
+    monospace;
+  color: #c6d1df;
+}
+.component {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 11px 15px;
+  color: #bdc9d9;
+}
+.component small {
+  margin-left: auto;
+  color: #718096;
+}
+.add-component {
+  margin: 10px 15px;
+  padding: 8px;
+  width: calc(100% - 30px);
+  background: #202b3a;
+  border: 1px solid #34465c;
+  border-radius: 4px;
+  color: #a9c9f5;
+  font: 11px Manrope;
+}
+.bottombar {
+  height: 32px;
+  border-top: 1px solid #29313e;
+  border-bottom: 0;
+}
+.bottombar span:first-child {
+  color: #77d5a6;
+}
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 180px minmax(280px, 1fr) 210px;
+  }
+}
