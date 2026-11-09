@@ -39,7 +39,7 @@ The repository was initially empty. The first iteration establishes architecture
 
 ## Deployment
 
-The Vercel project is connected to this GitHub repository and is configured for a Vite app rooted at `apps/editor`. A deployable application does not exist yet; the first deployment becomes possible after the Foundation milestone adds that app, the workspace manifest, and its lockfile.
+A Vercel project named `3d-engine` is connected to this GitHub repository. Its root directory and framework are left on automatic detection, with Node.js 22.x selected. The first deployment cannot become ready until the Foundation milestone adds an actual application, workspace manifest, and lockfile. The initial import attempt correctly exposed that the previously configured `apps/editor` directory did not exist; the invalid root-directory setting was removed.
 
 ## License
 
