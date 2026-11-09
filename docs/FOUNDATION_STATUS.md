@@ -6,7 +6,7 @@
 
 - pnpm workspace with strict TypeScript project references and a committed lockfile.
 - ESLint and Prettier configuration; Vitest unit-test runner; Playwright Chromium E2E configuration; GitHub Actions verification workflow.
-- `@engine/core`: lifecycle host with ordered startup, reverse shutdown, rollback after startup failure, idempotent disposal, and generation-tagged entity registry.
+- `@engine/core`: lifecycle host with ordered startup, reverse shutdown, rollback after startup failure, idempotent disposal, and monotonically generation-tagged entity registry.
 - `@engine/geometry`: renderer-independent CPU mesh contract and box primitive.
 - `@engine/renderer`: Three.js WebGL2 adapter isolated behind engine-owned interfaces; resize, mesh submission, render, and disposal.
 - `@engine/editor`: React application shell with hierarchy, inspector, and a live canvas viewport.
@@ -21,7 +21,7 @@
 
 ## Remaining gate items
 
-- Playwright browser test could not run in the implementation container because its Chromium binary lacks host `libglib-2.0.so.0`; CI installs Chromium and OS dependencies with `playwright install --with-deps chromium` and runs the E2E test. The E2E gate remains pending until a CI run passes.
+- Playwright Chromium E2E smoke test passed in a browser-enabled Linux environment, including a live editor-shell navigation check. The CI job installs Chromium and OS dependencies with `playwright install --with-deps chromium`; the GitHub Actions result remains pending until the PR workflow completes.
 - Production bundles currently emit a >500 kB chunk warning due to the initial Three.js integration; measure and split/lazy-load renderer/editor code in a later optimization pass.
 - Verify Vercel deployment from the monorepo root strategy before advertising a hosted editor URL.
 - Add package-boundary checks, browser WebGL2 smoke coverage, and dependency/licensing review.
