@@ -46,7 +46,7 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Status
 
-Foundation is an in-progress scaffold, not a feature-complete engine. ECS component storage/query scheduling, transform hierarchy, world serialization, asset pipeline, physics, animation, audio, input, editor commands/undo and AI authoring remain future gated milestones. The browser E2E smoke test and GitHub Actions CI pass on PR #2. Foundation remains in progress until the remaining package-boundary, renderer, lifecycle and integration acceptance gates are implemented and measured.
+Foundation scaffold is implemented and its CI exit gate has passed; this is not a feature-complete engine. ECS component storage/query scheduling, transform hierarchy, world serialization, asset pipeline, physics, animation, audio, input, editor commands/undo and AI authoring remain future gated milestones. The browser E2E smoke test and GitHub Actions CI pass on PR #2. Foundation remains in progress until the remaining package-boundary, renderer, lifecycle and integration acceptance gates are implemented and measured.
 
 ## Deployment
 
