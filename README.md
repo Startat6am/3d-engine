@@ -2,7 +2,7 @@
 
 An extensible, browser-first 3D engine for interactive scenes, voxel and mesh worlds, simulations, and games.
 
-> **Status:** architecture and requirements phase. No runtime capabilities are claimed yet.
+> **Status:** architecture baseline approved by project owner; implementation has not started.
 
 ## Project goals
 
@@ -12,6 +12,7 @@ An extensible, browser-first 3D engine for interactive scenes, voxel and mesh wo
 - Renderer abstraction with WebGL 2 as the initial compatibility baseline and WebGPU as a separately validated backend.
 - Standard asset interchange (glTF 2.0/GLB, KTX2) and a versioned `.world` project format.
 - Editor and player applications built on top of the same runtime contracts.
+- Prompt-driven AI authoring of objects and worlds through validated, previewable, undoable scene operations.
 
 ## Documentation
 
@@ -30,16 +31,17 @@ Start with [ENGINE_SPEC.md](docs/ENGINE_SPEC.md), then read [ARCHITECTURE.md](do
 | [Physics](docs/PHYSICS_SPEC.md) | Physics integration contract |
 | [Editor](docs/EDITOR_SPEC.md) | Authoring application |
 | [Runtime](docs/RUNTIME_SPEC.md) | Player lifecycle and frame scheduling |
+| [AI agent authoring](docs/AI_AGENT_SPEC.md) | Prompt-to-object/world workflow, operation protocol, validation and approval |
 | [Testing](docs/TESTING_SPEC.md) | Quality gates and benchmark methodology |
 | [ADRs](docs/ADR/) | Accepted and proposed architecture decisions |
 
 ## Current state
 
-The repository was initially empty. The first iteration establishes architecture specifications and deployment wiring. Implementation starts only after the architecture baseline is reviewed and accepted.
+The repository was initially empty. The architecture baseline and AI authoring contract are documented. Implementation starts in gated milestones; documentation does not imply that runtime features are already available.
 
 ## Deployment
 
-A Vercel project named `3d-engine` is connected to this GitHub repository. Its root directory and framework are left on automatic detection, with Node.js 22.x selected. The first deployment cannot become ready until the Foundation milestone adds an actual application, workspace manifest, and lockfile. The initial import attempt correctly exposed that the previously configured `apps/editor` directory did not exist; the invalid root-directory setting was removed.
+A Vercel project named `3d-engine` is connected to this GitHub repository. Node.js 22.x is selected and root/framework settings use automatic detection. A successful deployment currently verifies repository integration only; a functioning editor/player application requires the Foundation milestone.
 
 ## License
 
