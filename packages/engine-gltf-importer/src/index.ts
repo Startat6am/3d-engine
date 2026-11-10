@@ -42,6 +42,20 @@ export interface GltfNode {
   readonly matrix?: readonly number[];
 }
 
+export interface GltfImageAsset {
+  readonly name: string;
+  readonly mimeType: 'image/png' | 'image/jpeg';
+  /** Encoded image bytes copied from the GLB BIN chunk; decoding is a renderer concern. */
+  readonly data: Uint8Array;
+}
+
+export interface GltfSampler {
+  readonly magFilter: number | null;
+  readonly minFilter: number | null;
+  readonly wrapS: number;
+  readonly wrapT: number;
+}
+
 export interface GltfTextureInfo {
   readonly source: number | null;
   readonly sampler: number | null;
@@ -55,6 +69,8 @@ export interface GlbAsset {
   readonly meshes: readonly GltfMesh[];
   readonly materials: readonly GltfPbrMaterial[];
   readonly nodes: readonly GltfNode[];
+  readonly images: readonly GltfImageAsset[];
+  readonly samplers: readonly GltfSampler[];
   readonly textures: readonly GltfTextureInfo[];
   readonly extensionsUsed: readonly string[];
   readonly extensionsRequired: readonly string[];
@@ -111,7 +127,8 @@ interface GltfRoot {
     matrix?: number[];
   }[];
   textures?: { source?: number; sampler?: number }[];
-  images?: { mimeType?: string; bufferView?: number; uri?: string }[];
+  samplers?: { magFilter?: number; minFilter?: number; wrapS?: number; wrapT?: number }[];
+  images?: { name?: string; mimeType?: string; bufferView?: number; uri?: string }[];
   extensionsUsed?: string[];
   extensionsRequired?: string[];
 }
@@ -334,23 +351,55 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     };
   });
 
+  const images: GltfImageAsset[] = (root.images ?? []).map((image, index) => {
+    if (image.uri) fail('External/data URI images are not supported', 'UNSUPPORTED_FEATURE');
+    if (image.bufferView === undefined) fail(`Image ${index} must use an embedded bufferView`, 'UNSUPPORTED_FEATURE');
+    const bufferView = root.bufferViews?.[image.bufferView];
+    if (!bufferView || bufferView.buffer !== 0) fail(`Image ${index} references an invalid bufferView`);
+    if (image.mimeType !== 'image/png' && image.mimeType !== 'image/jpeg') {
+      fail(`Image ${index} has an unsupported or missing MIME type`, 'UNSUPPORTED_FEATURE');
+    }
+    const start = bufferView.byteOffset ?? 0;
+    const end = start + (bufferView.byteLength ?? 0);
+    if (!Number.isInteger(start) || start < 0 || end > binary.byteLength || end <= start) {
+      fail(`Image ${index} byte range is invalid`);
+    }
+    return {
+      name: image.name ?? `Image ${index}`,
+      mimeType: image.mimeType,
+      data: binary.slice(start, end),
+    };
+  });
+
+  const samplers: GltfSampler[] = (root.samplers ?? []).map((sampler, index) => {
+    const magFilter = sampler.magFilter ?? null;
+    const minFilter = sampler.minFilter ?? null;
+    const wrapS = sampler.wrapS ?? 10497;
+    const wrapT = sampler.wrapT ?? 10497;
+    if (magFilter !== null && ![9728, 9729].includes(magFilter)) fail(`Sampler ${index} has an invalid magFilter`);
+    if (minFilter !== null && ![9728, 9729, 9984, 9985, 9986, 9987].includes(minFilter)) fail(`Sampler ${index} has an invalid minFilter`);
+    if (![wrapS, wrapT].every((value) => [33071, 33648, 10497].includes(value))) fail(`Sampler ${index} has an invalid wrap mode`);
+    return { magFilter, minFilter, wrapS, wrapT };
+  });
+
   const textures: GltfTextureInfo[] = (root.textures ?? []).map((texture, index) => {
-    const image = root.images?.[texture.source ?? -1];
+    const image = texture.source === undefined ? undefined : images[texture.source];
     if (texture.source !== undefined && !image) fail(`Texture ${index} references a missing image`);
-    if (image?.uri) fail('External/data URI images are not supported; only embedded GLB image metadata is retained', 'UNSUPPORTED_FEATURE');
-    if (image?.bufferView !== undefined && !root.bufferViews?.[image.bufferView]) fail(`Texture ${index} references an invalid image bufferView`);
+    if (texture.sampler !== undefined && (!Number.isInteger(texture.sampler) || !samplers[texture.sampler])) {
+      fail(`Texture ${index} references a missing sampler`);
+    }
     return {
       source: texture.source ?? null,
       sampler: texture.sampler ?? null,
       mimeType: image?.mimeType ?? null,
-      embedded: image?.bufferView !== undefined,
+      embedded: image !== undefined,
     };
   });
 
   return {
     version: 2,
     generator: root.asset?.generator ?? 'unknown',
-    meshes, materials, nodes, textures,
+    meshes, materials, nodes, images, samplers, textures,
     extensionsUsed: root.extensionsUsed ?? [],
     extensionsRequired: root.extensionsRequired ?? [],
   };
