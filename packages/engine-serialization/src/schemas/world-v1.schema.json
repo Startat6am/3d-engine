@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://choreon.dev/schemas/world-v1.schema.json",
+  "title": "Choreon World Document v1",
+  "description": "Stable persisted envelope for a Choreon world. Component payloads and extension values remain extensible JSON.",
+  "type": "object",
+  "required": ["format", "schemaVersion", "engineVersion", "world", "assets", "extensions"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "format": { "const": "universal-3d-world" },
+    "schemaVersion": { "const": "1.0.0" },
+    "engineVersion": { "type": "string", "minLength": 1 },
+    "world": {
+      "type": "object",
+      "required": ["id", "name", "settings", "entities"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "settings": { "type": "object" },
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "name": { "type": "string" },
+              "parent": { "type": ["string", "null"] },
+              "components": { "type": "object" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "kind": { "type": "string", "minLength": 1 },
+          "name": { "type": "string" },
+          "uri": { "type": "string" },
+          "contentHash": { "type": "string", "minLength": 1 },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "importer": { "type": "object" },
+          "metadata": { "type": "object" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "assetPayloads": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["assetId", "mimeType", "encoding", "data"],
+        "properties": {
+          "assetId": { "type": "string", "minLength": 1 },
+          "mimeType": { "type": "string", "minLength": 1 },
+          "encoding": { "const": "base64" },
+          "data": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "extensions": { "type": "object" }
+  },
+  "additionalProperties": true
+}

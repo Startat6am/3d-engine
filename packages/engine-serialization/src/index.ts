@@ -1,3 +1,6 @@
+import Ajv from 'ajv';
+import worldV1Schema from './schemas/world-v1.schema.json' with { type: 'json' };
+
 export const WORLD_FORMAT = 'universal-3d-world' as const;
 export const CURRENT_WORLD_SCHEMA_VERSION = '1.0.0' as const;
 
@@ -168,6 +171,8 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
   }
 }
 
+const schemaValidator = new Ajv({ allErrors: true, strict: true }).compile(worldV1Schema);
+
 /** Validates the stable document envelope while leaving component payloads extensible. */
 export function validateWorldDocument(value: unknown): asserts value is WorldDocument {
   if (!isRecord(value)) throw new WorldSerializationError('Expected a JSON object');
@@ -212,6 +217,13 @@ export function validateWorldDocument(value: unknown): asserts value is WorldDoc
   }
   if (!isRecord(value.extensions))
     throw new WorldSerializationError('Expected extensions object', '$.extensions');
+  if (!schemaValidator(value)) {
+    const issue = schemaValidator.errors?.[0];
+    throw new WorldSerializationError(
+      `Schema validation failed: ${issue?.message ?? 'unknown schema violation'}`,
+      issue?.instancePath ? `$${issue.instancePath}` : '$',
+    );
+  }
   validateWorldAssetReferences(value);
 }
 
