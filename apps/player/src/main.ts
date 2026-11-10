@@ -1,6 +1,10 @@
 import { EngineHost } from '@engine/core';
 import { createBoxGeometry } from '@engine/geometry';
-import { ThreeWebGLRendererAdapter } from '@engine/renderer';
+import {
+  createDefaultCamera,
+  createDefaultMaterial,
+  ThreeWebGLRendererAdapter,
+} from '@engine/renderer';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#player');
 if (!canvas) throw new Error('Player canvas was not found');
@@ -12,10 +16,23 @@ const engine = new EngineHost({
 const renderer = new ThreeWebGLRendererAdapter(canvas);
 engine.register({ stop: () => renderer.dispose() });
 await engine.start();
-renderer.setMeshes([{ geometry: createBoxGeometry(), color: 0x6ea8fe }]);
+const scene = {
+  camera: createDefaultCamera(),
+  background: 0x151a23,
+  objects: [
+    {
+      id: 'box',
+      geometry: createBoxGeometry(),
+      material: createDefaultMaterial(),
+      position: [0, 0, 0] as const,
+      rotation: [0, 0, 0, 1] as const,
+      scale: [1, 1, 1] as const,
+    },
+  ],
+};
 const resize = () => {
   renderer.resize(window.innerWidth, window.innerHeight);
-  renderer.render();
+  renderer.render(scene);
 };
 window.addEventListener('resize', resize);
 resize();

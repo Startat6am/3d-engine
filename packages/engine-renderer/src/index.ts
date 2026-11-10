@@ -1,78 +1,174 @@
 import * as THREE from 'three';
-import type { MeshData } from '@engine/geometry';
+import { validateMeshData } from '@engine/geometry';
+import type {
+  RendererAdapter,
+  RendererCapabilities,
+  RendererOptions,
+  RenderScene,
+  RenderObject,
+} from './contracts.js';
+import { RendererError } from './contracts.js';
+export * from './contracts.js';
 
-export interface RendererCapabilities {
-  readonly backend: 'webgl2';
-  readonly maxTextureSize: number;
-}
-
-export interface RenderableMesh {
-  readonly geometry: MeshData;
-  readonly color?: number;
-  readonly position?: readonly [number, number, number];
-}
-
-/** Three.js is deliberately contained behind this adapter; no Three.js types escape. */
-export class ThreeWebGLRendererAdapter {
+/** Three.js is deliberately contained behind this adapter; no Three.js types escape the package API. */
+export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly capabilities: RendererCapabilities;
-  #renderer: THREE.WebGLRenderer;
-  #scene = new THREE.Scene();
-  #camera: THREE.PerspectiveCamera;
-  #meshes: THREE.Mesh[] = [];
+  readonly #renderer: THREE.WebGLRenderer;
+  readonly #scene = new THREE.Scene();
+  readonly #perspectiveCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+  readonly #objects = new Map<string, THREE.Mesh>();
+  #disposed = false;
 
-  constructor(canvas: HTMLCanvasElement) {
-    this.#renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
-    this.#renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.#camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
-    this.#camera.position.set(3, 2.5, 4);
-    this.#camera.lookAt(0, 0, 0);
-    this.#scene.background = new THREE.Color(0x151a23);
-    this.#scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 2));
-    const light = new THREE.DirectionalLight(0xffffff, 2.5);
+  constructor(canvas: HTMLCanvasElement, options: RendererOptions = {}) {
+    try {
+      const context = canvas.getContext('webgl2', {
+        antialias: options.antialias ?? true,
+        alpha: false,
+      });
+      if (!context)
+        throw new RendererError(
+          'WEBGL2_UNAVAILABLE',
+          'WebGL2 is unavailable in this browser or canvas',
+        );
+      this.#renderer = new THREE.WebGLRenderer({
+        canvas,
+        context,
+        antialias: options.antialias ?? true,
+        alpha: false,
+      });
+    } catch (error) {
+      if (error instanceof RendererError) throw error;
+      throw new RendererError('WEBGL2_UNAVAILABLE', 'Failed to initialize WebGL2 renderer', {
+        cause: error,
+      });
+    }
+    this.#renderer.setPixelRatio(
+      Math.min(window.devicePixelRatio || 1, options.pixelRatioCap ?? 2),
+    );
+    this.#scene.add(new THREE.HemisphereLight(0xffffff, 0x334155, 1.5));
+    const light = new THREE.DirectionalLight(0xffffff, 2.2);
     light.position.set(4, 6, 3);
     this.#scene.add(light);
     this.capabilities = {
       backend: 'webgl2',
       maxTextureSize: this.#renderer.capabilities.maxTextureSize,
+      maxSamples: this.#renderer.capabilities.maxSamples,
     };
   }
 
-  setMeshes(items: readonly RenderableMesh[]): void {
-    for (const mesh of this.#meshes) {
-      this.#scene.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
-    }
-    this.#meshes = items.map((item) => {
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.BufferAttribute(item.geometry.positions, 3));
-      geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
-      geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
-      const material = new THREE.MeshStandardMaterial({
-        color: item.color ?? 0x6ea8fe,
-        roughness: 0.7,
-      });
-      const mesh = new THREE.Mesh(geometry, material);
-      if (item.position) mesh.position.set(...item.position);
-      this.#scene.add(mesh);
-      return mesh;
-    });
-  }
-
   resize(width: number, height: number): void {
-    const safeWidth = Math.max(1, width),
-      safeHeight = Math.max(1, height);
-    this.#renderer.setSize(safeWidth, safeHeight, false);
-    this.#camera.aspect = safeWidth / safeHeight;
-    this.#camera.updateProjectionMatrix();
+    this.#assertActive();
+    const w = Math.max(1, Math.floor(width)),
+      h = Math.max(1, Math.floor(height));
+    this.#renderer.setSize(w, h, false);
+    this.#perspectiveCamera.aspect = w / h;
+    this.#perspectiveCamera.updateProjectionMatrix();
   }
 
-  render(): void {
-    this.#renderer.render(this.#scene, this.#camera);
+  render(scene: RenderScene): void {
+    this.#assertActive();
+    this.#syncObjects(scene.objects);
+    this.#scene.background = new THREE.Color(scene.background);
+    const camera = this.#applyCamera(scene.camera);
+    this.#renderer.render(this.#scene, camera);
   }
 
   dispose(): void {
-    this.setMeshes([]);
+    if (this.#disposed) return;
+    for (const mesh of this.#objects.values()) this.#disposeMesh(mesh);
+    this.#objects.clear();
     this.#renderer.dispose();
+    this.#disposed = true;
   }
+
+  #syncObjects(objects: readonly RenderObject[]): void {
+    const live = new Set(objects.map((item) => item.id));
+    for (const [id, mesh] of this.#objects)
+      if (!live.has(id)) {
+        this.#disposeMesh(mesh);
+        this.#objects.delete(id);
+      }
+    for (const item of objects) {
+      validateMeshData(item.geometry);
+      let mesh = this.#objects.get(item.id);
+      if (!mesh) {
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.BufferAttribute(item.geometry.positions, 3));
+        geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
+        geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
+        mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+        this.#objects.set(item.id, mesh);
+        this.#scene.add(mesh);
+      } else {
+        const geometry = mesh.geometry;
+        if (
+          geometry.getAttribute('position').array !== item.geometry.positions ||
+          geometry.index?.array !== item.geometry.indices
+        ) {
+          geometry.dispose();
+          const replacement = new THREE.BufferGeometry();
+          replacement.setAttribute(
+            'position',
+            new THREE.BufferAttribute(item.geometry.positions, 3),
+          );
+          replacement.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
+          replacement.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
+          mesh.geometry = replacement;
+        }
+      }
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      material.color.setHex(item.material.color);
+      material.roughness = item.material.roughness;
+      material.metalness = item.material.metalness;
+      material.opacity = item.material.opacity;
+      material.transparent = item.material.transparent;
+      material.wireframe = item.material.wireframe;
+      mesh.position.set(...item.position);
+      mesh.quaternion.set(...item.rotation);
+      mesh.scale.set(...item.scale);
+    }
+  }
+
+  #applyCamera(camera: RenderScene['camera']): THREE.Camera {
+    if (camera.projection === 'perspective') {
+      this.#perspectiveCamera.fov = camera.fovY ?? 60;
+      this.#perspectiveCamera.near = camera.near;
+      this.#perspectiveCamera.far = camera.far;
+      this.#perspectiveCamera.position.set(...camera.position);
+      this.#perspectiveCamera.quaternion.set(...camera.rotation);
+      this.#perspectiveCamera.updateProjectionMatrix();
+      return this.#perspectiveCamera;
+    } else {
+      const height = camera.orthographicHeight ?? 10,
+        width = height * this.#perspectiveCamera.aspect;
+      const orthographic = new THREE.OrthographicCamera(
+        -width / 2,
+        width / 2,
+        height / 2,
+        -height / 2,
+        camera.near,
+        camera.far,
+      );
+      orthographic.position.set(...camera.position);
+      orthographic.quaternion.set(...camera.rotation);
+      orthographic.updateProjectionMatrix();
+      return orthographic;
+    }
+  }
+
+  #disposeMesh(mesh: THREE.Mesh): void {
+    this.#scene.remove(mesh);
+    mesh.geometry.dispose();
+    (mesh.material as THREE.Material).dispose();
+  }
+  #assertActive(): void {
+    if (this.#disposed) throw new RendererError('DISPOSED', 'Renderer has been disposed');
+  }
+}
+
+export function createRenderer(
+  canvas: HTMLCanvasElement,
+  options?: RendererOptions,
+): RendererAdapter {
+  return new ThreeWebGLRendererAdapter(canvas, options);
 }

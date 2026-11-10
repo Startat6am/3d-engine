@@ -55,3 +55,5 @@ A Vercel preview deployment for PR #2 built successfully. Preview access is prot
 ## License
 
 Not decided yet. Do not assume this project is open-source licensed until a `LICENSE` file is added.
+
+The initial Geometry & Renderer implementation adds CPU Box/Plane/Sphere/Cylinder primitives and a backend-neutral `RenderScene`/`RendererAdapter` contract with a Three.js WebGL2 implementation. See [Geometry & Renderer status](docs/GEOMETRY_RENDERER_STATUS.md).
