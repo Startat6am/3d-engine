@@ -2,12 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AssetImportService,
   AssetRegistry,
+  AssetResourceCache,
+  type AssetResourceLease,
+  type ImportedAsset,
   type AssetId,
   type AssetKind,
   type RegisterAssetInput,
 } from '@engine/assets';
 import type { Matrix4 as Matrix4Type } from 'three';
 import type { GlbAsset } from '@engine/gltf-importer';
+import type { WorldAssetPayload } from '@engine/serialization';
 import { EditorHistory } from './EditorHistory.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
@@ -201,6 +205,22 @@ async function sha256(source: ArrayBuffer): Promise<string> {
   return `sha256:${hex}`;
 }
 
+function encodeBase64(source: ArrayBuffer): string {
+  const bytes = new Uint8Array(source);
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  }
+  return btoa(binary);
+}
+
+function decodeBase64(source: string): ArrayBuffer {
+  const binary = atob(source);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
+  return bytes.buffer;
+}
+
 export function EditorApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
@@ -271,6 +291,16 @@ export function EditorApp() {
   const assetRegistryRef = useRef(new AssetRegistry());
   const assetImportServiceRef = useRef(new AssetImportService());
   const glbImporterRegisteredRef = useRef(false);
+  const assetPayloadsRef = useRef(new Map<AssetId, WorldAssetPayload>());
+  const assetResourceCacheRef = useRef(new AssetResourceCache<ImportedAsset<GlbAsset>>());
+  const assetResourceLeasesRef = useRef<AssetResourceLease<ImportedAsset<GlbAsset>>[]>([]);
+  useEffect(
+    () => () => {
+      for (const lease of assetResourceLeasesRef.current) lease.release();
+      assetResourceLeasesRef.current = [];
+    },
+    [],
+  );
   const [camera, setCamera] = useState(() => createDefaultCamera());
   const [transformMode, setTransformMode] = useState<TransformMode>('position');
   const [transformAxis, setTransformAxis] = useState(0);
@@ -463,6 +493,7 @@ export function EditorApp() {
         ),
       },
       assets: assetRegistryRef.current.list(),
+      assetPayloads: [...assetPayloadsRef.current.values()],
       extensions: {},
     };
     const blob = new Blob([serializeWorld(worldDocument)], { type: 'application/json' });
@@ -480,6 +511,24 @@ export function EditorApp() {
     try {
       const root = parseWorld(await file.text());
       const restoredAssetRegistry = mergeAssetRegistry(assetRegistryRef.current, root.assets);
+      const restoredAssetPayloads = new Map(assetPayloadsRef.current);
+      for (const payload of root.assetPayloads ?? []) {
+        const assetId = payload.assetId as AssetId;
+        if (!restoredAssetRegistry.has(assetId)) {
+          throw new Error(`Embedded payload references an unknown asset: ${payload.assetId}`);
+        }
+        const actualHash = await sha256(decodeBase64(payload.data));
+        if (restoredAssetRegistry.require(assetId).contentHash !== actualHash) {
+          throw new Error(`Embedded asset payload hash mismatch: ${payload.assetId}`);
+        }
+        const existingPayload = restoredAssetPayloads.get(assetId);
+        if (existingPayload && existingPayload.data !== payload.data) {
+          throw new Error(
+            `Embedded asset payload conflicts with the current project: ${payload.assetId}`,
+          );
+        }
+        restoredAssetPayloads.set(assetId, payload);
+      }
       const parsed: SceneEntity[] = root.world.entities.map((entry, index) => {
         if (!entry || typeof entry !== 'object')
           throw new Error(`Invalid entity at index ${index}`);
@@ -547,6 +596,7 @@ export function EditorApp() {
       if (new Set(parsed.map((item) => item.id)).size !== parsed.length)
         throw new Error('World contains duplicate entity IDs');
       assetRegistryRef.current = restoredAssetRegistry;
+      assetPayloadsRef.current = restoredAssetPayloads;
       commitEntities(parsed);
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
@@ -558,6 +608,7 @@ export function EditorApp() {
 
   const importGlb = async (file?: File) => {
     if (!file) return;
+    let pendingLease: AssetResourceLease<ImportedAsset<GlbAsset>> | null = null;
     try {
       const [three, gltf] = await Promise.all([import('three'), import('@engine/gltf-importer')]);
       const { Matrix4, Quaternion, Vector3 } = three;
@@ -569,10 +620,18 @@ export function EditorApp() {
       const sourceBytes = await file.arrayBuffer();
       const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'import.glb';
       const uri = `imports/${safeFileName}`;
-      const imported = await assetImportServiceRef.current.import<GlbAsset>(uri, sourceBytes, {
-        signal: new AbortController().signal,
-      });
       const contentHash = await sha256(sourceBytes);
+      pendingLease = await assetResourceCacheRef.current.acquire(
+        contentHash,
+        () =>
+          assetImportServiceRef.current.import<GlbAsset>(uri, sourceBytes, {
+            signal: new AbortController().signal,
+          }),
+        () => {
+          // CPU mesh buffers are garbage-collected after the final editor lease is released.
+        },
+      );
+      const imported = pendingLease.resource;
       const asset = imported.data;
       const parentOf = new Map<number, number>();
       asset.nodes.forEach((node, parent) =>
@@ -703,10 +762,19 @@ export function EditorApp() {
         ...entity,
         assetId: assetRecord.id,
       }));
+      assetPayloadsRef.current.set(assetRecord.id, {
+        assetId: assetRecord.id,
+        mimeType: 'model/gltf-binary',
+        encoding: 'base64',
+        data: encodeBase64(sourceBytes),
+      });
+      assetResourceLeasesRef.current.push(pendingLease);
+      pendingLease = null;
       commitEntities([...entitiesRef.current, ...importedEntities]);
       setSelectedId(importedEntities[0]!.id);
       setWorldError('');
     } catch (error) {
+      pendingLease?.release();
       setWorldError(error instanceof Error ? error.message : String(error));
     }
   };

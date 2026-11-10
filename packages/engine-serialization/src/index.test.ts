@@ -25,6 +25,27 @@ describe('world serialization', () => {
     expect(serializeWorld(parseWorld(source))).toBe(source);
   });
 
+  it('round-trips embedded source asset payloads and rejects duplicate payload IDs', () => {
+    const document: WorldDocument = {
+      ...world(),
+      assetPayloads: [
+        {
+          assetId: 'asset:model',
+          mimeType: 'model/gltf-binary',
+          encoding: 'base64',
+          data: 'Z2xiYg==',
+        },
+      ],
+    };
+    expect(parseWorld(serializeWorld(document))).toEqual(document);
+    expect(() =>
+      validateWorldDocument({
+        ...document,
+        assetPayloads: [...document.assetPayloads!, ...document.assetPayloads!],
+      }),
+    ).toThrow('Duplicate asset payload ID');
+  });
+
   it('reports malformed JSON and invalid envelopes', () => {
     expect(() => parseWorld('{')).toThrow(WorldSerializationError);
     expect(() => validateWorldDocument({ format: 'wrong' })).toThrow('Unsupported world format');
