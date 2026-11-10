@@ -10,8 +10,8 @@
 
 ## Explicitly not delivered
 
-- No glTF/GLB importer or decoder is wired yet.
-- No texture/audio importer, async job queue, cancellation, content hashing implementation, cache, dependency scanner, or CPU/GPU resource retain/release lifecycle.
+- No glTF/GLB importer or decoder is wired yet; only the format-neutral importer registry/dispatch contract is implemented.
+- Importers receive an AbortSignal and dispatch is checked before/after decode; importer-side cancellation remains cooperative. No concrete async worker queue, texture/audio importer, content hashing implementation, cache, dependency scanner, or CPU/GPU resource retain/release lifecycle exists.
 - No JSON Schema artifact or generated runtime validators yet.
 - Editor Save/Open now calls `@engine/serialization` for envelope validation, parsing, and deterministic serialization; conversion of editor-specific entity payloads remains local.
 - Asset references are not yet integrated into Editor, Player, renderer resources, or AI authoring plans.
@@ -19,7 +19,7 @@
 ## Next gates
 
 1. Add golden fixtures and expand editor-specific round-trip coverage through the shared serializer.
-2. Add asset importer contracts and a GLB importer with fixtures for meshes, materials, textures, and animation.
+2. Implement a GLB importer against the new importer contract with fixtures for meshes, materials, textures, and animation.
 3. Add cancellable import jobs, content-addressed cache, dependency graph validation, and deterministic disposal.
 4. Verify world round-trip with asset references and missing-asset diagnostics.
 5. Run full workspace format, lint, typecheck, unit tests, production builds, and browser acceptance before marking the milestone complete.
