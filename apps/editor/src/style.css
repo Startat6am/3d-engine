@@ -698,3 +698,101 @@ input:focus-visible {
   color: #8295ad;
   font-size: 9px;
 }
+
+.transform-pad {
+  position: absolute;
+  z-index: 3;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(430px, calc(100% - 20px));
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  background: rgb(23 29 39 / 94%);
+  border: 1px solid #3a4c63;
+  border-radius: 8px;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
+}
+
+.transform-modes,
+.transform-adjust {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.transform-pad button {
+  min-width: 38px;
+  min-height: 38px;
+  padding: 6px 10px;
+  color: #b9cce5;
+  background: #202b3a;
+  border: 1px solid #34465c;
+  border-radius: 5px;
+  font:
+    11px 'DM Mono',
+    monospace;
+  touch-action: manipulation;
+}
+
+.transform-pad button.active {
+  color: #e8f1ff;
+  background: #315078;
+  border-color: #78aef0;
+}
+
+.transform-pad button:disabled {
+  opacity: 0.4;
+}
+
+.transform-pad .axis-x.active {
+  border-color: #e68b8b;
+}
+.transform-pad .axis-y.active {
+  border-color: #82d6a1;
+}
+.transform-pad .axis-z.active {
+  border-color: #82b7f2;
+}
+.transform-axis-label {
+  min-width: 42px;
+  color: #8295ad;
+  font:
+    9px 'DM Mono',
+    monospace;
+  text-align: center;
+}
+.transform-pad-spacer {
+  flex: 1;
+}
+.transform-adjust button[aria-label^='Increase'],
+.transform-adjust button[aria-label^='Decrease'] {
+  min-width: 44px;
+  font-size: 18px;
+}
+
+@media (max-width: 700px) {
+  .transform-pad {
+    top: 48px;
+    width: calc(100% - 16px);
+    gap: 5px;
+    padding: 6px;
+  }
+  .transform-pad button {
+    min-height: 42px;
+    min-width: 36px;
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+  .transform-modes button {
+    flex: 1;
+  }
+  .transform-adjust {
+    gap: 5px;
+  }
+  .transform-axis-label {
+    min-width: 34px;
+    font-size: 8px;
+  }
+}

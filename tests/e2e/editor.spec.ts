@@ -93,3 +93,21 @@ test('two-finger pinch changes camera zoom without horizontal page scrolling', a
   }));
   expect(dimensions.pageWidth).toBe(dimensions.viewportWidth);
 });
+
+test('mobile transform pad nudges the selected object on the chosen axis', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+  await expect(page.getByLabel('Position X')).toHaveValue('0');
+
+  await page.getByRole('button', { name: 'Increase X' }).click();
+  await expect(page.getByLabel('Position X')).toHaveValue('0.1');
+
+  await page.getByRole('button', { name: 'Rotate mode' }).click();
+  await page.getByRole('button', { name: 'Y axis' }).click();
+  await page.getByRole('button', { name: 'Increase Y' }).click();
+  await expect(page.getByLabel('rotation Y')).toHaveValue('15');
+
+  await page.getByRole('button', { name: 'Scale mode' }).click();
+  await page.getByRole('button', { name: 'Increase Y' }).click();
+  await expect(page.getByLabel('scale Y')).toHaveValue('1.1');
+});
