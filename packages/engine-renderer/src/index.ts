@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { AssetResourceCache, type AssetResourceLease } from '@engine/assets';
 import { validateMeshData } from '@engine/geometry';
 import type {
   RendererAdapter,
@@ -16,8 +17,23 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene = new THREE.Scene();
   readonly #perspectiveCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
-  readonly #objects = new Map<string, THREE.Mesh>();
+  readonly #objects = new Map<
+    string,
+    {
+      readonly mesh: THREE.Mesh;
+      geometrySource: object;
+      materialSource: object;
+      geometryLease: AssetResourceLease<THREE.BufferGeometry>;
+      materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
+    }
+  >();
+  readonly #geometryCache = new AssetResourceCache<THREE.BufferGeometry>();
+  readonly #materialCache = new AssetResourceCache<THREE.MeshStandardMaterial>();
+  readonly #geometryKeys = new WeakMap<object, string>();
+  readonly #materialKeys = new WeakMap<object, string>();
+  #nextResourceKey = 1;
   readonly #raycaster = new THREE.Raycaster();
+  readonly #orthographicCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 1000);
   #activeCamera: THREE.Camera | null = null;
   #disposed = false;
 
@@ -84,57 +100,99 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     camera.updateMatrixWorld();
     this.#scene.updateMatrixWorld(true);
     this.#raycaster.setFromCamera(pointer, camera);
-    const intersections = this.#raycaster.intersectObjects([...this.#objects.values()], false);
+    const intersections = this.#raycaster.intersectObjects(
+      [...this.#objects.values()].map((entry) => entry.mesh),
+      false,
+    );
     const entityId = intersections[0]?.object.userData['engineEntityId'];
     return typeof entityId === 'string' ? entityId : null;
   }
 
   dispose(): void {
     if (this.#disposed) return;
-    for (const mesh of this.#objects.values()) this.#disposeMesh(mesh);
+    for (const entry of this.#objects.values()) this.#releaseObject(entry);
     this.#objects.clear();
+    this.#scene.clear();
     this.#renderer.dispose();
     this.#disposed = true;
   }
 
   #syncObjects(objects: readonly RenderObject[]): void {
     const live = new Set(objects.map((item) => item.id));
-    for (const [id, mesh] of this.#objects)
+    for (const [id, entry] of this.#objects)
       if (!live.has(id)) {
-        this.#disposeMesh(mesh);
+        this.#releaseObject(entry);
         this.#objects.delete(id);
       }
     for (const item of objects) {
       validateMeshData(item.geometry);
-      let mesh = this.#objects.get(item.id);
-      if (!mesh) {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(item.geometry.positions, 3));
-        geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
-        geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
-        mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+      let entry = this.#objects.get(item.id);
+      const geometryKey = this.#keyFor(item.geometry, this.#geometryKeys, 'geometry');
+      const materialKey = this.#keyFor(item.material, this.#materialKeys, 'material');
+      if (!entry) {
+        const geometryLease = this.#geometryCache.acquireSync(
+          geometryKey,
+          () => {
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute(
+              'position',
+              new THREE.BufferAttribute(item.geometry.positions, 3),
+            );
+            geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
+            geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
+            return geometry;
+          },
+          (geometry) => geometry.dispose(),
+        );
+        const materialLease = this.#materialCache.acquireSync(
+          materialKey,
+          () => new THREE.MeshStandardMaterial(),
+          (material) => material.dispose(),
+        );
+        const mesh = new THREE.Mesh(geometryLease.resource, materialLease.resource);
         mesh.userData['engineEntityId'] = item.id;
-        this.#objects.set(item.id, mesh);
+        entry = {
+          mesh,
+          geometrySource: item.geometry,
+          materialSource: item.material,
+          geometryLease,
+          materialLease,
+        };
+        this.#objects.set(item.id, entry);
         this.#scene.add(mesh);
       } else {
-        const geometry = mesh.geometry;
-        if (
-          geometry.getAttribute('position').array !== item.geometry.positions ||
-          geometry.getAttribute('normal').array !== item.geometry.normals ||
-          geometry.index?.array !== item.geometry.indices
-        ) {
-          geometry.dispose();
-          const replacement = new THREE.BufferGeometry();
-          replacement.setAttribute(
-            'position',
-            new THREE.BufferAttribute(item.geometry.positions, 3),
+        if (entry.geometrySource !== item.geometry) {
+          entry.geometryLease.release();
+          entry.geometryLease = this.#geometryCache.acquireSync(
+            geometryKey,
+            () => {
+              const geometry = new THREE.BufferGeometry();
+              geometry.setAttribute(
+                'position',
+                new THREE.BufferAttribute(item.geometry.positions, 3),
+              );
+              geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
+              geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
+              return geometry;
+            },
+            (geometry) => geometry.dispose(),
           );
-          replacement.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
-          replacement.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
-          mesh.geometry = replacement;
+          entry.mesh.geometry = entry.geometryLease.resource;
+          entry.geometrySource = item.geometry;
+        }
+        if (entry.materialSource !== item.material) {
+          entry.materialLease.release();
+          entry.materialLease = this.#materialCache.acquireSync(
+            materialKey,
+            () => new THREE.MeshStandardMaterial(),
+            (material) => material.dispose(),
+          );
+          entry.mesh.material = entry.materialLease.resource;
+          entry.materialSource = item.material;
         }
       }
-      const material = mesh.material as THREE.MeshStandardMaterial;
+      const mesh = entry.mesh;
+      const material = entry.materialLease.resource;
       material.color.setHex(item.material.color);
       material.roughness = item.material.roughness;
       material.metalness = item.material.metalness;
@@ -159,26 +217,38 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     } else {
       const height = camera.orthographicHeight ?? 10,
         width = height * this.#perspectiveCamera.aspect;
-      const orthographic = new THREE.OrthographicCamera(
-        -width / 2,
-        width / 2,
-        height / 2,
-        -height / 2,
-        camera.near,
-        camera.far,
-      );
-      orthographic.position.set(...camera.position);
-      orthographic.quaternion.set(...camera.rotation);
-      orthographic.updateProjectionMatrix();
-      return orthographic;
+      this.#orthographicCamera.left = -width / 2;
+      this.#orthographicCamera.right = width / 2;
+      this.#orthographicCamera.top = height / 2;
+      this.#orthographicCamera.bottom = -height / 2;
+      this.#orthographicCamera.near = camera.near;
+      this.#orthographicCamera.far = camera.far;
+      this.#orthographicCamera.position.set(...camera.position);
+      this.#orthographicCamera.quaternion.set(...camera.rotation);
+      this.#orthographicCamera.updateProjectionMatrix();
+      return this.#orthographicCamera;
     }
   }
 
-  #disposeMesh(mesh: THREE.Mesh): void {
-    this.#scene.remove(mesh);
-    mesh.geometry.dispose();
-    (mesh.material as THREE.Material).dispose();
+  #keyFor(value: object, keys: WeakMap<object, string>, prefix: string): string {
+    let key = keys.get(value);
+    if (!key) {
+      key = `${prefix}:${this.#nextResourceKey++}`;
+      keys.set(value, key);
+    }
+    return key;
   }
+
+  #releaseObject(entry: {
+    readonly mesh: THREE.Mesh;
+    readonly geometryLease: AssetResourceLease<THREE.BufferGeometry>;
+    readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
+  }): void {
+    this.#scene.remove(entry.mesh);
+    entry.geometryLease.release();
+    entry.materialLease.release();
+  }
+
   #assertActive(): void {
     if (this.#disposed) throw new RendererError('DISPOSED', 'Renderer has been disposed');
   }

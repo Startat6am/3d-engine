@@ -298,6 +298,45 @@ export class AssetResourceCache<TResource> {
     return this.#entries.get(key)?.references ?? 0;
   }
 
+  /** Acquire an already-available resource synchronously (for render-loop resources). */
+  acquireSync(
+    key: string,
+    load: () => TResource,
+    dispose: (resource: TResource) => void,
+  ): AssetResourceLease<TResource> {
+    if (!key.trim()) throw new TypeError('Resource cache key must not be empty');
+    let entry = this.#entries.get(key);
+    if (entry) {
+      if (!entry.settled || entry.resource === undefined) {
+        throw new Error(`Resource is already loading asynchronously: ${key}`);
+      }
+      entry.references += 1;
+    } else {
+      const resource = load();
+      const created: ResourceCacheEntry<TResource> = {
+        references: 1,
+        settled: true,
+        disposed: false,
+        resource,
+        promise: Promise.resolve(resource),
+        dispose,
+      };
+      entry = created;
+      this.#entries.set(key, created);
+    }
+    const current = entry;
+    let released = false;
+    return Object.freeze({
+      resource: current.resource!,
+      release: () => {
+        if (released) return;
+        released = true;
+        current.references -= 1;
+        if (current.references === 0) this.#disposeEntry(key, current);
+      },
+    });
+  }
+
   async acquire(
     key: string,
     load: () => TResource | Promise<TResource>,
