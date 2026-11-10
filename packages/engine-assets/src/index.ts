@@ -270,3 +270,96 @@ export class AssetImportService {
     }
   }
 }
+
+export interface AssetResourceLease<TResource> {
+  readonly resource: TResource;
+  /** Idempotently release this consumer's reference to the cached resource. */
+  release(): void;
+}
+
+interface ResourceCacheEntry<TResource> {
+  references: number;
+  settled: boolean;
+  disposed: boolean;
+  resource?: TResource;
+  promise: Promise<TResource>;
+  readonly dispose: (resource: TResource) => void;
+}
+
+/** Deduplicates concurrent resource loads and disposes a resource after its final lease. */
+export class AssetResourceCache<TResource> {
+  readonly #entries = new Map<string, ResourceCacheEntry<TResource>>();
+
+  get size(): number {
+    return this.#entries.size;
+  }
+
+  referenceCount(key: string): number {
+    return this.#entries.get(key)?.references ?? 0;
+  }
+
+  async acquire(
+    key: string,
+    load: () => TResource | Promise<TResource>,
+    dispose: (resource: TResource) => void,
+  ): Promise<AssetResourceLease<TResource>> {
+    if (!key.trim()) throw new TypeError('Resource cache key must not be empty');
+
+    let entry = this.#entries.get(key);
+    if (entry) {
+      entry.references += 1;
+    } else {
+      const loadPromise = Promise.resolve().then(load);
+      const created: ResourceCacheEntry<TResource> = {
+        references: 1,
+        settled: false,
+        disposed: false,
+        promise: loadPromise,
+        dispose,
+      };
+      entry = created;
+      created.promise = loadPromise.then(
+        (resource) => {
+          created.resource = resource;
+          created.settled = true;
+          if (created.references === 0) this.#disposeEntry(key, created);
+          return resource;
+        },
+        (error: unknown) => {
+          created.settled = true;
+          if (this.#entries.get(key) === created) this.#entries.delete(key);
+          throw error;
+        },
+      );
+      this.#entries.set(key, created);
+    }
+
+    const current = entry;
+    try {
+      const resource = await current.promise;
+      let released = false;
+      return Object.freeze({
+        resource,
+        release: () => {
+          if (released) return;
+          released = true;
+          current.references -= 1;
+          if (current.references === 0 && current.settled) this.#disposeEntry(key, current);
+        },
+      });
+    } catch (error) {
+      current.references -= 1;
+      if (current.references === 0 && this.#entries.get(key) === current) {
+        this.#entries.delete(key);
+      }
+      throw error;
+    }
+  }
+
+  #disposeEntry(key: string, entry: ResourceCacheEntry<TResource>): void {
+    if (entry.disposed) return;
+    entry.disposed = true;
+    if (this.#entries.get(key) === entry) this.#entries.delete(key);
+    if (entry.resource !== undefined) entry.dispose(entry.resource);
+  }
+}
