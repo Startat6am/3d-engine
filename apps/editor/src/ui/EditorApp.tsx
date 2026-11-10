@@ -161,6 +161,9 @@ export function EditorApp() {
     startY: number;
     pointerId: number;
   } | null>(null);
+  const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const pinchDistanceRef = useRef<number | null>(null);
+  const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
 
   const renderScene = useMemo(
@@ -546,7 +549,17 @@ export function EditorApp() {
   };
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 && event.pointerType !== 'touch') return;
+    const pointers = activePointersRef.current;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    event.currentTarget.setPointerCapture(event.pointerId);
+    if (pointers.size >= 2) {
+      multiTouchRef.current = true;
+      dragRef.current = null;
+      const [first, second] = [...pointers.values()];
+      pinchDistanceRef.current = Math.hypot(first!.x - second!.x, first!.y - second!.y);
+      return;
+    }
     dragRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -554,9 +567,31 @@ export function EditorApp() {
       startY: event.clientY,
       pointerId: event.pointerId,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    const pointers = activePointersRef.current;
+    if (!pointers.has(event.pointerId)) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+    if (pointers.size >= 2) {
+      const [first, second] = [...pointers.values()];
+      const distance = Math.hypot(first!.x - second!.x, first!.y - second!.y);
+      const previousDistance = pinchDistanceRef.current;
+      pinchDistanceRef.current = distance;
+      if (previousDistance && distance > 0) {
+        const factor = previousDistance / distance;
+        setCamera((current) => {
+          const [x, y, z] = current.position;
+          const currentRadius = Math.hypot(x, y, z);
+          const radius = Math.min(40, Math.max(1.5, currentRadius * factor));
+          const scale = radius / currentRadius;
+          const position: Vec3 = [x * scale, y * scale, z * scale];
+          return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+        });
+      }
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
     const dx = event.clientX - drag.x;
@@ -739,12 +774,17 @@ export function EditorApp() {
           <canvas
             ref={canvasRef}
             aria-label="3D scene viewport"
+            data-camera-radius={Math.hypot(...camera.position).toFixed(3)}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={(event) => {
+              const wasMultiTouch = multiTouchRef.current;
+              activePointersRef.current.delete(event.pointerId);
               const drag = dragRef.current;
               dragRef.current = null;
-              if (!drag || drag.pointerId !== event.pointerId) return;
+              pinchDistanceRef.current = null;
+              if (activePointersRef.current.size === 0) multiTouchRef.current = false;
+              if (wasMultiTouch || !drag || drag.pointerId !== event.pointerId) return;
               const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
               if (moved > 4) return;
               const canvas = event.currentTarget;
@@ -757,8 +797,11 @@ export function EditorApp() {
               );
               if (hit) setSelectedId(hit);
             }}
-            onPointerCancel={() => {
+            onPointerCancel={(event) => {
+              activePointersRef.current.delete(event.pointerId);
               dragRef.current = null;
+              pinchDistanceRef.current = null;
+              if (activePointersRef.current.size === 0) multiTouchRef.current = false;
             }}
             onWheel={onWheel}
           />
@@ -766,7 +809,7 @@ export function EditorApp() {
             X <b>Y</b> Z
           </div>
           <div className="viewport-help">
-            Drag · Orbit <span>Scroll · Zoom</span>
+            Drag · Orbit <span>Pinch / Scroll · Zoom</span>
             {rendererError ? <span className="error-text">{rendererError}</span> : null}
           </div>
         </section>

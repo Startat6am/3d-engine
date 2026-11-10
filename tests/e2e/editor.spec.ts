@@ -47,3 +47,49 @@ test('hierarchy plus opens a primitive picker instead of silently adding a box',
   await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Sphere' })).toBeVisible();
   await expect(menu).toHaveCount(0);
 });
+
+test('two-finger pinch changes camera zoom without horizontal page scrolling', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.addInitScript(() => {
+    HTMLCanvasElement.prototype.setPointerCapture = () => {};
+  });
+  await page.goto('/');
+  const viewport = page.getByLabel('3D scene viewport');
+  const before = Number(await viewport.getAttribute('data-camera-radius'));
+
+  await viewport.dispatchEvent('pointerdown', {
+    pointerId: 11,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    clientX: 100,
+    clientY: 300,
+  });
+  await viewport.dispatchEvent('pointerdown', {
+    pointerId: 12,
+    pointerType: 'touch',
+    isPrimary: false,
+    button: 0,
+    clientX: 200,
+    clientY: 300,
+  });
+  await viewport.dispatchEvent('pointermove', {
+    pointerId: 12,
+    pointerType: 'touch',
+    isPrimary: false,
+    button: 0,
+    clientX: 250,
+    clientY: 300,
+  });
+  await expect
+    .poll(async () => Number(await viewport.getAttribute('data-camera-radius')))
+    .toBeLessThan(before);
+  await viewport.dispatchEvent('pointerup', { pointerId: 12, pointerType: 'touch' });
+  await viewport.dispatchEvent('pointerup', { pointerId: 11, pointerType: 'touch' });
+
+  const dimensions = await page.evaluate(() => ({
+    viewportWidth: document.documentElement.clientWidth,
+    pageWidth: document.documentElement.scrollWidth,
+  }));
+  expect(dimensions.pageWidth).toBe(dimensions.viewportWidth);
+});
