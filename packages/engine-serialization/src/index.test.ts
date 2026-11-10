@@ -1,3 +1,4 @@
+import goldenFixture from '../fixtures/world-v1-assets.world.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
 import {
   CURRENT_WORLD_SCHEMA_VERSION,
@@ -9,6 +10,8 @@ import {
   type WorldDocument,
 } from './index.js';
 
+const asset = (id: string, dependencies: string[] = []) => ({ id, dependencies });
+
 const world = (): WorldDocument => ({
   format: 'universal-3d-world',
   schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
@@ -19,6 +22,14 @@ const world = (): WorldDocument => ({
 });
 
 describe('world serialization', () => {
+  it('keeps the versioned asset world golden fixture byte-stable', () => {
+    const fixture = JSON.stringify(goldenFixture, null, 2);
+    const parsed = parseWorld(fixture);
+    expect(parsed.assets).toHaveLength(1);
+    expect(parsed.assetPayloads?.[0]?.assetId).toBe('asset:model:triangle');
+    expect(serializeWorld(parsed)).toBe(fixture);
+  });
+
   it('round-trips a valid document with deterministic key ordering', () => {
     const source = serializeWorld(world());
     expect(parseWorld(source)).toEqual(world());
@@ -28,6 +39,7 @@ describe('world serialization', () => {
   it('round-trips embedded source asset payloads and rejects duplicate payload IDs', () => {
     const document: WorldDocument = {
       ...world(),
+      assets: [asset('asset:model')],
       assetPayloads: [
         {
           assetId: 'asset:model',
@@ -44,6 +56,49 @@ describe('world serialization', () => {
         assetPayloads: [...document.assetPayloads!, ...document.assetPayloads!],
       }),
     ).toThrow('Duplicate asset payload ID');
+  });
+
+  it('rejects entity and embedded payload references to missing assets', () => {
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        world: {
+          ...world().world,
+          entities: [
+            { id: 'entity:missing', components: { MeshRenderer: { assetId: 'asset:missing' } } },
+          ],
+        },
+      }),
+    ).toThrow('Entity references an unknown asset');
+
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        assetPayloads: [
+          {
+            assetId: 'asset:missing',
+            mimeType: 'model/gltf-binary',
+            encoding: 'base64',
+            data: 'AA==',
+          },
+        ],
+      }),
+    ).toThrow('Embedded payload references an unknown asset');
+  });
+
+  it('rejects duplicate assets, missing dependencies and dependency cycles', () => {
+    expect(() =>
+      validateWorldDocument({ ...world(), assets: [asset('asset:a'), asset('asset:a')] }),
+    ).toThrow('Duplicate asset ID');
+    expect(() =>
+      validateWorldDocument({ ...world(), assets: [asset('asset:a', ['asset:missing'])] }),
+    ).toThrow('Asset dependency does not exist');
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        assets: [asset('asset:a', ['asset:b']), asset('asset:b', ['asset:a'])],
+      }),
+    ).toThrow('Asset dependency cycle detected');
   });
 
   it('reports malformed JSON and invalid envelopes', () => {

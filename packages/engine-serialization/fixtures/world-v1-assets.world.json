@@ -1,0 +1,67 @@
+{
+  "assetPayloads": [
+    {
+      "assetId": "asset:model:triangle",
+      "data": "Z2xiYg==",
+      "encoding": "base64",
+      "mimeType": "model/gltf-binary"
+    }
+  ],
+  "assets": [
+    {
+      "contentHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "dependencies": [],
+      "id": "asset:model:triangle",
+      "importer": {
+        "id": "engine.gltf.glb",
+        "settings": {
+          "generateNormals": true
+        },
+        "version": "1.0.0"
+      },
+      "kind": "model",
+      "metadata": {
+        "fileSize": 4
+      },
+      "name": "Triangle model",
+      "uri": "imports/triangle.glb"
+    }
+  ],
+  "engineVersion": "0.1.0",
+  "extensions": {},
+  "format": "universal-3d-world",
+  "schemaVersion": "1.0.0",
+  "world": {
+    "entities": [
+      {
+        "components": {
+          "MeshRenderer": {
+            "assetId": "asset:model:triangle",
+            "material": {
+              "color": 16777215,
+              "metalness": 0,
+              "opacity": 1,
+              "roughness": 1,
+              "transparent": false,
+              "wireframe": false
+            },
+            "primitive": "GLB"
+          },
+          "Transform": {
+            "position": [1, 0, 0],
+            "rotation": [0, 0, 0, 1],
+            "scale": [1, 1, 1]
+          }
+        },
+        "id": "entity:triangle",
+        "name": "Triangle",
+        "parent": null
+      }
+    ],
+    "id": "world:golden-assets",
+    "name": "Golden Asset Fixture",
+    "settings": {
+      "gravity": [0, -9.81, 0]
+    }
+  }
+}

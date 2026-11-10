@@ -4,11 +4,11 @@
 
 ## Names
 
-| Name | Meaning |
-| --- | --- |
-| **Choreon** | The 3D engine, including its authoring and runtime ecosystem. |
+| Name           | Meaning                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **Choreon**    | The 3D engine, including its authoring and runtime ecosystem.                              |
 | **Choreonome** | The planned declarative specification language for describing Choreon projects and scenes. |
-| **.choreon** | The planned file extension for Choreonome documents. |
+| **.choreon**   | The planned file extension for Choreonome documents.                                       |
 
 Use these spellings and capitalization consistently in user-facing documentation. Existing internal package names such as @engine/*, source directories, and the GitHub repository name are implementation identifiers and are not renamed by this decision.
 
@@ -25,6 +25,7 @@ Natural-language or model-generated content is untrusted input. A valid document
 ## Scope and compatibility
 
 This naming decision does **not** define:
+
 - a finalized Choreonome grammar or serialization encoding;
 - a stable .choreon schema or compatibility guarantee;
 - project-versus-scene document layouts;

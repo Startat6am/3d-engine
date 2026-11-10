@@ -49,6 +49,7 @@ These principles improve reliability for all clients. They are not a promise tha
 Subsystem contracts should be consumable by future provider-neutral AI authoring tools without requiring a model to infer hidden engine behavior. The model should need to select and parameterize documented capabilities, not reproduce internal engine logic.
 
 Future adapters may expose the same domain operations through:
+
 - editor UI and command APIs;
 - a project directory or scene files, including repositories hosted on GitHub;
 - MCP servers and other tool protocols;
