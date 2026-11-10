@@ -19,6 +19,49 @@ import {
   type Vec3,
 } from '@engine/renderer';
 
+type TransformNumberInputProps = {
+  readonly value: number;
+  readonly label: string;
+  readonly onCommit: (value: string) => void;
+};
+
+/** Keeps an editable text draft so clearing a numeric field does not become zero. */
+function TransformNumberInput({ value, label, onCommit }: TransformNumberInputProps) {
+  const [draft, setDraft] = useState(String(Number(value.toFixed(2))));
+
+  useEffect(() => {
+    setDraft(String(Number(value.toFixed(2))));
+  }, [value]);
+
+  const commit = () => {
+    if (draft.trim() === '') {
+      setDraft(String(Number(value.toFixed(2))));
+      return;
+    }
+    if (!Number.isFinite(Number(draft))) {
+      setDraft(String(Number(value.toFixed(2))));
+      return;
+    }
+    onCommit(draft);
+  };
+
+  return (
+    <input
+      aria-label={label}
+      type="text"
+      inputMode="decimal"
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          event.currentTarget.blur();
+        }
+      }}
+    />
+  );
+}
+
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
 type SceneEntity = RenderObject & {
   readonly name: string;
@@ -542,13 +585,11 @@ export function EditorApp() {
                       ? (selected.rotationEuler ?? [0, 0, 0])
                       : selected[key]
                     ).map((value, axis) => (
-                      <input
+                      <TransformNumberInput
                         key={axis}
-                        aria-label={`${key} ${'XYZ'[axis]}`}
-                        type="number"
-                        step="0.1"
-                        value={Number(value.toFixed(2))}
-                        onChange={(event) => updateVector(key, axis, event.target.value)}
+                        label={`${key} ${'XYZ'[axis]}`}
+                        value={value}
+                        onCommit={(nextValue) => updateVector(key, axis, nextValue)}
                       />
                     ))}
                   </div>
