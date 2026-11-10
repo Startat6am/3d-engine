@@ -406,3 +406,250 @@ input:focus-visible {
 .file-menu-content {
   z-index: 40;
 }
+
+/* Mobile-first workspace layout: tuned for 360px-wide phones such as realme C51. */
+@media (max-width: 700px) {
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+  }
+
+  body {
+    min-width: 0;
+    min-height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .editor-shell {
+    width: 100%;
+    min-height: 100dvh;
+    height: auto;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .topbar {
+    height: auto;
+    min-height: 48px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px;
+    letter-spacing: 0.04em;
+  }
+
+  .brand-mark {
+    font-size: 21px;
+  }
+
+  .topbar > strong {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .file-menu > summary {
+    min-height: 38px;
+    padding: 8px 10px;
+  }
+
+  .world-name {
+    order: 4;
+    flex: 1 1 100%;
+    width: 100%;
+    min-height: 36px;
+    font-size: 16px;
+  }
+
+  .topbar > .toolbar-button {
+    min-height: 38px;
+    padding: 8px 12px;
+  }
+
+  .topbar > .spacer,
+  .topbar > .status {
+    display: none;
+  }
+
+  .workspace {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .viewport {
+    order: 0;
+    width: 100%;
+    height: clamp(300px, 45dvh, 430px);
+    min-height: 300px;
+    flex: 0 0 auto;
+  }
+
+  .viewport-label {
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    font-size: 9px;
+  }
+
+  .viewport-label button {
+    min-height: 34px;
+    margin-top: -8px;
+    padding: 7px 9px;
+  }
+
+  .viewport-help {
+    bottom: 10px;
+    left: 10px;
+    font-size: 9px;
+  }
+
+  .viewport-help span {
+    margin-left: 8px;
+  }
+
+  .axis {
+    top: 42px;
+    right: 12px;
+  }
+
+  .hierarchy,
+  .inspector {
+    position: relative;
+    width: 100%;
+    border: 0;
+    border-top: 1px solid #29313e;
+    flex: 0 0 auto;
+  }
+
+  .hierarchy {
+    order: 1;
+    min-height: 130px;
+    padding-bottom: 36px;
+  }
+
+  .inspector {
+    order: 2;
+    min-height: 220px;
+    padding-bottom: 36px;
+  }
+
+  .panel-heading {
+    height: 44px;
+    padding: 12px 14px;
+    align-items: center;
+  }
+
+  .panel-heading button {
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .tree-row {
+    min-height: 40px;
+    height: auto;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .tree-row.active {
+    margin-top: 4px;
+  }
+
+  .tree-actions {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .tree-actions button {
+    min-height: 38px;
+    padding: 7px 3px;
+    font-size: 9px;
+  }
+
+  .panel-foot {
+    position: absolute;
+    bottom: 0;
+    height: 32px;
+    padding: 10px 12px;
+  }
+
+  .inspector-title {
+    padding: 14px 12px;
+  }
+
+  .inspector-title input {
+    min-height: 38px;
+    font-size: 16px;
+  }
+
+  .inspector label {
+    padding: 11px 12px;
+  }
+
+  .vector-field {
+    min-height: 48px;
+    padding: 7px 12px;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .vector-field > div {
+    flex: 0 1 auto;
+    gap: 5px;
+  }
+
+  .vector-field input {
+    width: clamp(48px, 16vw, 58px);
+    min-height: 38px;
+    padding: 7px 4px;
+    font-size: 16px;
+    text-align: center;
+  }
+
+  .component {
+    min-height: 42px;
+    padding: 10px 12px;
+  }
+
+  .add-component,
+  .component-menu button,
+  .tree-actions button,
+  .toolbar-button {
+    touch-action: manipulation;
+  }
+
+  .bottombar {
+    min-height: 34px;
+    height: auto;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    padding: 8px 10px;
+    font-size: 9px;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar {
+    gap: 6px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .topbar > strong {
+    font-size: 9px;
+  }
+
+  .vector-field {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .vector-field input {
+    width: 48px;
+  }
+}
