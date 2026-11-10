@@ -80,6 +80,94 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Validates cross-document asset links without interpreting opaque component payloads. */
+function validateWorldAssetReferences(document: Record<string, unknown>): void {
+  const assets = document.assets;
+  if (!Array.isArray(assets)) return;
+
+  const assetIds = new Set<string>();
+  const assetIndexes = new Map<string, number>();
+  const dependencies = new Map<string, string[]>();
+  for (const [index, asset] of assets.entries()) {
+    const path = `$.assets[${index}]`;
+    if (!isRecord(asset) || typeof asset.id !== 'string' || !asset.id.trim()) {
+      throw new WorldSerializationError('Asset must have a non-empty ID', `${path}.id`);
+    }
+    if (assetIds.has(asset.id)) {
+      throw new WorldSerializationError('Duplicate asset ID', `${path}.id`);
+    }
+    assetIds.add(asset.id);
+    assetIndexes.set(asset.id, index);
+    if (asset.dependencies !== undefined) {
+      if (
+        !Array.isArray(asset.dependencies) ||
+        !asset.dependencies.every((dependency) => typeof dependency === 'string')
+      ) {
+        throw new WorldSerializationError(
+          'Asset dependencies must be an array of asset IDs',
+          `${path}.dependencies`,
+        );
+      }
+      dependencies.set(asset.id, asset.dependencies as string[]);
+    } else {
+      dependencies.set(asset.id, []);
+    }
+  }
+
+  for (const [assetId, required] of dependencies) {
+    for (const dependency of required) {
+      if (!assetIds.has(dependency)) {
+        throw new WorldSerializationError(
+          `Asset dependency does not exist: ${dependency}`,
+          `$.assets[${assetIndexes.get(assetId)}].dependencies`,
+        );
+      }
+    }
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+  const visit = (assetId: string): void => {
+    if (visiting.has(assetId)) {
+      throw new WorldSerializationError('Asset dependency cycle detected', '$.assets');
+    }
+    if (visited.has(assetId)) return;
+    visiting.add(assetId);
+    for (const dependency of dependencies.get(assetId) ?? []) visit(dependency);
+    visiting.delete(assetId);
+    visited.add(assetId);
+  };
+  for (const assetId of assetIds) visit(assetId);
+
+  const world = document.world as Record<string, unknown>;
+  const entities = world.entities as unknown[];
+  for (const [index, entity] of entities.entries()) {
+    if (!isRecord(entity) || !isRecord(entity.components)) continue;
+    const meshRenderer = entity.components.MeshRenderer;
+    if (!isRecord(meshRenderer) || meshRenderer.assetId === undefined) continue;
+    if (typeof meshRenderer.assetId !== 'string' || !assetIds.has(meshRenderer.assetId)) {
+      throw new WorldSerializationError(
+        `Entity references an unknown asset: ${String(meshRenderer.assetId)}`,
+        `$.world.entities[${index}].components.MeshRenderer.assetId`,
+      );
+    }
+  }
+
+  const payloads = (document.assetPayloads as unknown[] | undefined) ?? [];
+  for (const [index, payload] of payloads.entries()) {
+    if (
+      isRecord(payload) &&
+      typeof payload.assetId === 'string' &&
+      !assetIds.has(payload.assetId)
+    ) {
+      throw new WorldSerializationError(
+        `Embedded payload references an unknown asset: ${payload.assetId}`,
+        `$.assetPayloads[${index}].assetId`,
+      );
+    }
+  }
+}
+
 /** Validates the stable document envelope while leaving component payloads extensible. */
 export function validateWorldDocument(value: unknown): asserts value is WorldDocument {
   if (!isRecord(value)) throw new WorldSerializationError('Expected a JSON object');
@@ -124,6 +212,7 @@ export function validateWorldDocument(value: unknown): asserts value is WorldDoc
   }
   if (!isRecord(value.extensions))
     throw new WorldSerializationError('Expected extensions object', '$.extensions');
+  validateWorldAssetReferences(value);
 }
 
 function canonicalize(value: unknown): unknown {
