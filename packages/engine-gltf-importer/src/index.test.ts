@@ -129,6 +129,83 @@ function makeGlb(
   return output;
 }
 
+function makeInterleavedGlb(): ArrayBuffer {
+  const binary = new Uint8Array(72);
+  const view = new DataView(binary.buffer);
+  const vertices = [
+    [0, 0, 0, 0, 0, 1],
+    [1, 0, 0, 0, 0, 1],
+    [0, 1, 0, 0, 0, 1],
+  ];
+  vertices.forEach((vertex, index) =>
+    vertex.forEach((value, component) => view.setFloat32(index * 24 + component * 4, value, true)),
+  );
+  const root = {
+    asset: { version: '2.0', generator: 'interleaved-fixture' },
+    buffers: [{ byteLength: binary.byteLength }],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 72, byteStride: 24 }],
+    accessors: [
+      { bufferView: 0, byteOffset: 0, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: 0, byteOffset: 12, componentType: 5126, count: 3, type: 'VEC3' },
+    ],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0, NORMAL: 1 } }] }],
+  };
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(root));
+  const jsonLength = Math.ceil(jsonBytes.length / 4) * 4;
+  const total = 12 + 8 + jsonLength + 8 + binary.byteLength;
+  const output = new ArrayBuffer(total);
+  const header = new DataView(output);
+  header.setUint32(0, 0x46546c67, true);
+  header.setUint32(4, 2, true);
+  header.setUint32(8, total, true);
+  header.setUint32(12, jsonLength, true);
+  header.setUint32(16, 0x4e4f534a, true);
+  new Uint8Array(output, 20, jsonBytes.length).set(jsonBytes);
+  new Uint8Array(output, 20 + jsonBytes.length, jsonLength - jsonBytes.length).fill(0x20);
+  const binHeader = 20 + jsonLength;
+  header.setUint32(binHeader, binary.byteLength, true);
+  header.setUint32(binHeader + 4, 0x004e4942, true);
+  new Uint8Array(output, binHeader + 8).set(binary);
+  return output;
+}
+
+type MutableGlbJson = {
+  extensionsRequired?: string[];
+  extensionsUsed?: string[];
+  accessors?: { count: number }[];
+  bufferViews?: { byteOffset?: number }[];
+  buffers?: { byteLength: number }[];
+};
+
+function rewriteGlbJson(source: ArrayBuffer, update: (root: MutableGlbJson) => void): ArrayBuffer {
+  const input = new DataView(source);
+  const jsonLength = input.getUint32(12, true);
+  const json = new TextDecoder().decode(new Uint8Array(source, 20, jsonLength)).trimEnd();
+  const root = JSON.parse(json) as MutableGlbJson;
+  update(root);
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(root));
+  const paddedJsonLength = Math.ceil(jsonBytes.length / 4) * 4;
+  const binHeader = 20 + input.getUint32(12, true) + 8;
+  const binLength = input.getUint32(binHeader - 8, true);
+  const binary = new Uint8Array(source, binHeader, binLength);
+  const paddedBinLength = Math.ceil(binLength / 4) * 4;
+  const total = 12 + 8 + paddedJsonLength + 8 + paddedBinLength;
+  const output = new ArrayBuffer(total);
+  const header = new DataView(output);
+  header.setUint32(0, 0x46546c67, true);
+  header.setUint32(4, 2, true);
+  header.setUint32(8, total, true);
+  header.setUint32(12, paddedJsonLength, true);
+  header.setUint32(16, 0x4e4f534a, true);
+  new Uint8Array(output, 20, jsonBytes.length).set(jsonBytes);
+  new Uint8Array(output, 20 + jsonBytes.length, paddedJsonLength - jsonBytes.length).fill(0x20);
+  const nextBinHeader = 20 + paddedJsonLength;
+  header.setUint32(nextBinHeader, paddedBinLength, true);
+  header.setUint32(nextBinHeader + 4, 0x004e4942, true);
+  new Uint8Array(output, nextBinHeader + 8).set(binary);
+  return output;
+}
+
 const context = { uri: 'models/triangle.glb', settings: {}, signal: new AbortController().signal };
 
 describe('GlbImporter', () => {
@@ -143,6 +220,49 @@ describe('GlbImporter', () => {
     expect(result.data.materials[0]?.roughnessFactor).toBe(0.8);
     expect(result.data.nodes[0]?.translation).toEqual([2, 0, 0]);
     expect(result.metadata.primitiveCount).toBe(1);
+  });
+
+  it('reads interleaved POSITION and NORMAL accessors using byteStride and accessor byteOffset', async () => {
+    const result = await new GlbImporter().import(makeInterleavedGlb(), context);
+    const mesh = result.data.meshes[0]!.primitives[0]!.mesh;
+    expect(mesh.positions).toEqual(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]));
+    expect(mesh.normals).toEqual(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]));
+  });
+
+  it('rejects documents that require an unsupported extension', async () => {
+    const glb = rewriteGlbJson(makeGlb(), (root) => {
+      root.extensionsRequired = ['EXT_fixture_required'];
+    });
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FEATURE',
+      message: expect.stringContaining('EXT_fixture_required'),
+    });
+  });
+
+  it('retains optional extension declarations without rejecting otherwise valid core data', async () => {
+    const glb = rewriteGlbJson(makeGlb(), (root) => {
+      root.extensionsUsed = ['EXT_fixture_optional'];
+    });
+    const result = await new GlbImporter().import(glb, context);
+    expect(result.data.extensionsUsed).toContain('EXT_fixture_optional');
+  });
+
+  it('rejects accessors whose declared element range exceeds the bufferView', async () => {
+    const glb = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.count = 100;
+    });
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+  });
+
+  it('rejects bufferViews that exceed the declared embedded buffer', async () => {
+    const glb = rewriteGlbJson(makeGlb(), (root) => {
+      root.bufferViews![0]!.byteOffset = root.buffers![0]!.byteLength;
+    });
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
   });
 
   it('decomposes matrix-authored nodes into equivalent TRS transforms', async () => {
