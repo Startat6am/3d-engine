@@ -175,3 +175,5 @@ export class EntityRegistry {
     return { index, generation };
   }
 }
+
+export * from './ecs.js';
