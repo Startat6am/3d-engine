@@ -7,6 +7,7 @@ import type {
   RendererOptions,
   RenderScene,
   RenderObject,
+  TextureSource,
 } from './contracts.js';
 import { RendererError } from './contracts.js';
 export * from './contracts.js';
@@ -25,10 +26,14 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       materialSource: object;
       geometryLease: AssetResourceLease<THREE.BufferGeometry>;
       materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
+      textureSource?: TextureSource;
+      textureLease?: AssetResourceLease<THREE.Texture>;
+      active: boolean;
     }
   >();
   readonly #geometryCache = new AssetResourceCache<THREE.BufferGeometry>();
   readonly #materialCache = new AssetResourceCache<THREE.MeshStandardMaterial>();
+  readonly #textureCache = new AssetResourceCache<THREE.Texture>();
   readonly #geometryKeys = new WeakMap<object, string>();
   readonly #materialKeys = new WeakMap<object, string>();
   #nextResourceKey = 1;
@@ -36,6 +41,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #orthographicCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 1000);
   #activeCamera: THREE.Camera | null = null;
   #disposed = false;
+  #lastScene: RenderScene | null = null;
 
   constructor(canvas: HTMLCanvasElement, options: RendererOptions = {}) {
     try {
@@ -85,6 +91,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
 
   render(scene: RenderScene): void {
     this.#assertActive();
+    this.#lastScene = scene;
     this.#syncObjects(scene.objects);
     this.#scene.background = new THREE.Color(scene.background);
     const camera = this.#applyCamera(scene.camera);
@@ -112,6 +119,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     if (this.#disposed) return;
     for (const entry of this.#objects.values()) this.#releaseObject(entry);
     this.#objects.clear();
+    this.#lastScene = null;
     this.#scene.clear();
     this.#renderer.dispose();
     this.#disposed = true;
@@ -161,6 +169,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         }
         entry = {
           mesh,
+          active: true,
           geometrySource: item.geometry,
           materialSource: item.material,
           geometryLease,
@@ -228,10 +237,76 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       material.opacity = item.material.opacity;
       material.transparent = item.material.transparent;
       material.wireframe = item.material.wireframe;
+      this.#syncTexture(entry, item.material.baseColorTexture);
       mesh.position.set(...item.position);
       mesh.quaternion.set(...item.rotation);
       mesh.scale.set(...item.scale);
     }
+  }
+
+  #syncTexture(
+    entry: {
+      readonly mesh: THREE.Mesh;
+      readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
+      textureSource?: TextureSource;
+      textureLease?: AssetResourceLease<THREE.Texture>;
+      active: boolean;
+    },
+    source: TextureSource | undefined,
+  ): void {
+    const material = entry.materialLease.resource;
+    if (!source) {
+      delete entry.textureSource;
+      entry.textureLease?.release();
+      delete entry.textureLease;
+      if (material.map) {
+        material.map = null;
+        material.needsUpdate = true;
+      }
+      return;
+    }
+    if (entry.textureSource?.assetId === source.assetId) return;
+    if (material.map) {
+      material.map = null;
+      material.needsUpdate = true;
+    }
+    entry.textureLease?.release();
+    delete entry.textureLease;
+    entry.textureSource = source;
+    void this.#textureCache
+      .acquire(
+        source.cacheKey,
+        async () => {
+          const bitmap = await createImageBitmap(
+            new Blob([source.data.slice().buffer as ArrayBuffer], { type: source.mimeType }),
+          );
+          const texture = new THREE.Texture(bitmap);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.flipY = false;
+          texture.needsUpdate = true;
+          return texture;
+        },
+        (texture) => {
+          const bitmap = texture.image as ImageBitmap | undefined;
+          texture.dispose();
+          bitmap?.close();
+        },
+      )
+      .then((lease) => {
+        if (this.#disposed || !entry.active || entry.textureSource !== source) {
+          lease.release();
+          return;
+        }
+        entry.textureLease = lease;
+        material.map = lease.resource;
+        material.needsUpdate = true;
+        const scene = this.#lastScene;
+        if (scene && !this.#disposed) this.render(scene);
+      })
+      .catch((error: unknown) => {
+        if (entry.textureSource === source) delete entry.textureSource;
+        console.error(`Failed to decode texture asset ${source.assetId}`, error);
+      });
   }
 
   #applyCamera(camera: RenderScene['camera']): THREE.Camera {
@@ -272,8 +347,12 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     readonly mesh: THREE.Mesh;
     readonly geometryLease: AssetResourceLease<THREE.BufferGeometry>;
     readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
+    textureLease?: AssetResourceLease<THREE.Texture>;
+    active: boolean;
   }): void {
+    entry.active = false;
     this.#scene.remove(entry.mesh);
+    entry.textureLease?.release();
     entry.geometryLease.release();
     entry.materialLease.release();
   }
