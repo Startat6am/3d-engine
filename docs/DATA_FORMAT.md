@@ -48,6 +48,10 @@ Built-in components have namespaced stable type IDs and explicit schema versions
 
 Asset records include stable ID, type, URI relative to project root, content hash, importer metadata, and optional source URI. Paths are normalized and sandboxed to project root. Hashes detect changed content; no credentials or absolute machine paths are stored.
 
+For imported models, keep the source identity and the normalized/derived asset identity distinct. Importer metadata should record source format and version, importer/converter identity and version, deterministic settings, and the capability/diagnostic report. A conversion result (for example, a GLB exported from a `.blend` source) is a derived asset linked to its source through explicit dependency metadata; it must not silently replace or overwrite the original source. Do not assume the source file itself must be embedded in every project archive.
+
+The world/project schema describes asset references and relationships; it does not embed format-specific parser state or require the runtime to understand Blender, FBX, or USD internals.
+
 Within one world document, asset IDs are unique. Every `MeshRenderer.assetId`, embedded `assetPayloads[].assetId`, and declared asset dependency must resolve to an asset record in the same document. Asset dependencies must be acyclic. Validation reports the offending JSON path and rejects the document before editor state is changed; unknown optional component payloads remain opaque and are not recursively interpreted as asset references.
 
 ## Migrations and compatibility
