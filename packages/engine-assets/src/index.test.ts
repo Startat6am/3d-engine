@@ -174,6 +174,27 @@ describe('AssetResourceCache', () => {
     expect(cache.size).toBe(0);
   });
 
+  it('does not cache a synchronous resource when its factory throws', () => {
+    const cache = new AssetResourceCache<number>();
+    expect(() =>
+      cache.acquireSync(
+        'gpu:broken',
+        () => {
+          throw new Error('allocation failed');
+        },
+        () => {},
+      ),
+    ).toThrow('allocation failed');
+    expect(cache.size).toBe(0);
+    const lease = cache.acquireSync(
+      'gpu:broken',
+      () => 7,
+      () => {},
+    );
+    expect(lease.resource).toBe(7);
+    lease.release();
+  });
+
   it('rejects a synchronous acquire while the same key is loading asynchronously', async () => {
     const cache = new AssetResourceCache<number>();
     let resolve!: (value: number) => void;
