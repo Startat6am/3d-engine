@@ -6,8 +6,10 @@ import {
   createCylinderGeometry,
   createPlaneGeometry,
   createUvSphereGeometry,
+  validateMeshData,
   type MeshData,
 } from '@engine/geometry';
+import { GlbImporter } from '@engine/gltf-importer';
 import {
   createDefaultCamera,
   createDefaultMaterial,
@@ -20,7 +22,7 @@ import {
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
 type SceneEntity = RenderObject & {
   readonly name: string;
-  readonly primitive: Primitive;
+  readonly primitive: Primitive | 'GLB';
   readonly rotationEuler?: readonly [number, number, number];
 };
 const geometryFor: Record<Primitive, () => MeshData> = {
@@ -92,6 +94,7 @@ export function EditorApp() {
   const [worldName, setWorldName] = useState('Untitled World');
   const [worldError, setWorldError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const glbInputRef = useRef<HTMLInputElement>(null);
   const [camera, setCamera] = useState(() => createDefaultCamera());
   const dragRef = useRef<{
     x: number;
@@ -228,13 +231,13 @@ export function EditorApp() {
         id: 'world:editor-session',
         name: worldName,
         settings: { gravity: [0, -9.81, 0], environment: {} },
-        entities: entities.map(({ id, name, primitive, position, rotation, scale, material }) => ({
+        entities: entities.map(({ id, name, primitive, position, rotation, scale, material, geometry }) => ({
           id,
           name,
           parent: null,
           components: {
             Transform: { position, rotation, scale },
-            MeshRenderer: { primitive, material },
+            MeshRenderer: { primitive, material, ...(primitive === 'GLB' ? { geometry: { positions: Array.from(geometry.positions), normals: Array.from(geometry.normals), indices: Array.from(geometry.indices) } } : {}) },
           },
         })),
       },
@@ -263,19 +266,29 @@ export function EditorApp() {
           name?: string;
           components?: {
             Transform?: { position?: number[]; rotation?: number[]; scale?: number[] };
-            MeshRenderer?: { primitive?: Primitive; material?: SceneEntity['material'] };
+            MeshRenderer?: { primitive?: Primitive | 'GLB'; material?: SceneEntity['material']; geometry?: { positions?: number[]; normals?: number[]; indices?: number[] } };
           };
         };
         const transform = entity.components?.Transform;
         const mesh = entity.components?.MeshRenderer;
         const primitive = mesh?.primitive;
+        let geometry: MeshData;
+        if (primitive === 'GLB') {
+          const source = mesh?.geometry;
+          if (!source || !Array.isArray(source.positions) || !Array.isArray(source.normals) || !Array.isArray(source.indices) || ![...source.positions, ...source.normals].every(Number.isFinite) || !source.indices.every((index) => Number.isInteger(index) && index >= 0)) throw new Error(`Entity ${entity.name} has invalid imported mesh buffers`);
+          geometry = { positions: Float32Array.from(source.positions), normals: Float32Array.from(source.normals), indices: Uint32Array.from(source.indices) };
+          validateMeshData(geometry);
+        } else if (primitive && primitive in geometryFor) {
+          geometry = geometryFor[primitive]();
+        } else {
+          throw new Error(`Entity ${index} has an unsupported geometry type`);
+        }
         if (
           !entity.id ||
           !entity.name ||
           !transform ||
           !mesh ||
-          !primitive ||
-          !(primitive in geometryFor)
+          !primitive
         )
           throw new Error(`Entity ${index} is missing supported Transform or MeshRenderer data`);
         const vector = (value: number[] | undefined, length: number, fallback: number[]) => {
@@ -288,7 +301,7 @@ export function EditorApp() {
           id: entity.id,
           name: entity.name,
           primitive,
-          geometry: geometryFor[primitive](),
+          geometry,
           material: mesh.material ?? createDefaultMaterial(),
           position: vector(transform.position, 3, [0, 0, 0]) as [number, number, number],
           rotation: vector(transform.rotation, 4, [0, 0, 0, 1]) as [number, number, number, number],
@@ -304,6 +317,34 @@ export function EditorApp() {
     } catch (error) {
       setWorldError(error instanceof Error ? error.message : String(error));
     }
+  };
+
+  const importGlb = async (file?: File) => {
+    if (!file) return;
+    try {
+      const imported = await new GlbImporter().import(await file.arrayBuffer(), { uri: file.name || 'import.glb', settings: {}, signal: new AbortController().signal });
+      const asset = imported.data;
+      const parentOf = new Map<number, number>();
+      asset.nodes.forEach((node, parent) => node.children.forEach((child) => parentOf.set(child, parent)));
+      if (asset.nodes.some((node) => node.matrix)) throw new Error('Editor import currently supports TRS node transforms, not matrix-authored nodes');
+      if ([...parentOf.keys()].some((index) => asset.nodes[index]?.mesh !== null && asset.nodes[index]?.mesh !== undefined)) throw new Error('Nested mesh nodes are not yet supported; import a flattened GLB scene');
+      const instances = asset.nodes.map((node, nodeIndex) => ({ node, nodeIndex })).filter(({ node }) => node.mesh !== null);
+      const sources = instances.length
+        ? instances.flatMap(({ node, nodeIndex }) => asset.meshes[node.mesh!]!.primitives.map((primitive, primitiveIndex) => ({ name: node.name || asset.meshes[node.mesh!]!.name, primitive, position: node.translation, rotation: node.rotation, scale: node.scale, key: `${nodeIndex}-${primitiveIndex}` })))
+        : asset.meshes.flatMap((mesh, meshIndex) => mesh.primitives.map((primitive, primitiveIndex) => ({ name: mesh.name, primitive, position: [0, 0, 0] as const, rotation: [0, 0, 0, 1] as const, scale: [1, 1, 1] as const, key: `${meshIndex}-${primitiveIndex}` })));
+      if (!sources.length) throw new Error('The GLB contains no renderable triangle meshes');
+      const importedEntities: SceneEntity[] = sources.map((source, index) => {
+        const pbr = source.primitive.material === null ? undefined : asset.materials[source.primitive.material];
+        const factor = pbr?.baseColorFactor ?? [0.72, 0.76, 0.82, 1];
+        const toSrgb = (value: number) => { const linear = Math.min(1, Math.max(0, value)); return linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055; };
+        const color = factor.slice(0, 3).reduce((hex, value) => (hex << 8) | Math.round(toSrgb(value!) * 255), 0);
+        const alpha = Math.min(1, Math.max(0, factor[3] ?? 1));
+        return { id: `glb-${Date.now()}-${index}-${source.key}`, name: sources.length === 1 ? source.name : `${source.name} · ${index + 1}`, primitive: 'GLB', geometry: source.primitive.mesh, material: { color, roughness: pbr?.roughnessFactor ?? 1, metalness: pbr?.metallicFactor ?? 1, opacity: alpha, transparent: pbr?.alphaMode === 'BLEND' || alpha < 1, wireframe: false }, position: source.position, rotation: source.rotation, scale: source.scale };
+      });
+      commitEntities([...entitiesRef.current, ...importedEntities]);
+      setSelectedId(importedEntities[0]!.id);
+      setWorldError('');
+    } catch (error) { setWorldError(error instanceof Error ? error.message : String(error)); }
   };
 
   const resetCamera = () => setCamera(createDefaultCamera());
@@ -382,6 +423,8 @@ export function EditorApp() {
         <button className="toolbar-button" onClick={() => fileInputRef.current?.click()}>
           Open .world
         </button>
+        <button className="toolbar-button" onClick={() => glbInputRef.current?.click()}>Import .glb</button>
+        <input ref={glbInputRef} hidden type="file" accept=".glb,model/gltf-binary" onChange={(event) => { void importGlb(event.target.files?.[0]); event.currentTarget.value = ''; }} />
         <input
           ref={fileInputRef}
           hidden
@@ -517,7 +560,7 @@ export function EditorApp() {
                 <small>✓</small>
               </div>
               <div className="component">
-                ▧ <span>{selected.primitive} Geometry</span>
+                ▧ <span>{selected.primitive === 'GLB' ? 'Imported GLB Mesh' : `${selected.primitive} Geometry`}</span>
                 <small>✓</small>
               </div>
             </>

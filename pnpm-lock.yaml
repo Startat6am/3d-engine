@@ -249,6 +249,9 @@ importers:
       '@engine/serialization':
         specifier: workspace:*
         version: link:../../packages/engine-serialization
+      '@engine/gltf-importer':
+        specifier: workspace:*
+        version: link:../../packages/engine-gltf-importer
       '@vitejs/plugin-react':
         specifier: 5.1.4
         version: 5.1.4(vite@7.3.8(lightningcss@1.33.0))

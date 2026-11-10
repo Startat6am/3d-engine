@@ -238,8 +238,8 @@ function makeNormals(positions: readonly number[], indices: readonly number[]): 
   }
   for (let i = 0; i < normals.length; i += 3) {
     const length = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!);
-    if (length > 1e-12) { normals[i] /= length; normals[i + 1] /= length; normals[i + 2] /= length; }
-    else { normals[i] = 0; normals[i + 1] = 1; normals[i + 2] = 0; }
+    if (length > 1e-12) normals.set([normals[i]! / length, normals[i + 1]! / length, normals[i + 2]! / length], i);
+    else normals.set([0, 1, 0], i);
   }
   return Float32Array.from(normals);
 }
