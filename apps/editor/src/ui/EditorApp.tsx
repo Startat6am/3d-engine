@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { EditorHistory } from './EditorHistory.js';
 import {
   createBoxGeometry,
   createCylinderGeometry,
@@ -42,6 +43,49 @@ export function EditorApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
   const [entities, setEntities] = useState<SceneEntity[]>([initialEntity()]);
+  const entitiesRef = useRef(entities);
+  const history = useRef(new EditorHistory<SceneEntity[]>(100));
+  const [historyVersion, setHistoryVersion] = useState(0);
+  void historyVersion;
+
+  const commitEntities = (next: SceneEntity[]) => {
+    history.current.commit(entitiesRef.current);
+    entitiesRef.current = next;
+    setEntities(next);
+    setHistoryVersion((version) => version + 1);
+  };
+
+  const undo = useCallback(() => {
+    const previous = history.current.undo(entitiesRef.current);
+    if (!previous) return;
+    entitiesRef.current = previous;
+    setEntities(previous);
+    setHistoryVersion((version) => version + 1);
+    setSelectedId((current) => previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''));
+  }, []);
+
+  const redo = useCallback(() => {
+    const next = history.current.redo(entitiesRef.current);
+    if (!next) return;
+    entitiesRef.current = next;
+    setEntities(next);
+    setHistoryVersion((version) => version + 1);
+    setSelectedId((current) => next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''));
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const editingText = target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+      if (editingText || !(event.ctrlKey || event.metaKey)) return;
+      const key = event.key.toLowerCase();
+      if (key === 'z' && event.shiftKey) { event.preventDefault(); redo(); }
+      else if (key === 'z') { event.preventDefault(); undo(); }
+      else if (key === 'y') { event.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [redo, undo]);
   const [selectedId, setSelectedId] = useState('entity-1');
   const [rendererError, setRendererError] = useState('');
   const [worldName, setWorldName] = useState('Untitled World');
@@ -134,7 +178,7 @@ export function EditorApp() {
         rotation: [0, 0, 0, 1],
         scale: [1, 1, 1],
       };
-      setEntities((current) => [...current, entity]);
+      commitEntities([...entities, entity]);
       setSelectedId(id);
     },
     [entities],
@@ -143,8 +187,8 @@ export function EditorApp() {
   const updateVector = (key: 'position' | 'rotation' | 'scale', axis: number, value: string) => {
     const number = Number(value);
     if (!Number.isFinite(number) || !selected) return;
-    setEntities((current) =>
-      current.map((entity) => {
+    commitEntities(
+      entities.map((entity) => {
         if (entity.id !== selectedId) return entity;
         if (key === 'rotation') {
           const euler = [...(entity.rotationEuler ?? [0, 0, 0])] as [number, number, number];
@@ -169,11 +213,9 @@ export function EditorApp() {
 
   const renameSelected = (name: string) => {
     if (!selected || !name.trim()) return;
-    setEntities((current) =>
-      current.map((entity) =>
-        entity.id === selectedId ? { ...entity, name: name.trim() } : entity,
-      ),
-    );
+    commitEntities(entities.map((entity) =>
+      entity.id === selectedId ? { ...entity, name: name.trim() } : entity,
+    ));
   };
 
   const saveWorld = () => {
@@ -268,7 +310,7 @@ export function EditorApp() {
       });
       if (new Set(parsed.map((item) => item.id)).size !== parsed.length)
         throw new Error('World contains duplicate entity IDs');
-      setEntities(parsed);
+      commitEntities(parsed);
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
       setWorldError('');
@@ -282,7 +324,7 @@ export function EditorApp() {
   const removeSelected = () => {
     if (!selected) return;
     const next = entities.filter((entity) => entity.id !== selectedId);
-    setEntities(next);
+    commitEntities(next);
     setSelectedId(next[0]?.id ?? '');
   };
 
@@ -341,6 +383,12 @@ export function EditorApp() {
           value={worldName}
           onChange={(event) => setWorldName(event.target.value)}
         />
+        <button className="toolbar-button" onClick={undo} disabled={!history.current.canUndo} title="Undo (Ctrl/Cmd+Z)">
+          Undo
+        </button>
+        <button className="toolbar-button" onClick={redo} disabled={!history.current.canRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
+          Redo
+        </button>
         <button className="toolbar-button" onClick={saveWorld}>
           Save .world
         </button>
