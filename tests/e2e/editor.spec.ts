@@ -30,3 +30,20 @@ test('editor remains usable on a 360px mobile viewport', async ({ page }) => {
   await page.getByLabel('Position X').press('Enter');
   await expect(page.getByLabel('Position X')).toHaveValue('2.5');
 });
+
+test('hierarchy plus opens a primitive picker instead of silently adding a box', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Add object' }).click();
+  const menu = page.locator('#hierarchy-add-menu');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole('button', { name: /Sphere/ })).toBeVisible();
+  await expect(menu.getByRole('button', { name: /Plane/ })).toBeVisible();
+
+  await menu.getByRole('button', { name: /Sphere/ }).click();
+  await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Sphere' })).toBeVisible();
+  await expect(menu).toHaveCount(0);
+});
