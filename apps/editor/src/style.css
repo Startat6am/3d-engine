@@ -774,25 +774,43 @@ input:focus-visible {
 
 @media (max-width: 700px) {
   .transform-pad {
-    top: 48px;
+    top: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 50%;
     width: calc(100% - 16px);
+    max-width: 430px;
+    display: flex;
+    align-items: center;
     gap: 5px;
-    padding: 6px;
+    padding: 5px;
+    transform: translateX(-50%);
+    background: rgb(23 29 39 / 96%);
+  }
+  .transform-modes,
+  .transform-adjust {
+    display: contents;
   }
   .transform-pad button {
-    min-height: 42px;
-    min-width: 36px;
-    padding: 6px 9px;
-    font-size: 11px;
+    min-width: 0;
+    min-height: 40px;
+    padding: 5px 7px;
+    font-size: 10px;
   }
   .transform-modes button {
-    flex: 1;
+    flex: 1 1 0;
   }
-  .transform-adjust {
-    gap: 5px;
+  .transform-axis-label,
+  .transform-pad-spacer {
+    display: none;
   }
-  .transform-axis-label {
-    min-width: 34px;
-    font-size: 8px;
+  .transform-adjust button.axis-choice {
+    flex: 0 0 30px;
+    padding-inline: 0;
+  }
+  .transform-adjust button[aria-label^='Increase'],
+  .transform-adjust button[aria-label^='Decrease'] {
+    flex: 0 0 36px;
+    min-width: 36px;
+    font-size: 17px;
   }
 }
