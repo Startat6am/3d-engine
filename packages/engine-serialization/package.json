@@ -9,10 +9,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./schemas/world-v1.schema.json": "./dist/schemas/world-v1.schema.json"
   },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
   }
 }
