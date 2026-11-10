@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   EngineClock,
+  EngineRuntime,
   EventBus,
   defineComponent,
   SystemScheduler,
@@ -91,6 +92,75 @@ describe('system scheduler, events and clock', () => {
     expect(tick.deltaTime).toBe(0.5);
     expect(tick.fixedSteps).toBe(3);
     expect(tick.interpolationAlpha).toBeCloseTo(0);
+  });
+});
+
+describe('EngineRuntime', () => {
+  it('runs fixed steps before variable/post phases and propagates transforms last', () => {
+    const runtime = new EngineRuntime({ fixedDeltaTime: 0.1, maxFrameDelta: 0.5, maxSubSteps: 4 });
+    const parent = runtime.world.createEntity();
+    const child = runtime.world.createEntity();
+    runtime.world.add(parent, Transform, {
+      position: [0, 0, 0],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+      parent: null,
+    });
+    runtime.world.add(child, Transform, {
+      position: [2, 0, 0],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+      parent: null,
+    });
+    runtime.hierarchy.setParent(child, parent);
+
+    const phases: string[] = [];
+    const fixedTimes: Array<[number, number]> = [];
+    runtime.scheduler.add({ phase: 'pre-update', update: () => phases.push('pre') });
+    runtime.scheduler.add({
+      phase: 'fixed-update',
+      update: ({ world, deltaTime, elapsedTime }) => {
+        phases.push('fixed');
+        fixedTimes.push([deltaTime, elapsedTime]);
+        world.get(parent, Transform)!.position = [
+          world.get(parent, Transform)!.position[0] + 1,
+          0,
+          0,
+        ];
+      },
+    });
+    runtime.scheduler.add({ phase: 'variable-update', update: () => phases.push('variable') });
+    runtime.scheduler.add({ phase: 'post-update', update: () => phases.push('post') });
+
+    const frames: number[] = [];
+    runtime.events.on('runtime:frame', (tick: { fixedSteps: number }) =>
+      frames.push(tick.fixedSteps),
+    );
+    const tick = runtime.advance(0.25);
+
+    expect(tick.fixedSteps).toBe(2);
+    expect(phases).toEqual(['pre', 'fixed', 'fixed', 'variable', 'post']);
+    expect(fixedTimes[0]?.[0]).toBeCloseTo(0.1);
+    expect(fixedTimes[0]?.[1]).toBeCloseTo(0.1);
+    expect(fixedTimes[1]?.[1]).toBeCloseTo(0.2);
+    expect(Array.from(runtime.hierarchy.getWorldMatrix(child)!.slice(12, 15))).toEqual([4, 0, 0]);
+    expect(frames).toEqual([2]);
+  });
+
+  it('skips fixed systems when no fixed step is due but still propagates after the frame', () => {
+    const runtime = new EngineRuntime({ fixedDeltaTime: 0.1 });
+    const entity = runtime.world.createEntity();
+    runtime.world.add(entity, Transform, {
+      position: [3, 0, 0],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+      parent: null,
+    });
+    const fixed = vi.fn();
+    runtime.scheduler.add({ phase: 'fixed-update', update: fixed });
+    runtime.advance(0.02);
+    expect(fixed).not.toHaveBeenCalled();
+    expect(runtime.hierarchy.getWorldMatrix(entity)?.[12]).toBe(3);
   });
 });
 

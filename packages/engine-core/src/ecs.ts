@@ -440,3 +440,62 @@ export class TransformPropagationSystem implements WorldSystem {
     this.hierarchy.propagate();
   }
 }
+
+/** Owns the headless simulation primitives and advances them in deterministic phase order. */
+export class EngineRuntime {
+  readonly world = new World();
+  readonly hierarchy = new TransformHierarchy(this.world);
+  readonly scheduler = new SystemScheduler();
+  readonly clock: EngineClock;
+  readonly events = new EventBus();
+
+  constructor(clockOptions: ClockOptions = {}) {
+    this.clock = new EngineClock(clockOptions);
+    this.scheduler.add(new TransformPropagationSystem(this.hierarchy));
+  }
+
+  /** Advance one rendered frame, running zero or more fixed simulation steps. */
+  advance(frameDelta: number): ClockTick {
+    const tick = this.clock.advance(frameDelta);
+    this.scheduler.update('pre-update', {
+      world: this.world,
+      deltaTime: tick.deltaTime,
+      elapsedTime: tick.elapsedTime,
+    });
+
+    const fixedDeltaTime = this.clock.fixedDeltaTime;
+    for (let step = 0; step < tick.fixedSteps; step++) {
+      const elapsedTime =
+        tick.elapsedTime -
+        tick.interpolationAlpha * fixedDeltaTime -
+        (tick.fixedSteps - 1 - step) * fixedDeltaTime;
+      this.scheduler.update('fixed-update', {
+        world: this.world,
+        deltaTime: fixedDeltaTime,
+        elapsedTime,
+      });
+    }
+
+    this.scheduler.update('variable-update', {
+      world: this.world,
+      deltaTime: tick.deltaTime,
+      elapsedTime: tick.elapsedTime,
+    });
+    this.scheduler.update('post-update', {
+      world: this.world,
+      deltaTime: tick.deltaTime,
+      elapsedTime: tick.elapsedTime,
+    });
+    this.scheduler.update('transform-propagation', {
+      world: this.world,
+      deltaTime: tick.deltaTime,
+      elapsedTime: tick.elapsedTime,
+    });
+    this.events.emit('runtime:frame', tick);
+    return tick;
+  }
+
+  resetClock(): void {
+    this.clock.reset();
+  }
+}
