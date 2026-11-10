@@ -157,6 +157,7 @@ export function EditorApp() {
   const [camera, setCamera] = useState(() => createDefaultCamera());
   const [transformMode, setTransformMode] = useState<TransformMode>('position');
   const [transformAxis, setTransformAxis] = useState(0);
+  const [isTransformPadCollapsed, setIsTransformPadCollapsed] = useState(false);
   const dragRef = useRef<{
     x: number;
     y: number;
@@ -789,63 +790,80 @@ export function EditorApp() {
             SCENE VIEW <span>WEBGL2</span>
             <button onClick={resetCamera}>Reset Camera</button>
           </div>
-          <div className="transform-pad" aria-label="Transform controls">
-            <div className="transform-modes" role="group" aria-label="Transform mode">
-              {(
-                [
-                  ['position', 'Move'],
-                  ['rotation', 'Rotate'],
-                  ['scale', 'Scale'],
-                ] as const
-              ).map(([mode, label]) => (
-                <button
-                  key={mode}
-                  aria-label={`${label} mode`}
-                  aria-pressed={transformMode === mode}
-                  className={transformMode === mode ? 'active' : ''}
-                  disabled={!selected}
-                  onClick={() => setTransformMode(mode)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="transform-adjust" role="group" aria-label="Transform axis controls">
-              <span className="transform-axis-label">
-                {transformMode === 'position'
-                  ? 'MOVE'
-                  : transformMode === 'rotation'
-                    ? 'ROT'
-                    : 'SCALE'}
-              </span>
-              {(['X', 'Y', 'Z'] as const).map((axis, index) => (
-                <button
-                  key={axis}
-                  aria-label={`${axis} axis`}
-                  aria-pressed={transformAxis === index}
-                  className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
-                  disabled={!selected}
-                  onClick={() => setTransformAxis(index)}
-                >
-                  {axis}
-                </button>
-              ))}
-              <span className="transform-pad-spacer" />
-              <button
-                aria-label={`Decrease ${'XYZ'[transformAxis]}`}
-                disabled={!selected}
-                onClick={() => nudgeSelected(-1)}
-              >
-                −
-              </button>
-              <button
-                aria-label={`Increase ${'XYZ'[transformAxis]}`}
-                disabled={!selected}
-                onClick={() => nudgeSelected(1)}
-              >
-                ＋
-              </button>
-            </div>
+          <div
+            className={`transform-pad ${isTransformPadCollapsed ? 'is-collapsed' : ''}`}
+            aria-label="Transform controls"
+          >
+            <button
+              className="transform-collapse-toggle"
+              aria-label={
+                isTransformPadCollapsed ? 'Expand transform panel' : 'Collapse transform panel'
+              }
+              aria-expanded={!isTransformPadCollapsed}
+              onClick={() => setIsTransformPadCollapsed((collapsed) => !collapsed)}
+            >
+              {isTransformPadCollapsed ? '»»' : '««'}
+            </button>
+            {!isTransformPadCollapsed ? (
+              <>
+                <div className="transform-modes" role="group" aria-label="Transform mode">
+                  {(
+                    [
+                      ['position', 'Move'],
+                      ['rotation', 'Rotate'],
+                      ['scale', 'Scale'],
+                    ] as const
+                  ).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      aria-label={`${label} mode`}
+                      aria-pressed={transformMode === mode}
+                      className={transformMode === mode ? 'active' : ''}
+                      disabled={!selected}
+                      onClick={() => setTransformMode(mode)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="transform-adjust" role="group" aria-label="Transform axis controls">
+                  <span className="transform-axis-label">
+                    {transformMode === 'position'
+                      ? 'MOVE'
+                      : transformMode === 'rotation'
+                        ? 'ROT'
+                        : 'SCALE'}
+                  </span>
+                  {(['X', 'Y', 'Z'] as const).map((axis, index) => (
+                    <button
+                      key={axis}
+                      aria-label={`${axis} axis`}
+                      aria-pressed={transformAxis === index}
+                      className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
+                      disabled={!selected}
+                      onClick={() => setTransformAxis(index)}
+                    >
+                      {axis}
+                    </button>
+                  ))}
+                  <span className="transform-pad-spacer" />
+                  <button
+                    aria-label={`Decrease ${'XYZ'[transformAxis]}`}
+                    disabled={!selected}
+                    onClick={() => nudgeSelected(-1)}
+                  >
+                    −
+                  </button>
+                  <button
+                    aria-label={`Increase ${'XYZ'[transformAxis]}`}
+                    disabled={!selected}
+                    onClick={() => nudgeSelected(1)}
+                  >
+                    ＋
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
           <canvas
             ref={canvasRef}
