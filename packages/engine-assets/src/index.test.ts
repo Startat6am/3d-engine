@@ -159,6 +159,45 @@ describe('AssetResourceCache', () => {
     expect(cache.size).toBe(0);
   });
 
+  it('shares synchronous resources and disposes only after the final lease', () => {
+    const cache = new AssetResourceCache<{ id: number }>();
+    const load = vi.fn(() => ({ id: 11 }));
+    const dispose = vi.fn();
+    const first = cache.acquireSync('gpu:geometry', load, dispose);
+    const second = cache.acquireSync('gpu:geometry', load, dispose);
+    expect(load).toHaveBeenCalledOnce();
+    expect(first.resource).toBe(second.resource);
+    first.release();
+    expect(dispose).not.toHaveBeenCalled();
+    second.release();
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(cache.size).toBe(0);
+  });
+
+  it('rejects a synchronous acquire while the same key is loading asynchronously', async () => {
+    const cache = new AssetResourceCache<number>();
+    let resolve!: (value: number) => void;
+    const pending = cache.acquire(
+      'mixed:key',
+      () =>
+        new Promise<number>((done) => {
+          resolve = done;
+        }),
+      () => {},
+    );
+    await Promise.resolve();
+    expect(() =>
+      cache.acquireSync(
+        'mixed:key',
+        () => 2,
+        () => {},
+      ),
+    ).toThrow('already loading');
+    resolve(1);
+    const lease = await pending;
+    lease.release();
+  });
+
   it('removes failed loads so a later acquire can retry', async () => {
     const cache = new AssetResourceCache<number>();
     await expect(
