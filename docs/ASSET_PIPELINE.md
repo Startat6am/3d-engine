@@ -50,7 +50,7 @@ CPU descriptors may outlive renderer device resources. GPU handles are backend-o
 
 ## Dependencies
 
-Serialization defines persisted references; renderer consumes decoded geometry/material/texture data; animation/audio consume their respective asset types.
+Serialization defines persisted references. Asset IDs are unique within a world document; entity references, embedded source payloads, and dependency edges must resolve, and the dependency graph must be acyclic. Renderer consumes decoded geometry/material/texture data; animation/audio consume their respective asset types.
 
 ## Performance
 
