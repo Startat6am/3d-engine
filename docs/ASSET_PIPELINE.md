@@ -12,14 +12,14 @@ Provide stable asset identity, source import, decoding, caching, dependency trac
 
 The importer pool is intended to grow behind one format-neutral importer contract:
 
-| Format | Intended role | Strategy / priority |
-| --- | --- | --- |
-| **.glb** | Primary single-file model interchange | Current initial importer target; support is limited to the capabilities documented by the implementation and fixtures. |
-| **.gltf** | JSON glTF with external or embedded resources | Planned next extension of the glTF importer. |
-| **.blend** | Native Blender project/source | Planned optional Blender-assisted conversion to GLB. Do not implement a native .blend parser in engine-core. |
-| **FBX** | Common DCC and game-production interchange | Planned evaluation after the glTF path; choose a maintained importer or controlled converter only after license, runtime, and deployment review. |
-| **OBJ** | Static mesh interchange | Optional lower-priority importer; not a character rig/animation interchange solution. |
-| **USD / USDZ** | Composed scenes and larger production pipelines | Longer-term evaluation; substantially broader scene-composition scope than a basic model importer. |
+| Format         | Intended role                                   | Strategy / priority                                                                                                                              |
+| -------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **.glb**       | Primary single-file model interchange           | Current initial importer target; support is limited to the capabilities documented by the implementation and fixtures.                           |
+| **.gltf**      | JSON glTF with external or embedded resources   | Planned next extension of the glTF importer.                                                                                                     |
+| **.blend**     | Native Blender project/source                   | Planned optional Blender-assisted conversion to GLB. Do not implement a native .blend parser in engine-core.                                     |
+| **FBX**        | Common DCC and game-production interchange      | Planned evaluation after the glTF path; choose a maintained importer or controlled converter only after license, runtime, and deployment review. |
+| **OBJ**        | Static mesh interchange                         | Optional lower-priority importer; not a character rig/animation interchange solution.                                                            |
+| **USD / USDZ** | Composed scenes and larger production pipelines | Longer-term evaluation; substantially broader scene-composition scope than a basic model importer.                                               |
 
 This is a direction, not a delivery schedule or a claim that these formats are currently supported. The current implementation status and unsupported glTF features are tracked in [Assets & Serialization Status](ASSETS_SERIALIZATION_STATUS.md) and must be kept accurate as code changes.
 
@@ -63,3 +63,5 @@ Validate malformed assets, unsupported extensions, missing dependencies, hash mi
 ## Acceptance
 
 Import a representative GLB with meshes/materials/animation; resolve referenced textures; reuse cached results; release resources deterministically; round-trip references through .world.
+
+The editor resolves glTF `baseColorTexture` references to embedded PNG/JPEG texture assets. The renderer decodes these asynchronously, uploads them as sRGB GPU textures, and caches decoded resources by content hash with reference-counted leases. Removing an object or replacing/removing its texture releases its lease. Metallic-roughness, normal, occlusion, emissive maps, texture transforms, and glTF sampler fidelity remain outside the current rendering slice.
