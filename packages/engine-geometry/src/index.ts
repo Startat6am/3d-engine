@@ -152,7 +152,7 @@ export function createCylinderGeometry(
     for (let x = 0; x < radialSegments; x++) {
       const a = y * stride + x,
         b = a + stride;
-      indices.push(a, b, a + 1, b, b + 1, a + 1);
+      indices.push(a, a + 1, b, b, a + 1, b + 1);
     }
   return mesh(positions, normals, indices);
 }
