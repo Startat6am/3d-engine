@@ -31,6 +31,7 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [Engine specification](docs/ENGINE_SPEC.md)    | Product scope, requirements, non-goals and acceptance    |
 | [Architecture](docs/ARCHITECTURE.md)           | Package boundaries and dependency direction              |
 | [Roadmap](docs/ROADMAP.md)                     | Gated implementation sequence                            |
+| [Subsystem contracts](docs/SUBSYSTEM_CONTRACTS.md) | Contract-first design, machine-readable specs, errors and tests |
 | [Foundation status](docs/FOUNDATION_STATUS.md) | Implemented scaffold, verification and remaining gates   |
 | [API specification](docs/API_SPEC.md)          | Public contracts and compatibility policy                |
 | [Data format](docs/DATA_FORMAT.md)             | Versioned project/world serialization                    |
