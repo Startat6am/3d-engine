@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { EditorHistory } from './EditorHistory.js';
+import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
   createBoxGeometry,
   createCylinderGeometry,
@@ -219,7 +220,7 @@ export function EditorApp() {
   };
 
   const saveWorld = () => {
-    const worldDocument = {
+    const worldDocument: WorldDocument = {
       format: 'universal-3d-world',
       schemaVersion: '1.0.0',
       engineVersion: '0.1.0',
@@ -240,7 +241,7 @@ export function EditorApp() {
       assets: [],
       extensions: {},
     };
-    const blob = new Blob([JSON.stringify(worldDocument, null, 2)], { type: 'application/json' });
+    const blob = new Blob([serializeWorld(worldDocument)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = window.document.createElement('a');
     anchor.href = url;
@@ -253,21 +254,7 @@ export function EditorApp() {
   const loadWorld = async (file?: File) => {
     if (!file) return;
     try {
-      const data: unknown = JSON.parse(await file.text());
-      if (!data || typeof data !== 'object')
-        throw new Error('World file must contain a JSON object');
-      const root = data as {
-        format?: string;
-        schemaVersion?: string;
-        world?: { name?: string; entities?: unknown[] };
-      };
-      if (
-        root.format !== 'universal-3d-world' ||
-        root.schemaVersion !== '1.0.0' ||
-        !root.world ||
-        !Array.isArray(root.world.entities)
-      )
-        throw new Error('Unsupported .world format or schema version');
+      const root = parseWorld(await file.text());
       const parsed: SceneEntity[] = root.world.entities.map((entry, index) => {
         if (!entry || typeof entry !== 'object')
           throw new Error(`Invalid entity at index ${index}`);

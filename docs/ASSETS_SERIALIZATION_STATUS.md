@@ -13,12 +13,12 @@
 - No glTF/GLB importer or decoder is wired yet.
 - No texture/audio importer, async job queue, cancellation, content hashing implementation, cache, dependency scanner, or CPU/GPU resource retain/release lifecycle.
 - No JSON Schema artifact or generated runtime validators yet.
-- Editor Save/Open still uses its local v1 parser/serializer; it has not been migrated to `@engine/serialization`.
+- Editor Save/Open now calls `@engine/serialization` for envelope validation, parsing, and deterministic serialization; conversion of editor-specific entity payloads remains local.
 - Asset references are not yet integrated into Editor, Player, renderer resources, or AI authoring plans.
 
 ## Next gates
 
-1. Integrate the shared world serializer into Editor Save/Open and add golden fixtures.
+1. Add golden fixtures and expand editor-specific round-trip coverage through the shared serializer.
 2. Add asset importer contracts and a GLB importer with fixtures for meshes, materials, textures, and animation.
 3. Add cancellable import jobs, content-addressed cache, dependency graph validation, and deterministic disposal.
 4. Verify world round-trip with asset references and missing-asset diagnostics.
