@@ -64,6 +64,7 @@ function TransformNumberInput({ value, label, onCommit }: TransformNumberInputPr
 }
 
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
+type TransformMode = 'position' | 'rotation' | 'scale';
 type SceneEntity = RenderObject & {
   readonly name: string;
   readonly primitive: Primitive | 'GLB';
@@ -154,6 +155,8 @@ export function EditorApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
   const [camera, setCamera] = useState(() => createDefaultCamera());
+  const [transformMode, setTransformMode] = useState<TransformMode>('position');
+  const [transformAxis, setTransformAxis] = useState(0);
   const dragRef = useRef<{
     x: number;
     y: number;
@@ -273,6 +276,21 @@ export function EditorApp() {
         next[axis] = number;
         return { ...entity, [key]: next };
       }),
+    );
+  };
+
+  const nudgeSelected = (direction: -1 | 1) => {
+    if (!selected) return;
+    const current =
+      transformMode === 'rotation'
+        ? (selected.rotationEuler ?? [0, 0, 0])[transformAxis]!
+        : selected[transformMode][transformAxis]!;
+    const step = transformMode === 'rotation' ? 15 : 0.1;
+    const next = current + direction * step;
+    updateVector(
+      transformMode,
+      transformAxis,
+      String(transformMode === 'scale' ? Math.max(0.05, next) : next),
     );
   };
 
@@ -770,6 +788,64 @@ export function EditorApp() {
           <div className="viewport-label">
             SCENE VIEW <span>WEBGL2</span>
             <button onClick={resetCamera}>Reset Camera</button>
+          </div>
+          <div className="transform-pad" aria-label="Transform controls">
+            <div className="transform-modes" role="group" aria-label="Transform mode">
+              {(
+                [
+                  ['position', 'Move'],
+                  ['rotation', 'Rotate'],
+                  ['scale', 'Scale'],
+                ] as const
+              ).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  aria-label={`${label} mode`}
+                  aria-pressed={transformMode === mode}
+                  className={transformMode === mode ? 'active' : ''}
+                  disabled={!selected}
+                  onClick={() => setTransformMode(mode)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="transform-adjust" role="group" aria-label="Transform axis controls">
+              <span className="transform-axis-label">
+                {transformMode === 'position'
+                  ? 'MOVE'
+                  : transformMode === 'rotation'
+                    ? 'ROT'
+                    : 'SCALE'}
+              </span>
+              {(['X', 'Y', 'Z'] as const).map((axis, index) => (
+                <button
+                  key={axis}
+                  aria-label={`${axis} axis`}
+                  aria-pressed={transformAxis === index}
+                  className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
+                  disabled={!selected}
+                  onClick={() => setTransformAxis(index)}
+                >
+                  {axis}
+                </button>
+              ))}
+              <span className="transform-pad-spacer" />
+              <button
+                aria-label={`Decrease ${'XYZ'[transformAxis]}`}
+                disabled={!selected}
+                onClick={() => nudgeSelected(-1)}
+              >
+                −
+              </button>
+              <button
+                aria-label={`Increase ${'XYZ'[transformAxis]}`}
+                disabled={!selected}
+                onClick={() => nudgeSelected(1)}
+              >
+                ＋
+              </button>
+            </div>
           </div>
           <canvas
             ref={canvasRef}
