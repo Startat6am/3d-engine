@@ -35,3 +35,10 @@ Command undo/redo round-trips, hierarchy selection, inspector editing, gizmo tra
 The Editor currently has a bounded snapshot history for scene entity edits (100 snapshots), with Undo/Redo toolbar actions and Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y shortcuts. Text-entry controls retain their native editing shortcuts. A new edit after undo clears the redo branch. This is an interim scene-document history service; it is not yet the planned engine-editor command/transaction system, and pointer gestures are not grouped into transactions.
 
 Implementation and unit tests are tracked in PR #7. The Editor MVP exit gate remains open until the full command model, gizmos, asset workflow, save/reopen and browser E2E acceptance pass.
+
+
+## GLB import integration slice
+
+The Editor exposes an `Import .glb` action backed by `@engine/gltf-importer`. Imported triangle primitives become selectable scene entities. Metallic-roughness base color, roughness, metalness and alpha factors are mapped into the current renderer material descriptor. Imported CPU mesh buffers are retained in `.world` save/open documents and participate in entity snapshot Undo/Redo.
+
+Current constraints: GLB 2.0 triangle meshes only; texture pixels are not decoded or rendered; matrix-authored nodes and nested mesh-node hierarchies are rejected. Flat-node TRS transforms are applied. Animation, skinning and morph targets are not supported by this Editor integration slice. Browser/WebGL visual acceptance and automated test execution remain separate validation gates.
