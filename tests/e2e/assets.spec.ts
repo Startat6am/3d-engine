@@ -5,7 +5,7 @@ function makeTriangleGlb(): Buffer {
   const positions = Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
   const normals = Buffer.from(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]).buffer);
   const image = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=',
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
     'base64',
   );
   const binary = Buffer.concat([positions, normals, image]);
@@ -52,7 +52,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
   page,
 }) => {
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
   await page.goto('/');
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'triangle.glb',
@@ -61,6 +65,8 @@ test('GLB imports register stable project assets and survive world save/reopen',
   });
   await expect(page.getByText('TriangleNode')).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.waitForTimeout(250);
+  expect(consoleErrors).toEqual([]);
 
   const saveWorld = async () => {
     const menu = page.locator('.file-menu');
@@ -89,7 +95,7 @@ test('GLB imports register stable project assets and survive world save/reopen',
     world: {
       entities: Array<{
         components?: {
-          MeshRenderer?: { assetId?: string };
+          MeshRenderer?: { assetId?: string; material?: { baseColorTextureAssetId?: string } };
         };
       }>;
     };
@@ -107,6 +113,9 @@ test('GLB imports register stable project assets and survive world save/reopen',
     (entity) => entity.components?.MeshRenderer?.assetId,
   );
   expect(importedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
+  expect(importedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
+    texture.id,
+  );
   expect(firstDocument.assetPayloads).toHaveLength(2);
   const modelPayload = firstDocument.assetPayloads.find((payload) => payload.assetId === asset.id)!;
   const texturePayload = firstDocument.assetPayloads.find(
@@ -139,5 +148,10 @@ test('GLB imports register stable project assets and survive world save/reopen',
     (entity) => entity.components?.MeshRenderer?.assetId,
   );
   expect(reopenedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
+  expect(reopenedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
+    texture.id,
+  );
+  await page.waitForTimeout(250);
+  expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

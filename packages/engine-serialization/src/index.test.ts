@@ -116,6 +116,25 @@ describe('world serialization', () => {
     ).toThrow('Schema validation failed');
   });
 
+  it('rejects materials that reference a missing base color texture asset', () => {
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        world: {
+          ...world().world,
+          entities: [
+            {
+              id: 'entity:mesh',
+              components: {
+                MeshRenderer: { material: { baseColorTextureAssetId: 'asset:missing-texture' } },
+              },
+            },
+          ],
+        },
+      }),
+    ).toThrow('Material references an unknown texture asset');
+  });
+
   it('rejects malformed base64 asset payloads through the shared schema', () => {
     expect(() =>
       validateWorldDocument({

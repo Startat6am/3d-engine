@@ -147,11 +147,26 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
   for (const [index, entity] of entities.entries()) {
     if (!isRecord(entity) || !isRecord(entity.components)) continue;
     const meshRenderer = entity.components.MeshRenderer;
-    if (!isRecord(meshRenderer) || meshRenderer.assetId === undefined) continue;
-    if (typeof meshRenderer.assetId !== 'string' || !assetIds.has(meshRenderer.assetId)) {
+    if (!isRecord(meshRenderer)) continue;
+    if (
+      meshRenderer.assetId !== undefined &&
+      (typeof meshRenderer.assetId !== 'string' || !assetIds.has(meshRenderer.assetId))
+    ) {
       throw new WorldSerializationError(
         `Entity references an unknown asset: ${String(meshRenderer.assetId)}`,
         `$.world.entities[${index}].components.MeshRenderer.assetId`,
+      );
+    }
+    const material = meshRenderer.material;
+    if (
+      isRecord(material) &&
+      material.baseColorTextureAssetId !== undefined &&
+      (typeof material.baseColorTextureAssetId !== 'string' ||
+        !assetIds.has(material.baseColorTextureAssetId))
+    ) {
+      throw new WorldSerializationError(
+        `Material references an unknown texture asset: ${String(material.baseColorTextureAssetId)}`,
+        `$.world.entities[${index}].components.MeshRenderer.material.baseColorTextureAssetId`,
       );
     }
   }

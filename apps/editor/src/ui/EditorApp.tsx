@@ -476,7 +476,17 @@ export function EditorApp() {
               Transform: { position, rotation, scale },
               MeshRenderer: {
                 primitive,
-                material,
+                material: {
+                  color: material.color,
+                  roughness: material.roughness,
+                  metalness: material.metalness,
+                  opacity: material.opacity,
+                  transparent: material.transparent,
+                  wireframe: material.wireframe,
+                  ...(material.baseColorTexture
+                    ? { baseColorTextureAssetId: material.baseColorTexture.assetId }
+                    : {}),
+                },
                 ...(assetId ? { assetId } : {}),
                 ...(primitive === 'GLB'
                   ? {
@@ -540,7 +550,7 @@ export function EditorApp() {
             MeshRenderer?: {
               primitive?: Primitive | 'GLB';
               assetId?: string;
-              material?: SceneEntity['material'];
+              material?: SceneEntity['material'] & { readonly baseColorTextureAssetId?: string };
               geometry?: { positions?: number[]; normals?: number[]; indices?: number[] };
             };
           };
@@ -581,13 +591,51 @@ export function EditorApp() {
             throw new Error(`Entity ${entity.name} has invalid transform values`);
           return value;
         };
+        const storedMaterial = (mesh.material ??
+          createDefaultMaterial()) as SceneEntity['material'] & {
+          readonly baseColorTextureAssetId?: string;
+        };
+        const textureAssetId = storedMaterial.baseColorTextureAssetId;
+        const texturePayload = textureAssetId
+          ? restoredAssetPayloads.get(textureAssetId as AssetId)
+          : undefined;
+        const textureMimeType = texturePayload?.mimeType;
+        const textureRecord = textureAssetId
+          ? restoredAssetRegistry.require(textureAssetId as AssetId)
+          : undefined;
+        if (textureRecord && textureRecord.kind !== 'texture')
+          throw new Error(`Material reference is not a texture asset: ${textureAssetId}`);
+        const material = {
+          color: storedMaterial.color,
+          roughness: storedMaterial.roughness,
+          metalness: storedMaterial.metalness,
+          opacity: storedMaterial.opacity,
+          transparent: storedMaterial.transparent,
+          wireframe: storedMaterial.wireframe,
+          ...(textureAssetId &&
+          texturePayload &&
+          (textureMimeType === 'image/png' || textureMimeType === 'image/jpeg')
+            ? {
+                baseColorTexture: {
+                  assetId: textureAssetId,
+                  cacheKey: textureRecord!.contentHash,
+                  mimeType: textureMimeType as 'image/png' | 'image/jpeg',
+                  data: new Uint8Array(decodeBase64(texturePayload.data)),
+                },
+              }
+            : {}),
+        };
+        if (textureAssetId && !texturePayload)
+          throw new Error(
+            `Material references a missing embedded texture payload: ${textureAssetId}`,
+          );
         return {
           id: entity.id,
           name: entity.name,
           primitive,
           ...(mesh.assetId ? { assetId: mesh.assetId as AssetId } : {}),
           geometry,
-          material: mesh.material ?? createDefaultMaterial(),
+          material,
           position: vector(transform.position, 3, [0, 0, 0]) as [number, number, number],
           rotation: vector(transform.rotation, 4, [0, 0, 0, 1]) as [number, number, number, number],
           scale: vector(transform.scale, 3, [1, 1, 1]) as [number, number, number],
@@ -788,10 +836,41 @@ export function EditorApp() {
         dependencies: [...(imported.dependencies as AssetId[]), ...textureRecords],
         metadata: { ...imported.metadata, fileSize: file.size },
       });
-      const importedEntities = importedEntitiesWithoutAsset.map((entity) => ({
-        ...entity,
-        assetId: assetRecord.id,
-      }));
+      const importedEntities = importedEntitiesWithoutAsset.map((entity, entityIndex) => {
+        const source = sources[entityIndex]!;
+        const pbr =
+          source.primitive.material === null
+            ? undefined
+            : asset.materials[source.primitive.material];
+        const textureIndex = pbr?.baseColorTexture;
+        const imageIndex =
+          textureIndex === undefined ? undefined : asset.textures[textureIndex]?.source;
+        const image =
+          imageIndex === null || imageIndex === undefined ? undefined : asset.images[imageIndex];
+        const textureAssetId =
+          imageIndex === null || imageIndex === undefined ? undefined : textureRecords[imageIndex];
+        if (textureIndex !== undefined && (!image || !textureAssetId))
+          throw new Error(
+            `GLB material references an unavailable base color image: ${textureIndex}`,
+          );
+        return {
+          ...entity,
+          assetId: assetRecord.id,
+          ...(image && textureAssetId
+            ? {
+                material: {
+                  ...entity.material,
+                  baseColorTexture: {
+                    assetId: textureAssetId,
+                    cacheKey: stagedRegistry.require(textureAssetId).contentHash,
+                    mimeType: image.mimeType,
+                    data: image.data.slice(),
+                  },
+                },
+              }
+            : {}),
+        };
+      });
       stagedPayloads.set(assetRecord.id, {
         assetId: assetRecord.id,
         mimeType: 'model/gltf-binary',
