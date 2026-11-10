@@ -108,7 +108,9 @@ export function EditorApp() {
     entitiesRef.current = previous;
     setEntities(previous);
     setHistoryVersion((version) => version + 1);
-    setSelectedId((current) => previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''));
+    setSelectedId((current) =>
+      previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''),
+    );
   }, []);
 
   const redo = useCallback(() => {
@@ -117,18 +119,29 @@ export function EditorApp() {
     entitiesRef.current = next;
     setEntities(next);
     setHistoryVersion((version) => version + 1);
-    setSelectedId((current) => next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''));
+    setSelectedId((current) =>
+      next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''),
+    );
   }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
-      const editingText = target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+      const editingText =
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
       if (editingText || !(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
-      if (key === 'z' && event.shiftKey) { event.preventDefault(); redo(); }
-      else if (key === 'z') { event.preventDefault(); undo(); }
-      else if (key === 'y') { event.preventDefault(); redo(); }
+      if (key === 'z' && event.shiftKey) {
+        event.preventDefault();
+        redo();
+      } else if (key === 'z') {
+        event.preventDefault();
+        undo();
+      } else if (key === 'y') {
+        event.preventDefault();
+        redo();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -261,9 +274,11 @@ export function EditorApp() {
 
   const renameSelected = (name: string) => {
     if (!selected || !name.trim()) return;
-    commitEntities(entities.map((entity) =>
-      entity.id === selectedId ? { ...entity, name: name.trim() } : entity,
-    ));
+    commitEntities(
+      entities.map((entity) =>
+        entity.id === selectedId ? { ...entity, name: name.trim() } : entity,
+      ),
+    );
   };
 
   const saveWorld = () => {
@@ -275,15 +290,29 @@ export function EditorApp() {
         id: 'world:editor-session',
         name: worldName,
         settings: { gravity: [0, -9.81, 0], environment: {} },
-        entities: entities.map(({ id, name, primitive, position, rotation, scale, material, geometry }) => ({
-          id,
-          name,
-          parent: null,
-          components: {
-            Transform: { position, rotation, scale },
-            MeshRenderer: { primitive, material, ...(primitive === 'GLB' ? { geometry: { positions: Array.from(geometry.positions), normals: Array.from(geometry.normals), indices: Array.from(geometry.indices) } } : {}) },
-          },
-        })),
+        entities: entities.map(
+          ({ id, name, primitive, position, rotation, scale, material, geometry }) => ({
+            id,
+            name,
+            parent: null,
+            components: {
+              Transform: { position, rotation, scale },
+              MeshRenderer: {
+                primitive,
+                material,
+                ...(primitive === 'GLB'
+                  ? {
+                      geometry: {
+                        positions: Array.from(geometry.positions),
+                        normals: Array.from(geometry.normals),
+                        indices: Array.from(geometry.indices),
+                      },
+                    }
+                  : {}),
+              },
+            },
+          }),
+        ),
       },
       assets: [],
       extensions: {},
@@ -310,7 +339,11 @@ export function EditorApp() {
           name?: string;
           components?: {
             Transform?: { position?: number[]; rotation?: number[]; scale?: number[] };
-            MeshRenderer?: { primitive?: Primitive | 'GLB'; material?: SceneEntity['material']; geometry?: { positions?: number[]; normals?: number[]; indices?: number[] } };
+            MeshRenderer?: {
+              primitive?: Primitive | 'GLB';
+              material?: SceneEntity['material'];
+              geometry?: { positions?: number[]; normals?: number[]; indices?: number[] };
+            };
           };
         };
         const transform = entity.components?.Transform;
@@ -319,21 +352,27 @@ export function EditorApp() {
         let geometry: MeshData;
         if (primitive === 'GLB') {
           const source = mesh?.geometry;
-          if (!source || !Array.isArray(source.positions) || !Array.isArray(source.normals) || !Array.isArray(source.indices) || ![...source.positions, ...source.normals].every(Number.isFinite) || !source.indices.every((index) => Number.isInteger(index) && index >= 0)) throw new Error(`Entity ${entity.name} has invalid imported mesh buffers`);
-          geometry = { positions: Float32Array.from(source.positions), normals: Float32Array.from(source.normals), indices: Uint32Array.from(source.indices) };
+          if (
+            !source ||
+            !Array.isArray(source.positions) ||
+            !Array.isArray(source.normals) ||
+            !Array.isArray(source.indices) ||
+            ![...source.positions, ...source.normals].every(Number.isFinite) ||
+            !source.indices.every((index) => Number.isInteger(index) && index >= 0)
+          )
+            throw new Error(`Entity ${entity.name} has invalid imported mesh buffers`);
+          geometry = {
+            positions: Float32Array.from(source.positions),
+            normals: Float32Array.from(source.normals),
+            indices: Uint32Array.from(source.indices),
+          };
           validateMeshData(geometry);
         } else if (primitive && primitive in geometryFor) {
           geometry = geometryFor[primitive]();
         } else {
           throw new Error(`Entity ${index} has an unsupported geometry type`);
         }
-        if (
-          !entity.id ||
-          !entity.name ||
-          !transform ||
-          !mesh ||
-          !primitive
-        )
+        if (!entity.id || !entity.name || !transform || !mesh || !primitive)
           throw new Error(`Entity ${index} is missing supported Transform or MeshRenderer data`);
         const vector = (value: number[] | undefined, length: number, fallback: number[]) => {
           if (!value) return fallback;
@@ -366,19 +405,34 @@ export function EditorApp() {
   const importGlb = async (file?: File) => {
     if (!file) return;
     try {
-      const imported = await new GlbImporter().import(await file.arrayBuffer(), { uri: file.name || 'import.glb', settings: {}, signal: new AbortController().signal });
+      const imported = await new GlbImporter().import(await file.arrayBuffer(), {
+        uri: file.name || 'import.glb',
+        settings: {},
+        signal: new AbortController().signal,
+      });
       const asset = imported.data;
       const parentOf = new Map<number, number>();
-      asset.nodes.forEach((node, parent) => node.children.forEach((child) => {
-        if (parentOf.has(child)) throw new Error(`GLB node ${child} has more than one parent`);
-        parentOf.set(child, parent);
-      }));
-      const sources: { name: string; primitive: (typeof asset.meshes)[number]['primitives'][number]; position: readonly [number, number, number]; rotation: readonly [number, number, number, number]; scale: readonly [number, number, number]; key: string }[] = [];
+      asset.nodes.forEach((node, parent) =>
+        node.children.forEach((child) => {
+          if (parentOf.has(child)) throw new Error(`GLB node ${child} has more than one parent`);
+          parentOf.set(child, parent);
+        }),
+      );
+      const sources: {
+        name: string;
+        primitive: (typeof asset.meshes)[number]['primitives'][number];
+        position: readonly [number, number, number];
+        rotation: readonly [number, number, number, number];
+        scale: readonly [number, number, number];
+        key: string;
+      }[] = [];
       const visited = new Set<number>();
       const active = new Set<number>();
       const visitNode = (nodeIndex: number, parentWorld: Matrix4) => {
-        if (active.has(nodeIndex)) throw new Error(`GLB node hierarchy contains a cycle at node ${nodeIndex}`);
-        if (visited.has(nodeIndex)) throw new Error(`GLB node ${nodeIndex} is referenced more than once`);
+        if (active.has(nodeIndex))
+          throw new Error(`GLB node hierarchy contains a cycle at node ${nodeIndex}`);
+        if (visited.has(nodeIndex))
+          throw new Error(`GLB node ${nodeIndex} is referenced more than once`);
         const node = asset.nodes[nodeIndex];
         if (!node) throw new Error(`GLB references missing node ${nodeIndex}`);
         active.add(nodeIndex);
@@ -394,50 +448,91 @@ export function EditorApp() {
         const scale = new Vector3();
         world.decompose(position, rotation, scale);
         const reconstructed = new Matrix4().compose(position, rotation, scale);
-        if (world.elements.some((value, index) => Math.abs(value - reconstructed.elements[index]!) > 1e-4)) {
-          throw new Error(`GLB node ${node.name} has a combined transform with shear; this cannot be represented by the Editor Transform yet`);
+        if (
+          world.elements.some(
+            (value, index) => Math.abs(value - reconstructed.elements[index]!) > 1e-4,
+          )
+        ) {
+          throw new Error(
+            `GLB node ${node.name} has a combined transform with shear; this cannot be represented by the Editor Transform yet`,
+          );
         }
         if (node.mesh !== null) {
           const mesh = asset.meshes[node.mesh];
           if (!mesh) throw new Error(`GLB node ${nodeIndex} references missing mesh ${node.mesh}`);
-          mesh.primitives.forEach((primitive, primitiveIndex) => sources.push({
-            name: node.name || mesh.name,
-            primitive,
-            position: [position.x, position.y, position.z],
-            rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
-            scale: [scale.x, scale.y, scale.z],
-            key: `${nodeIndex}-${primitiveIndex}`,
-          }));
+          mesh.primitives.forEach((primitive, primitiveIndex) =>
+            sources.push({
+              name: node.name || mesh.name,
+              primitive,
+              position: [position.x, position.y, position.z],
+              rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
+              scale: [scale.x, scale.y, scale.z],
+              key: `${nodeIndex}-${primitiveIndex}`,
+            }),
+          );
         }
         node.children.forEach((child) => visitNode(child, world));
         active.delete(nodeIndex);
       };
-      const rootNodes = asset.nodes.map((_, index) => index).filter((index) => !parentOf.has(index));
+      const rootNodes = asset.nodes
+        .map((_, index) => index)
+        .filter((index) => !parentOf.has(index));
       rootNodes.forEach((root) => visitNode(root, new Matrix4()));
-      if (visited.size !== asset.nodes.length) throw new Error('GLB node hierarchy contains a cycle or nodes without a root');
+      if (visited.size !== asset.nodes.length)
+        throw new Error('GLB node hierarchy contains a cycle or nodes without a root');
       if (!asset.nodes.length) {
-        asset.meshes.forEach((mesh, meshIndex) => mesh.primitives.forEach((primitive, primitiveIndex) => sources.push({
-          name: mesh.name,
-          primitive,
-          position: [0, 0, 0],
-          rotation: [0, 0, 0, 1],
-          scale: [1, 1, 1],
-          key: `${meshIndex}-${primitiveIndex}`,
-        })));
+        asset.meshes.forEach((mesh, meshIndex) =>
+          mesh.primitives.forEach((primitive, primitiveIndex) =>
+            sources.push({
+              name: mesh.name,
+              primitive,
+              position: [0, 0, 0],
+              rotation: [0, 0, 0, 1],
+              scale: [1, 1, 1],
+              key: `${meshIndex}-${primitiveIndex}`,
+            }),
+          ),
+        );
       }
       if (!sources.length) throw new Error('The GLB contains no renderable triangle meshes');
       const importedEntities: SceneEntity[] = sources.map((source, index) => {
-        const pbr = source.primitive.material === null ? undefined : asset.materials[source.primitive.material];
+        const pbr =
+          source.primitive.material === null
+            ? undefined
+            : asset.materials[source.primitive.material];
         const factor = pbr?.baseColorFactor ?? [0.72, 0.76, 0.82, 1];
-        const toSrgb = (value: number) => { const linear = Math.min(1, Math.max(0, value)); return linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055; };
-        const color = factor.slice(0, 3).reduce((hex, value) => (hex << 8) | Math.round(toSrgb(value!) * 255), 0);
+        const toSrgb = (value: number) => {
+          const linear = Math.min(1, Math.max(0, value));
+          return linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
+        };
+        const color = factor
+          .slice(0, 3)
+          .reduce((hex, value) => (hex << 8) | Math.round(toSrgb(value!) * 255), 0);
         const alpha = Math.min(1, Math.max(0, factor[3] ?? 1));
-        return { id: `glb-${Date.now()}-${index}-${source.key}`, name: sources.length === 1 ? source.name : `${source.name} · ${index + 1}`, primitive: 'GLB', geometry: source.primitive.mesh, material: { color, roughness: pbr?.roughnessFactor ?? 1, metalness: pbr?.metallicFactor ?? 1, opacity: alpha, transparent: pbr?.alphaMode === 'BLEND' || alpha < 1, wireframe: false }, position: source.position, rotation: source.rotation, scale: source.scale };
+        return {
+          id: `glb-${Date.now()}-${index}-${source.key}`,
+          name: sources.length === 1 ? source.name : `${source.name} · ${index + 1}`,
+          primitive: 'GLB',
+          geometry: source.primitive.mesh,
+          material: {
+            color,
+            roughness: pbr?.roughnessFactor ?? 1,
+            metalness: pbr?.metallicFactor ?? 1,
+            opacity: alpha,
+            transparent: pbr?.alphaMode === 'BLEND' || alpha < 1,
+            wireframe: false,
+          },
+          position: source.position,
+          rotation: source.rotation,
+          scale: source.scale,
+        };
       });
       commitEntities([...entitiesRef.current, ...importedEntities]);
       setSelectedId(importedEntities[0]!.id);
       setWorldError('');
-    } catch (error) { setWorldError(error instanceof Error ? error.message : String(error)); }
+    } catch (error) {
+      setWorldError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const resetCamera = () => setCamera(createDefaultCamera());
@@ -504,10 +599,20 @@ export function EditorApp() {
           value={worldName}
           onChange={(event) => setWorldName(event.target.value)}
         />
-        <button className="toolbar-button" onClick={undo} disabled={!history.current.canUndo} title="Undo (Ctrl/Cmd+Z)">
+        <button
+          className="toolbar-button"
+          onClick={undo}
+          disabled={!history.current.canUndo}
+          title="Undo (Ctrl/Cmd+Z)"
+        >
           Undo
         </button>
-        <button className="toolbar-button" onClick={redo} disabled={!history.current.canRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
+        <button
+          className="toolbar-button"
+          onClick={redo}
+          disabled={!history.current.canRedo}
+          title="Redo (Ctrl/Cmd+Shift+Z)"
+        >
           Redo
         </button>
         <details className="file-menu" style={{ position: 'relative' }}>
@@ -529,18 +634,39 @@ export function EditorApp() {
               boxShadow: '0 8px 24px rgba(0,0,0,.3)',
             }}
           >
-            <button className="toolbar-button" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={() => glbInputRef.current?.click()}>
+            <button
+              className="toolbar-button"
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
+              onClick={() => glbInputRef.current?.click()}
+            >
               Import GLB…
             </button>
-            <button className="toolbar-button" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={() => fileInputRef.current?.click()}>
+            <button
+              className="toolbar-button"
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
+              onClick={() => fileInputRef.current?.click()}
+            >
               Open World…
             </button>
-            <button className="toolbar-button" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={saveWorld}>
+            <button
+              className="toolbar-button"
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
+              onClick={saveWorld}
+            >
               Save World…
             </button>
           </div>
         </details>
-        <input ref={glbInputRef} hidden type="file" accept=".glb,model/gltf-binary" onChange={(event) => { void importGlb(event.target.files?.[0]); event.currentTarget.value = ''; }} />
+        <input
+          ref={glbInputRef}
+          hidden
+          type="file"
+          accept=".glb,model/gltf-binary"
+          onChange={(event) => {
+            void importGlb(event.target.files?.[0]);
+            event.currentTarget.value = '';
+          }}
+        />
         <input
           ref={fileInputRef}
           hidden
@@ -674,7 +800,12 @@ export function EditorApp() {
                 <small>✓</small>
               </div>
               <div className="component">
-                ▧ <span>{selected.primitive === 'GLB' ? 'Imported GLB Mesh' : `${selected.primitive} Geometry`}</span>
+                ▧{' '}
+                <span>
+                  {selected.primitive === 'GLB'
+                    ? 'Imported GLB Mesh'
+                    : `${selected.primitive} Geometry`}
+                </span>
                 <small>✓</small>
               </div>
             </>

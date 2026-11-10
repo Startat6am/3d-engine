@@ -17,7 +17,10 @@ export interface WorldDocument {
 }
 
 export class WorldSerializationError extends Error {
-  constructor(message: string, readonly path = '$') {
+  constructor(
+    message: string,
+    readonly path = '$',
+  ) {
     super(`${message} at ${path}`);
     this.name = 'WorldSerializationError';
   }
@@ -29,11 +32,15 @@ export class WorldMigrationRegistry {
   readonly #migrations = new Map<string, WorldMigration>();
 
   register(fromVersion: string, migration: WorldMigration): void {
-    if (this.#migrations.has(fromVersion)) throw new Error(`Migration already registered from ${fromVersion}`);
+    if (this.#migrations.has(fromVersion))
+      throw new Error(`Migration already registered from ${fromVersion}`);
     this.#migrations.set(fromVersion, migration);
   }
 
-  migrate(document: Record<string, unknown>, targetVersion = CURRENT_WORLD_SCHEMA_VERSION): Record<string, unknown> {
+  migrate(
+    document: Record<string, unknown>,
+    targetVersion = CURRENT_WORLD_SCHEMA_VERSION,
+  ): Record<string, unknown> {
     let current = document;
     const visited = new Set<string>();
     while (current.schemaVersion !== targetVersion) {
@@ -43,10 +50,17 @@ export class WorldMigrationRegistry {
       }
       visited.add(version);
       const migration = this.#migrations.get(version);
-      if (!migration) throw new WorldSerializationError(`No migration registered from schema ${version}`, '$.schemaVersion');
+      if (!migration)
+        throw new WorldSerializationError(
+          `No migration registered from schema ${version}`,
+          '$.schemaVersion',
+        );
       const next = migration(current);
       if (next === current || next.schemaVersion === version) {
-        throw new WorldSerializationError('Migration did not advance schema version', '$.schemaVersion');
+        throw new WorldSerializationError(
+          'Migration did not advance schema version',
+          '$.schemaVersion',
+        );
       }
       current = next;
     }
@@ -61,23 +75,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 /** Validates the stable document envelope while leaving component payloads extensible. */
 export function validateWorldDocument(value: unknown): asserts value is WorldDocument {
   if (!isRecord(value)) throw new WorldSerializationError('Expected a JSON object');
-  if (value.format !== WORLD_FORMAT) throw new WorldSerializationError('Unsupported world format', '$.format');
-  if (typeof value.schemaVersion !== 'string') throw new WorldSerializationError('Expected schema version string', '$.schemaVersion');
-  if (typeof value.engineVersion !== 'string') throw new WorldSerializationError('Expected engine version string', '$.engineVersion');
+  if (value.format !== WORLD_FORMAT)
+    throw new WorldSerializationError('Unsupported world format', '$.format');
+  if (typeof value.schemaVersion !== 'string')
+    throw new WorldSerializationError('Expected schema version string', '$.schemaVersion');
+  if (typeof value.engineVersion !== 'string')
+    throw new WorldSerializationError('Expected engine version string', '$.engineVersion');
   if (!isRecord(value.world)) throw new WorldSerializationError('Expected world object', '$.world');
   if (typeof value.world.id !== 'string' || typeof value.world.name !== 'string') {
     throw new WorldSerializationError('World id and name are required', '$.world');
   }
-  if (!isRecord(value.world.settings)) throw new WorldSerializationError('Expected settings object', '$.world.settings');
-  if (!Array.isArray(value.world.entities)) throw new WorldSerializationError('Expected entities array', '$.world.entities');
-  if (!Array.isArray(value.assets)) throw new WorldSerializationError('Expected assets array', '$.assets');
-  if (!isRecord(value.extensions)) throw new WorldSerializationError('Expected extensions object', '$.extensions');
+  if (!isRecord(value.world.settings))
+    throw new WorldSerializationError('Expected settings object', '$.world.settings');
+  if (!Array.isArray(value.world.entities))
+    throw new WorldSerializationError('Expected entities array', '$.world.entities');
+  if (!Array.isArray(value.assets))
+    throw new WorldSerializationError('Expected assets array', '$.assets');
+  if (!isRecord(value.extensions))
+    throw new WorldSerializationError('Expected extensions object', '$.extensions');
 }
 
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (!isRecord(value)) return value;
-  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, canonicalize(value[key])]),
+  );
 }
 
 export function serializeWorld(document: WorldDocument, space = 2): string {
@@ -93,15 +118,19 @@ export function parseWorld(
   try {
     parsed = JSON.parse(source);
   } catch (cause) {
-    throw new WorldSerializationError(`Invalid JSON: ${cause instanceof Error ? cause.message : String(cause)}`);
+    throw new WorldSerializationError(
+      `Invalid JSON: ${cause instanceof Error ? cause.message : String(cause)}`,
+    );
   }
   if (!isRecord(parsed)) throw new WorldSerializationError('Expected a JSON object');
-  const migrated = parsed.schemaVersion === CURRENT_WORLD_SCHEMA_VERSION
-    ? parsed
-    : migrations.migrate(parsed);
+  const migrated =
+    parsed.schemaVersion === CURRENT_WORLD_SCHEMA_VERSION ? parsed : migrations.migrate(parsed);
   validateWorldDocument(migrated);
   if (migrated.schemaVersion !== CURRENT_WORLD_SCHEMA_VERSION) {
-    throw new WorldSerializationError('Unsupported future or legacy schema version', '$.schemaVersion');
+    throw new WorldSerializationError(
+      'Unsupported future or legacy schema version',
+      '$.schemaVersion',
+    );
   }
   return migrated;
 }

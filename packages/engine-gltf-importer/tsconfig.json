@@ -2,8 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "composite": true, "rootDir": "src", "outDir": "dist" },
   "include": ["src"],
-  "references": [
-    { "path": "../engine-assets" },
-    { "path": "../engine-geometry" }
-  ]
+  "references": [{ "path": "../engine-assets" }, { "path": "../engine-geometry" }]
 }

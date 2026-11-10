@@ -1,14 +1,7 @@
 export type AssetId = string & { readonly __assetId: unique symbol };
 
 export type AssetKind =
-  | 'model'
-  | 'mesh'
-  | 'material'
-  | 'texture'
-  | 'audio'
-  | 'animation'
-  | 'environment'
-  | 'other';
+  'model' | 'mesh' | 'material' | 'texture' | 'audio' | 'animation' | 'environment' | 'other';
 
 export interface AssetRecord {
   readonly id: AssetId;
@@ -35,7 +28,13 @@ export interface RegisterAssetInput extends Omit<AssetRecord, 'id' | 'uri' | 'de
 export class AssetRegistryError extends Error {
   constructor(
     message: string,
-    readonly code: 'INVALID_ID' | 'INVALID_URI' | 'DUPLICATE_ID' | 'MISSING_DEPENDENCY' | 'DEPENDENCY_CYCLE' | 'NOT_FOUND',
+    readonly code:
+      | 'INVALID_ID'
+      | 'INVALID_URI'
+      | 'DUPLICATE_ID'
+      | 'MISSING_DEPENDENCY'
+      | 'DEPENDENCY_CYCLE'
+      | 'NOT_FOUND',
   ) {
     super(message);
     this.name = 'AssetRegistryError';
@@ -46,7 +45,14 @@ const ASSET_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 
 /** Normalize a project-relative asset URI and reject traversal or external locations. */
 export function normalizeAssetUri(uri: string): string {
-  if (!uri || uri.includes('\\') || uri.startsWith('/') || /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(uri) || uri.includes('?') || uri.includes('#')) {
+  if (
+    !uri ||
+    uri.includes('\\') ||
+    uri.startsWith('/') ||
+    /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(uri) ||
+    uri.includes('?') ||
+    uri.includes('#')
+  ) {
     throw new AssetRegistryError('Asset URI must be a project-relative path', 'INVALID_URI');
   }
   const segments = uri.split('/');
@@ -65,9 +71,12 @@ function freezeRecord(input: RegisterAssetInput): AssetRecord {
   }
   return Object.freeze({
     ...input,
-    id: input.id ?? `asset:${crypto.randomUUID()}` as AssetId,
+    id: input.id ?? (`asset:${crypto.randomUUID()}` as AssetId),
     uri: normalizeAssetUri(input.uri),
-    importer: Object.freeze({ ...input.importer, settings: Object.freeze({ ...input.importer.settings }) }),
+    importer: Object.freeze({
+      ...input.importer,
+      settings: Object.freeze({ ...input.importer.settings }),
+    }),
     dependencies: Object.freeze([...(input.dependencies ?? [])]),
     metadata: Object.freeze({ ...input.metadata }),
   });
@@ -84,7 +93,10 @@ export class AssetRegistry {
     }
     for (const dependency of record.dependencies) {
       if (!this.#records.has(dependency)) {
-        throw new AssetRegistryError(`Missing asset dependency: ${dependency}`, 'MISSING_DEPENDENCY');
+        throw new AssetRegistryError(
+          `Missing asset dependency: ${dependency}`,
+          'MISSING_DEPENDENCY',
+        );
       }
       if (dependency === record.id || this.#dependsOn(dependency, record.id)) {
         throw new AssetRegistryError('Asset dependency cycle detected', 'DEPENDENCY_CYCLE');
@@ -115,7 +127,10 @@ export class AssetRegistry {
   remove(id: AssetId): boolean {
     if (!this.#records.has(id)) return false;
     if ([...this.#records.values()].some((record) => record.dependencies.includes(id))) {
-      throw new AssetRegistryError('Cannot remove an asset that is still referenced', 'MISSING_DEPENDENCY');
+      throw new AssetRegistryError(
+        'Cannot remove an asset that is still referenced',
+        'MISSING_DEPENDENCY',
+      );
     }
     return this.#records.delete(id);
   }
@@ -132,7 +147,11 @@ export class AssetRegistry {
     if (visited.has(from)) return false;
     visited.add(from);
     const record = this.#records.get(from);
-    return Boolean(record?.dependencies.some((dependency) => dependency === target || this.#dependsOn(dependency, target, visited)));
+    return Boolean(
+      record?.dependencies.some(
+        (dependency) => dependency === target || this.#dependsOn(dependency, target, visited),
+      ),
+    );
   }
 }
 
@@ -184,15 +203,26 @@ export class AssetImportService {
 
   register(importer: AssetImporter): void {
     if (!importer.id.trim() || !importer.version.trim() || importer.extensions.length === 0) {
-      throw new AssetImportError('Importer identity and at least one extension are required', 'IMPORT_FAILED');
+      throw new AssetImportError(
+        'Importer identity and at least one extension are required',
+        'IMPORT_FAILED',
+      );
     }
-    const extensions = importer.extensions.map((extension) => extension.replace(/^\\./, '').toLowerCase());
+    const extensions = importer.extensions.map((extension) =>
+      extension.replace(/^\./, '').toLowerCase(),
+    );
     if (extensions.some((extension) => !/^[a-z0-9]+$/.test(extension))) {
-      throw new AssetImportError('Importer extensions must be simple file extensions', 'IMPORT_FAILED');
+      throw new AssetImportError(
+        'Importer extensions must be simple file extensions',
+        'IMPORT_FAILED',
+      );
     }
     for (const extension of extensions) {
       if (this.#importers.has(extension)) {
-        throw new AssetImportError(`An importer is already registered for .${extension}`, 'DUPLICATE_IMPORTER');
+        throw new AssetImportError(
+          `An importer is already registered for .${extension}`,
+          'DUPLICATE_IMPORTER',
+        );
       }
     }
     for (const extension of extensions) this.#importers.set(extension, importer);
@@ -212,7 +242,10 @@ export class AssetImportService {
     const extension = dot >= 0 ? fileName.slice(dot + 1).toLowerCase() : '';
     const importer = this.#importers.get(extension);
     if (!importer) {
-      throw new AssetImportError(`No importer registered for .${extension || '(none)'}`, 'UNSUPPORTED_FORMAT');
+      throw new AssetImportError(
+        `No importer registered for .${extension || '(none)'}`,
+        'UNSUPPORTED_FORMAT',
+      );
     }
     const signal = options.signal ?? new AbortController().signal;
     throwIfImportAborted(signal);
@@ -229,7 +262,11 @@ export class AssetImportService {
       if (signal.aborted) {
         throw new AssetImportError('Asset import was aborted', 'ABORTED', { cause });
       }
-      throw new AssetImportError(`Importer ${importer.id} failed for ${normalizedUri}`, 'IMPORT_FAILED', { cause });
+      throw new AssetImportError(
+        `Importer ${importer.id} failed for ${normalizedUri}`,
+        'IMPORT_FAILED',
+        { cause },
+      );
     }
   }
 }
