@@ -11,6 +11,13 @@ export interface CameraDescriptor {
   readonly fovY?: number;
   readonly orthographicHeight?: number;
 }
+export interface TextureSource {
+  readonly assetId: string;
+  /** Content hash used for decoded/GPU resource deduplication across project assets. */
+  readonly cacheKey: string;
+  readonly mimeType: 'image/png' | 'image/jpeg';
+  readonly data: Uint8Array;
+}
 export interface MaterialDescriptor {
   readonly color: number;
   readonly roughness: number;
@@ -18,6 +25,7 @@ export interface MaterialDescriptor {
   readonly opacity: number;
   readonly transparent: boolean;
   readonly wireframe: boolean;
+  readonly baseColorTexture?: TextureSource;
 }
 export interface RenderObject {
   readonly id: string;
