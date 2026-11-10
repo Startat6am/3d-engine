@@ -261,6 +261,63 @@ function makeNormals(positions: readonly number[], indices: readonly number[]): 
   return Float32Array.from(normals);
 }
 
+function decomposeNodeMatrix(matrix: readonly number[], index: number): {
+  translation: readonly [number, number, number];
+  rotation: readonly [number, number, number, number];
+  scale: readonly [number, number, number];
+} {
+  const epsilon = 1e-5;
+  if (matrix.length !== 16 || !matrix.every(Number.isFinite) ||
+    Math.abs(matrix[3]!) > epsilon || Math.abs(matrix[7]!) > epsilon ||
+    Math.abs(matrix[11]!) > epsilon || Math.abs(matrix[15]! - 1) > epsilon) {
+    fail(`Node ${index} matrix must be a finite affine transform`, 'UNSUPPORTED_FEATURE');
+  }
+  const x = [matrix[0]!, matrix[1]!, matrix[2]!];
+  const y = [matrix[4]!, matrix[5]!, matrix[6]!];
+  const z = [matrix[8]!, matrix[9]!, matrix[10]!];
+  let sx = Math.hypot(...x), sy = Math.hypot(...y), sz = Math.hypot(...z);
+  if (sx < epsilon || sy < epsilon || sz < epsilon) {
+    fail(`Node ${index} matrix contains a zero scale`, 'UNSUPPORTED_FEATURE');
+  }
+  const dot = (a: number[], b: number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+  const nx = x.map((value) => value / sx);
+  const ny = y.map((value) => value / sy);
+  const nz = z.map((value) => value / sz);
+  if (Math.abs(dot(nx, ny)) > epsilon || Math.abs(dot(nx, nz)) > epsilon || Math.abs(dot(ny, nz)) > epsilon) {
+    fail(`Node ${index} matrix contains shear and cannot be represented by Editor TRS`, 'UNSUPPORTED_FEATURE');
+  }
+  const cross = [ny[1]! * nz[2]! - ny[2]! * nz[1]!, ny[2]! * nz[0]! - ny[0]! * nz[2]!, ny[0]! * nz[1]! - ny[1]! * nz[0]!];
+  if (dot(nx, cross) < 0) {
+    sx = -sx;
+    for (let i = 0; i < 3; i++) nx[i] = -nx[i]!;
+  }
+  // Rotation matrix entries are read by row from the column-major glTF matrix.
+  const r00 = nx[0]!, r01 = ny[0]!, r02 = nz[0]!;
+  const r10 = nx[1]!, r11 = ny[1]!, r12 = nz[1]!;
+  const r20 = nx[2]!, r21 = ny[2]!, r22 = nz[2]!;
+  const trace = r00 + r11 + r22;
+  let qx: number, qy: number, qz: number, qw: number;
+  if (trace > 0) {
+    const t = Math.sqrt(trace + 1) * 2;
+    qw = 0.25 * t; qx = (r21 - r12) / t; qy = (r02 - r20) / t; qz = (r10 - r01) / t;
+  } else if (r00 > r11 && r00 > r22) {
+    const t = Math.sqrt(1 + r00 - r11 - r22) * 2;
+    qw = (r21 - r12) / t; qx = 0.25 * t; qy = (r01 + r10) / t; qz = (r02 + r20) / t;
+  } else if (r11 > r22) {
+    const t = Math.sqrt(1 + r11 - r00 - r22) * 2;
+    qw = (r02 - r20) / t; qx = (r01 + r10) / t; qy = 0.25 * t; qz = (r12 + r21) / t;
+  } else {
+    const t = Math.sqrt(1 + r22 - r00 - r11) * 2;
+    qw = (r10 - r01) / t; qx = (r02 + r20) / t; qy = (r12 + r21) / t; qz = 0.25 * t;
+  }
+  const qLength = Math.hypot(qx, qy, qz, qw);
+  return {
+    translation: [matrix[12]!, matrix[13]!, matrix[14]!],
+    rotation: [qx / qLength, qy / qLength, qz / qLength, qw / qLength],
+    scale: [sx, sy, sz],
+  };
+}
+
 function tuple<T extends readonly number[]>(values: number[] | undefined, defaults: T, length: number, label: string): T {
   const result = values ?? defaults;
   if (result.length !== length || !result.every(Number.isFinite)) fail(`Invalid ${label}`);
@@ -335,18 +392,24 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
   });
 
   const nodes: GltfNode[] = (root.nodes ?? []).map((node, index) => {
-    const translation = tuple(node.translation, [0, 0, 0] as const, 3, `node ${index} translation`);
-    const rotation = tuple(node.rotation, [0, 0, 0, 1] as const, 4, `node ${index} rotation`);
-    const scale = tuple(node.scale, [1, 1, 1] as const, 3, `node ${index} scale`);
+    if (node.matrix && (node.translation !== undefined || node.rotation !== undefined || node.scale !== undefined)) {
+      fail(`Node ${index} must use either matrix or TRS properties, not both`);
+    }
+    const transform = node.matrix
+      ? decomposeNodeMatrix(node.matrix, index)
+      : {
+          translation: tuple(node.translation, [0, 0, 0] as const, 3, `node ${index} translation`),
+          rotation: tuple(node.rotation, [0, 0, 0, 1] as const, 4, `node ${index} rotation`),
+          scale: tuple(node.scale, [1, 1, 1] as const, 3, `node ${index} scale`),
+        };
     if (node.mesh !== undefined && !meshes[node.mesh]) fail(`Node ${index} references missing mesh ${node.mesh}`);
     const children = node.children ?? [];
     if (children.some((child) => !Number.isInteger(child) || child < 0 || child >= (root.nodes?.length ?? 0))) fail(`Node ${index} references an invalid child`);
-    if (node.matrix && (node.matrix.length !== 16 || !node.matrix.every(Number.isFinite))) fail(`Node ${index} has an invalid matrix`);
     return {
       name: node.name ?? `Node ${index}`,
       mesh: node.mesh ?? null,
       children,
-      translation, rotation, scale,
+      ...transform,
       ...(node.matrix ? { matrix: node.matrix } : {}),
     };
   });
