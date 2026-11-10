@@ -144,13 +144,21 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
           },
           (geometry) => geometry.dispose(),
         );
-        const materialLease = this.#materialCache.acquireSync(
-          materialKey,
-          () => new THREE.MeshStandardMaterial(),
-          (material) => material.dispose(),
-        );
-        const mesh = new THREE.Mesh(geometryLease.resource, materialLease.resource);
-        mesh.userData['engineEntityId'] = item.id;
+        let materialLease: AssetResourceLease<THREE.MeshStandardMaterial> | undefined;
+        let mesh: THREE.Mesh;
+        try {
+          materialLease = this.#materialCache.acquireSync(
+            materialKey,
+            () => new THREE.MeshStandardMaterial(),
+            (material) => material.dispose(),
+          );
+          mesh = new THREE.Mesh(geometryLease.resource, materialLease.resource);
+          mesh.userData['engineEntityId'] = item.id;
+        } catch (error) {
+          materialLease?.release();
+          geometryLease.release();
+          throw error;
+        }
         entry = {
           mesh,
           geometrySource: item.geometry,
