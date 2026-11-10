@@ -1,5 +1,11 @@
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
-import { createBoxGeometry, type MeshData } from '@engine/geometry';
+import {
+  createBoxGeometry,
+  createCylinderGeometry,
+  createPlaneGeometry,
+  createUvSphereGeometry,
+  type MeshData,
+} from '@engine/geometry';
 import {
   createDefaultCamera,
   createDefaultMaterial,
@@ -25,17 +31,31 @@ const runtime = new EngineRuntime();
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
   'Renderable',
 );
-const box = runtime.world.createEntity();
-runtime.world.add(box, Transform, {
-  position: [0, 0, 0],
-  rotation: [0, 0, 0, 1],
-  scale: [1, 1, 1],
-  parent: null,
-});
-runtime.world.add(box, Renderable, {
-  geometry: createBoxGeometry(),
-  material: createDefaultMaterial(),
-});
+const addRenderable = (
+  position: readonly [number, number, number],
+  geometry: MeshData,
+  color: number,
+  scale: readonly [number, number, number] = [1, 1, 1],
+) => {
+  const entity = runtime.world.createEntity();
+  runtime.world.add(entity, Transform, {
+    position,
+    rotation: [0, 0, 0, 1],
+    scale,
+    parent: null,
+  });
+  runtime.world.add(entity, Renderable, {
+    geometry,
+    material: createDefaultMaterial(color),
+  });
+  return entity;
+};
+
+// Milestone 4 acceptance scene: four CPU primitives rendered through the WebGL2 adapter.
+addRenderable([0, -0.55, 0], createPlaneGeometry(4, 3, 4, 3), 0x334155);
+addRenderable([-1.25, 0, 0], createBoxGeometry(), 0x6ea8fe, [0.8, 0.8, 0.8]);
+addRenderable([0, 0, 0], createUvSphereGeometry(0.5, 24, 16), 0xf59e0b, [0.9, 0.9, 0.9]);
+addRenderable([1.25, 0, 0], createCylinderGeometry(), 0x34d399, [0.8, 0.9, 0.8]);
 
 const camera = createDefaultCamera();
 let previousFrame = 0;

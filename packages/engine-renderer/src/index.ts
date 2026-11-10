@@ -120,6 +120,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         const geometry = mesh.geometry;
         if (
           geometry.getAttribute('position').array !== item.geometry.positions ||
+          geometry.getAttribute('normal').array !== item.geometry.normals ||
           geometry.index?.array !== item.geometry.indices
         ) {
           geometry.dispose();
