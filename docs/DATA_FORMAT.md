@@ -48,6 +48,8 @@ Built-in components have namespaced stable type IDs and explicit schema versions
 
 Asset records include stable ID, type, URI relative to project root, content hash, importer metadata, and optional source URI. Paths are normalized and sandboxed to project root. Hashes detect changed content; no credentials or absolute machine paths are stored.
 
+Within one world document, asset IDs are unique. Every `MeshRenderer.assetId`, embedded `assetPayloads[].assetId`, and declared asset dependency must resolve to an asset record in the same document. Asset dependencies must be acyclic. Validation reports the offending JSON path and rejects the document before editor state is changed; unknown optional component payloads remain opaque and are not recursively interpreted as asset references.
+
 ## Migrations and compatibility
 
 - `schemaVersion` uses semver; readers reject unsupported future major versions.
