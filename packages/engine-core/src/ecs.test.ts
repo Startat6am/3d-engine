@@ -6,6 +6,7 @@ import {
   SystemScheduler,
   Transform,
   TransformHierarchy,
+  TransformPropagationSystem,
   World,
   type SystemContext,
 } from './ecs.js';
@@ -138,6 +139,49 @@ describe('transform hierarchy', () => {
     const matrix = hierarchy.worldMatrix(child);
     expect(Array.from(matrix.slice(12, 15))).toEqual([12, 6, 0]);
     expect(Array.from(matrix.slice(0, 3))).toEqual([2, 0, 0]);
+  });
+
+  it('propagates parent and child transforms in the scheduler final phase', () => {
+    const world = new World();
+    const hierarchy = new TransformHierarchy(world);
+    const parent = world.createEntity();
+    const child = world.createEntity();
+    world.add(parent, Transform, {
+      position: [5, 0, 0],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+      parent: null,
+    });
+    world.add(child, Transform, {
+      position: [2, 3, 0],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+      parent: null,
+    });
+    hierarchy.setParent(child, parent);
+
+    const scheduler = new SystemScheduler();
+    scheduler.add({
+      phase: 'post-update',
+      update: () => {
+        world.get(parent, Transform)!.position = [8, 0, 0];
+      },
+    });
+    scheduler.add(new TransformPropagationSystem(hierarchy));
+    scheduler.updateFrame({
+      world,
+      deltaTime: 1 / 60,
+      elapsedTime: 1 / 60,
+    });
+
+    expect(Array.from(hierarchy.getWorldMatrix(child)!.slice(12, 15))).toEqual([10, 3, 0]);
+    const snapshot = hierarchy.getWorldMatrix(child)!;
+    snapshot[12] = 999;
+    expect(hierarchy.getWorldMatrix(child)![12]).toBe(10);
+
+    world.get(parent, Transform)!.position = [11, 0, 0];
+    hierarchy.propagate();
+    expect(Array.from(hierarchy.getWorldMatrix(child)!.slice(12, 15))).toEqual([13, 3, 0]);
   });
 
   it('recursively destroys descendants', () => {

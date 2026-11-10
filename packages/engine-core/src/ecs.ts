@@ -144,7 +144,8 @@ export interface EntityQuery {
   forEach(visit: (entity: EntityId, ...components: unknown[]) => void): void;
 }
 
-export type SystemPhase = 'pre-update' | 'fixed-update' | 'variable-update' | 'post-update';
+export type SystemPhase =
+  'pre-update' | 'fixed-update' | 'variable-update' | 'post-update' | 'transform-propagation';
 export interface SystemContext {
   readonly world: World;
   readonly deltaTime: number;
@@ -160,6 +161,7 @@ const PHASE_ORDER: readonly SystemPhase[] = [
   'fixed-update',
   'variable-update',
   'post-update',
+  'transform-propagation',
 ];
 export class SystemScheduler {
   readonly #systems = new Map<SystemPhase, WorldSystem[]>();
@@ -278,7 +280,39 @@ export function createTransform(): TransformData {
 }
 
 export class TransformHierarchy {
+  readonly #worldMatrices = new Map<EntityId, Float64Array>();
+
   constructor(readonly world: World) {}
+
+  /** Rebuild derived world matrices after simulation systems have completed. */
+  propagate(): void {
+    const next = new Map<EntityId, Float64Array>();
+    const resolve = (entity: EntityId, visiting: Set<EntityId>): Float64Array => {
+      const cached = next.get(entity);
+      if (cached) return cached;
+      if (visiting.has(entity)) throw new Error('Transform hierarchy contains a cycle');
+      visiting.add(entity);
+      const transform = this.world.get(entity, Transform);
+      if (!transform) throw new Error(`Entity has no Transform: ${entity}`);
+      const local = composeTransform(transform);
+      const result =
+        transform.parent === null
+          ? local
+          : multiplyMatrices(resolve(transform.parent, visiting), local);
+      visiting.delete(entity);
+      next.set(entity, result);
+      return result;
+    };
+
+    this.world.query(Transform).forEach((entity) => resolve(entity, new Set()));
+    this.#worldMatrices.clear();
+    for (const [entity, matrix] of next) this.#worldMatrices.set(entity, matrix);
+  }
+
+  /** Returns a defensive copy of the latest propagated matrix. */
+  getWorldMatrix(entity: EntityId): Float64Array | undefined {
+    return this.#worldMatrices.get(entity)?.slice();
+  }
   setParent(child: EntityId, parent: EntityId | null): void {
     const transform = this.world.get(child, Transform);
     if (!transform) throw new Error(`Entity has no Transform: ${child}`);
@@ -394,4 +428,15 @@ function multiplyMatrices(a: Float64Array, b: Float64Array): Float64Array {
     }
   }
   return result;
+}
+
+/** Scheduler adapter that propagates transforms after all update phases. */
+export class TransformPropagationSystem implements WorldSystem {
+  readonly phase = 'transform-propagation' as const;
+
+  constructor(readonly hierarchy: TransformHierarchy) {}
+
+  update(): void {
+    this.hierarchy.propagate();
+  }
 }
