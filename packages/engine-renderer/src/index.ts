@@ -144,13 +144,21 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
           },
           (geometry) => geometry.dispose(),
         );
-        const materialLease = this.#materialCache.acquireSync(
-          materialKey,
-          () => new THREE.MeshStandardMaterial(),
-          (material) => material.dispose(),
-        );
-        const mesh = new THREE.Mesh(geometryLease.resource, materialLease.resource);
-        mesh.userData['engineEntityId'] = item.id;
+        let materialLease: AssetResourceLease<THREE.MeshStandardMaterial> | undefined;
+        let mesh: THREE.Mesh;
+        try {
+          materialLease = this.#materialCache.acquireSync(
+            materialKey,
+            () => new THREE.MeshStandardMaterial(),
+            (material) => material.dispose(),
+          );
+          mesh = new THREE.Mesh(geometryLease.resource, materialLease.resource);
+          mesh.userData['engineEntityId'] = item.id;
+        } catch (error) {
+          materialLease?.release();
+          geometryLease.release();
+          throw error;
+        }
         entry = {
           mesh,
           geometrySource: item.geometry,
@@ -161,34 +169,55 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         this.#objects.set(item.id, entry);
         this.#scene.add(mesh);
       } else {
-        if (entry.geometrySource !== item.geometry) {
-          entry.geometryLease.release();
-          entry.geometryLease = this.#geometryCache.acquireSync(
-            geometryKey,
-            () => {
-              const geometry = new THREE.BufferGeometry();
-              geometry.setAttribute(
-                'position',
-                new THREE.BufferAttribute(item.geometry.positions, 3),
-              );
-              geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
-              geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
-              return geometry;
-            },
-            (geometry) => geometry.dispose(),
-          );
-          entry.mesh.geometry = entry.geometryLease.resource;
-          entry.geometrySource = item.geometry;
+        // Acquire replacements before releasing the current leases. If creating either
+        // resource fails, the existing mesh remains valid and its leases stay intact.
+        let nextGeometryLease: AssetResourceLease<THREE.BufferGeometry> | undefined;
+        let nextMaterialLease: AssetResourceLease<THREE.MeshStandardMaterial> | undefined;
+        try {
+          if (entry.geometrySource !== item.geometry) {
+            nextGeometryLease = this.#geometryCache.acquireSync(
+              geometryKey,
+              () => {
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute(
+                  'position',
+                  new THREE.BufferAttribute(item.geometry.positions, 3),
+                );
+                geometry.setAttribute(
+                  'normal',
+                  new THREE.BufferAttribute(item.geometry.normals, 3),
+                );
+                geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
+                return geometry;
+              },
+              (geometry) => geometry.dispose(),
+            );
+          }
+          if (entry.materialSource !== item.material) {
+            nextMaterialLease = this.#materialCache.acquireSync(
+              materialKey,
+              () => new THREE.MeshStandardMaterial(),
+              (material) => material.dispose(),
+            );
+          }
+        } catch (error) {
+          nextGeometryLease?.release();
+          nextMaterialLease?.release();
+          throw error;
         }
-        if (entry.materialSource !== item.material) {
-          entry.materialLease.release();
-          entry.materialLease = this.#materialCache.acquireSync(
-            materialKey,
-            () => new THREE.MeshStandardMaterial(),
-            (material) => material.dispose(),
-          );
-          entry.mesh.material = entry.materialLease.resource;
+        if (nextGeometryLease) {
+          const previousLease = entry.geometryLease;
+          entry.geometryLease = nextGeometryLease;
+          entry.geometrySource = item.geometry;
+          entry.mesh.geometry = nextGeometryLease.resource;
+          previousLease.release();
+        }
+        if (nextMaterialLease) {
+          const previousLease = entry.materialLease;
+          entry.materialLease = nextMaterialLease;
           entry.materialSource = item.material;
+          entry.mesh.material = nextMaterialLease.resource;
+          previousLease.release();
         }
       }
       const mesh = entry.mesh;
