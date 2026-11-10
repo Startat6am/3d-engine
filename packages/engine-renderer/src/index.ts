@@ -17,6 +17,8 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #scene = new THREE.Scene();
   readonly #perspectiveCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
   readonly #objects = new Map<string, THREE.Mesh>();
+  readonly #raycaster = new THREE.Raycaster();
+  #activeCamera: THREE.Camera | null = null;
   #disposed = false;
 
   constructor(canvas: HTMLCanvasElement, options: RendererOptions = {}) {
@@ -70,7 +72,21 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     this.#syncObjects(scene.objects);
     this.#scene.background = new THREE.Color(scene.background);
     const camera = this.#applyCamera(scene.camera);
+    this.#activeCamera = camera;
     this.#renderer.render(this.#scene, camera);
+  }
+
+  pick(x: number, y: number, width: number, height: number): string | null {
+    this.#assertActive();
+    const camera = this.#activeCamera;
+    if (!camera || width <= 0 || height <= 0) return null;
+    const pointer = new THREE.Vector2((x / width) * 2 - 1, 1 - (y / height) * 2);
+    camera.updateMatrixWorld();
+    this.#scene.updateMatrixWorld(true);
+    this.#raycaster.setFromCamera(pointer, camera);
+    const intersections = this.#raycaster.intersectObjects([...this.#objects.values()], false);
+    const entityId = intersections[0]?.object.userData['engineEntityId'];
+    return typeof entityId === 'string' ? entityId : null;
   }
 
   dispose(): void {
@@ -97,6 +113,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
         geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
         mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial());
+        mesh.userData['engineEntityId'] = item.id;
         this.#objects.set(item.id, mesh);
         this.#scene.add(mesh);
       } else {
