@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Matrix4, Quaternion, Vector3 } from 'three';
 import { EditorHistory } from './EditorHistory.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
@@ -368,13 +369,62 @@ export function EditorApp() {
       const imported = await new GlbImporter().import(await file.arrayBuffer(), { uri: file.name || 'import.glb', settings: {}, signal: new AbortController().signal });
       const asset = imported.data;
       const parentOf = new Map<number, number>();
-      asset.nodes.forEach((node, parent) => node.children.forEach((child) => parentOf.set(child, parent)));
-      if (asset.nodes.some((node) => node.matrix)) throw new Error('Editor import currently supports TRS node transforms, not matrix-authored nodes');
-      if ([...parentOf.keys()].some((index) => asset.nodes[index]?.mesh !== null && asset.nodes[index]?.mesh !== undefined)) throw new Error('Nested mesh nodes are not yet supported; import a flattened GLB scene');
-      const instances = asset.nodes.map((node, nodeIndex) => ({ node, nodeIndex })).filter(({ node }) => node.mesh !== null);
-      const sources = instances.length
-        ? instances.flatMap(({ node, nodeIndex }) => asset.meshes[node.mesh!]!.primitives.map((primitive, primitiveIndex) => ({ name: node.name || asset.meshes[node.mesh!]!.name, primitive, position: node.translation, rotation: node.rotation, scale: node.scale, key: `${nodeIndex}-${primitiveIndex}` })))
-        : asset.meshes.flatMap((mesh, meshIndex) => mesh.primitives.map((primitive, primitiveIndex) => ({ name: mesh.name, primitive, position: [0, 0, 0] as const, rotation: [0, 0, 0, 1] as const, scale: [1, 1, 1] as const, key: `${meshIndex}-${primitiveIndex}` })));
+      asset.nodes.forEach((node, parent) => node.children.forEach((child) => {
+        if (parentOf.has(child)) throw new Error(`GLB node ${child} has more than one parent`);
+        parentOf.set(child, parent);
+      }));
+      const sources: { name: string; primitive: (typeof asset.meshes)[number]['primitives'][number]; position: readonly [number, number, number]; rotation: readonly [number, number, number, number]; scale: readonly [number, number, number]; key: string }[] = [];
+      const visited = new Set<number>();
+      const active = new Set<number>();
+      const visitNode = (nodeIndex: number, parentWorld: Matrix4) => {
+        if (active.has(nodeIndex)) throw new Error(`GLB node hierarchy contains a cycle at node ${nodeIndex}`);
+        if (visited.has(nodeIndex)) throw new Error(`GLB node ${nodeIndex} is referenced more than once`);
+        const node = asset.nodes[nodeIndex];
+        if (!node) throw new Error(`GLB references missing node ${nodeIndex}`);
+        active.add(nodeIndex);
+        visited.add(nodeIndex);
+        const local = new Matrix4().compose(
+          new Vector3(...node.translation),
+          new Quaternion(...node.rotation),
+          new Vector3(...node.scale),
+        );
+        const world = parentWorld.clone().multiply(local);
+        const position = new Vector3();
+        const rotation = new Quaternion();
+        const scale = new Vector3();
+        world.decompose(position, rotation, scale);
+        const reconstructed = new Matrix4().compose(position, rotation, scale);
+        if (world.elements.some((value, index) => Math.abs(value - reconstructed.elements[index]!) > 1e-4)) {
+          throw new Error(`GLB node ${node.name} has a combined transform with shear; this cannot be represented by the Editor Transform yet`);
+        }
+        if (node.mesh !== null) {
+          const mesh = asset.meshes[node.mesh];
+          if (!mesh) throw new Error(`GLB node ${nodeIndex} references missing mesh ${node.mesh}`);
+          mesh.primitives.forEach((primitive, primitiveIndex) => sources.push({
+            name: node.name || mesh.name,
+            primitive,
+            position: [position.x, position.y, position.z],
+            rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
+            scale: [scale.x, scale.y, scale.z],
+            key: `${nodeIndex}-${primitiveIndex}`,
+          }));
+        }
+        node.children.forEach((child) => visitNode(child, world));
+        active.delete(nodeIndex);
+      };
+      const rootNodes = asset.nodes.map((_, index) => index).filter((index) => !parentOf.has(index));
+      rootNodes.forEach((root) => visitNode(root, new Matrix4()));
+      if (visited.size !== asset.nodes.length) throw new Error('GLB node hierarchy contains a cycle or nodes without a root');
+      if (!asset.nodes.length) {
+        asset.meshes.forEach((mesh, meshIndex) => mesh.primitives.forEach((primitive, primitiveIndex) => sources.push({
+          name: mesh.name,
+          primitive,
+          position: [0, 0, 0],
+          rotation: [0, 0, 0, 1],
+          scale: [1, 1, 1],
+          key: `${meshIndex}-${primitiveIndex}`,
+        })));
+      }
       if (!sources.length) throw new Error('The GLB contains no renderable triangle meshes');
       const importedEntities: SceneEntity[] = sources.map((source, index) => {
         const pbr = source.primitive.material === null ? undefined : asset.materials[source.primitive.material];

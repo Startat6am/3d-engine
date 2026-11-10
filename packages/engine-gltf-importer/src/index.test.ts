@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GlbImportError, GlbImporter } from './index.js';
 
-function makeGlb(options: { indices?: number[]; mode?: number; normals?: boolean; imageBytes?: number[] } = {}): ArrayBuffer {
+function makeGlb(options: { indices?: number[]; mode?: number; normals?: boolean; imageBytes?: number[]; nodeMatrix?: number[] } = {}): ArrayBuffer {
   const binaryParts: Uint8Array[] = [];
   const views: { byteOffset: number; byteLength: number }[] = [];
   const addFloats = (values: number[]) => {
@@ -48,7 +48,7 @@ function makeGlb(options: { indices?: number[]; mode?: number; normals?: boolean
       samplers: [{ magFilter: 9729, minFilter: 9987, wrapS: 10497, wrapT: 33071 }],
       textures: [{ source: 0, sampler: 0 }],
     }),
-    nodes: [{ mesh: 0, translation: [2, 0, 0] }],
+    nodes: [{ mesh: 0, ...(options.nodeMatrix ? { matrix: options.nodeMatrix } : { translation: [2, 0, 0] }) }],
   };
   const jsonBytes = new TextEncoder().encode(JSON.stringify(json));
   const jsonLength = Math.ceil(jsonBytes.length / 4) * 4;
@@ -82,6 +82,21 @@ describe('GlbImporter', () => {
     expect(result.data.materials[0]?.roughnessFactor).toBe(0.8);
     expect(result.data.nodes[0]?.translation).toEqual([2, 0, 0]);
     expect(result.metadata.primitiveCount).toBe(1);
+  });
+
+  it('decomposes matrix-authored nodes into equivalent TRS transforms', async () => {
+    const matrix = [2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 5, 6, 7, 1];
+    const result = await new GlbImporter().import(makeGlb({ nodeMatrix: matrix }), context);
+    expect(result.data.nodes[0]?.translation).toEqual([5, 6, 7]);
+    expect(result.data.nodes[0]?.rotation).toEqual([0, 0, 0, 1]);
+    expect(result.data.nodes[0]?.scale).toEqual([2, 3, 4]);
+    expect(result.data.nodes[0]?.matrix).toEqual(matrix);
+  });
+
+  it('rejects matrix-authored nodes containing shear instead of silently approximating them', async () => {
+    const matrix = [1, 0, 0, 0, 0.25, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    await expect(new GlbImporter().import(makeGlb({ nodeMatrix: matrix }), context))
+      .rejects.toMatchObject({ code: 'UNSUPPORTED_FEATURE' });
   });
 
   it('retains embedded image bytes and resolves texture sampler/material references', async () => {
