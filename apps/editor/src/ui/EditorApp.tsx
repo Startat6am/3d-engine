@@ -749,25 +749,57 @@ export function EditorApp() {
           scale: source.scale,
         };
       });
-      const assetRecord = assetRegistryRef.current.register({
+      // Stage embedded texture assets and the model record in a project-scoped copy.
+      // This keeps registry/payload state unchanged if any image hash or registration fails.
+      const stagedRegistry = mergeAssetRegistry(assetRegistryRef.current, []);
+      const stagedPayloads = new Map(assetPayloadsRef.current);
+      const textureRecords: AssetId[] = [];
+      for (const [imageIndex, image] of asset.images.entries()) {
+        const imageBytes = image.data.slice();
+        const imageBuffer = imageBytes.buffer.slice(
+          imageBytes.byteOffset,
+          imageBytes.byteOffset + imageBytes.byteLength,
+        ) as ArrayBuffer;
+        const imageHash = await sha256(imageBuffer);
+        const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
+        const textureRecord = stagedRegistry.register({
+          name: image.name,
+          kind: 'texture',
+          uri: `${uri}.image-${imageIndex}.${extension}`,
+          contentHash: imageHash,
+          importer: { id: 'engine.gltf.embedded-image', version: importer.version, settings: {} },
+          dependencies: [],
+          metadata: { sourceFormat: 'glb', imageIndex, mimeType: image.mimeType },
+        });
+        textureRecords.push(textureRecord.id);
+        stagedPayloads.set(textureRecord.id, {
+          assetId: textureRecord.id,
+          mimeType: image.mimeType,
+          encoding: 'base64',
+          data: encodeBase64(imageBuffer),
+        });
+      }
+      const assetRecord = stagedRegistry.register({
         name: file.name || safeFileName,
         kind: imported.kind,
         uri,
         contentHash,
         importer: { id: importer.id, version: importer.version, settings: {} },
-        dependencies: imported.dependencies as AssetId[],
+        dependencies: [...(imported.dependencies as AssetId[]), ...textureRecords],
         metadata: { ...imported.metadata, fileSize: file.size },
       });
       const importedEntities = importedEntitiesWithoutAsset.map((entity) => ({
         ...entity,
         assetId: assetRecord.id,
       }));
-      assetPayloadsRef.current.set(assetRecord.id, {
+      stagedPayloads.set(assetRecord.id, {
         assetId: assetRecord.id,
         mimeType: 'model/gltf-binary',
         encoding: 'base64',
         data: encodeBase64(sourceBytes),
       });
+      assetRegistryRef.current = stagedRegistry;
+      assetPayloadsRef.current = stagedPayloads;
       assetResourceLeasesRef.current.push(pendingLease);
       pendingLease = null;
       commitEntities([...entitiesRef.current, ...importedEntities]);
