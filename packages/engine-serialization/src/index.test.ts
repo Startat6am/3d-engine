@@ -101,6 +101,38 @@ describe('world serialization', () => {
     ).toThrow('Asset dependency cycle detected');
   });
 
+  it('ships the JSON Schema beside the compiled package entry point', async () => {
+    const schemaUrl = new URL('./schemas/world-v1.schema.json', import.meta.url);
+    const schema = await import(schemaUrl.href, { with: { type: 'json' } });
+    expect(schema.default.$id).toBe('https://choreon.dev/schemas/world-v1.schema.json');
+  });
+
+  it('validates nested document structure against the published v1 JSON Schema', () => {
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        world: { ...world().world, entities: [{ id: 'entity:bad', components: [] }] },
+      }),
+    ).toThrow('Schema validation failed');
+  });
+
+  it('rejects malformed base64 asset payloads through the shared schema', () => {
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        assets: [asset('asset:model')],
+        assetPayloads: [
+          {
+            assetId: 'asset:model',
+            mimeType: 'model/gltf-binary',
+            encoding: 'base64',
+            data: 'not base64!',
+          },
+        ],
+      }),
+    ).toThrow('Schema validation failed');
+  });
+
   it('reports malformed JSON and invalid envelopes', () => {
     expect(() => parseWorld('{')).toThrow(WorldSerializationError);
     expect(() => validateWorldDocument({ format: 'wrong' })).toThrow('Unsupported world format');
