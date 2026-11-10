@@ -11,11 +11,12 @@
 - `AssetResourceCache`: asynchronous and synchronous resource acquisition, shared leases, reference counting, retry after failed creation, and disposal after the final lease. The renderer uses it for geometry/material resources and releases leases on replacement, removal, and renderer disposal.
 - Editor Save/Open uses the shared serializer. Browser E2E verifies GLB import, stable asset references, source-payload preservation, save/reopen, and asset identity continuity.
 - Serialization tests include a versioned golden world fixture with an embedded model asset.
+- GLB importer fixtures cover interleaved POSITION/NORMAL accessors (`byteStride` and accessor offsets), rejection of unsupported required extensions, preservation of optional extension declarations, and malformed accessor/bufferView ranges.
 
 ## Not yet delivered
 
 - No published JSON Schema artifact or generated runtime validators yet; runtime validation is currently implemented in TypeScript.
-- GLB external/data URI buffers and images, sparse/normalized accessors, non-triangle primitive modes, GLB v1, glTF JSON with external buffers, skins, morph targets, and animation channels remain unsupported. Interleaved accessor coverage and broader conformance fixtures remain open.
+- GLB external/data URI buffers and images, sparse/normalized accessors, non-triangle primitive modes, GLB v1, glTF JSON with external buffers, skins, morph targets, and animation channels remain unsupported. Broader conformance fixtures remain open beyond the current interleaved-accessor, extension-declaration, and malformed-range coverage.
 - Embedded image bytes are decoded/preserved by the importer, but renderer texture creation/upload and full material texture rendering are not integrated.
 - Cancellation is cooperative through `AbortSignal`; there is no worker-backed import job queue or mid-accessor interruption for synchronous parsing.
 - Editor-specific entity/component conversion remains local to the editor. Asset references are not yet integrated into player packaging or AI authoring plans.
@@ -23,7 +24,7 @@
 
 ## Next gates
 
-1. Expand GLB conformance fixtures for interleaved accessors, unsupported extensions, and additional malformed inputs.
+1. Expand GLB conformance fixtures beyond the current baseline, including extension-specific capability handling, alignment/bounds edge cases, and additional malformed inputs.
 2. Define JSON Schema artifacts and align generated/runtime validation with the TypeScript contracts.
 3. Add worker-backed cancellable import jobs when the job boundary is specified; preserve the current cooperative cancellation contract.
 4. Add texture upload/rendering and verify device/context-loss recreation and disposal.
