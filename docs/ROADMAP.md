@@ -25,8 +25,6 @@ Core contracts precede all feature adapters. Every subsystem must follow [Subsys
 ## Release policy
 
 No milestone is marked complete based on code presence alone. Required tests, docs, acceptance scene, and known limitations must be recorded. Performance claims require reproducible benchmark output and hardware/runtime metadata.
-
-
 ## Model-import expansion (planned; not yet scheduled)
 
 After the M5 asset identity, serialization, and import-lifecycle gates are stable, expand the model importer pool without changing the milestone order:
