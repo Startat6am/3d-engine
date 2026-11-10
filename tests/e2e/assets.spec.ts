@@ -4,19 +4,29 @@ import { readFile } from 'node:fs/promises';
 function makeTriangleGlb(): Buffer {
   const positions = Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
   const normals = Buffer.from(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]).buffer);
-  const binary = Buffer.concat([positions, normals]);
+  const image = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const binary = Buffer.concat([positions, normals, image]);
   const document = {
     asset: { version: '2.0', generator: 'editor-assets-e2e' },
     buffers: [{ byteLength: binary.length }],
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: positions.length },
       { buffer: 0, byteOffset: positions.length, byteLength: normals.length },
+      { buffer: 0, byteOffset: positions.length + normals.length, byteLength: image.length },
     ],
     accessors: [
       { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' },
       { bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
     ],
-    meshes: [{ name: 'Triangle', primitives: [{ attributes: { POSITION: 0, NORMAL: 1 } }] }],
+    images: [{ name: 'One pixel', mimeType: 'image/png', bufferView: 2 }],
+    textures: [{ source: 0 }],
+    materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+    meshes: [
+      { name: 'Triangle', primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, material: 0 }] },
+    ],
     nodes: [{ name: 'TriangleNode', mesh: 0, translation: [1, 0, 0] }],
   };
   const json = Buffer.from(JSON.stringify(document));
@@ -67,7 +77,14 @@ test('GLB imports register stable project assets and survive world save/reopen',
 
   const firstSave = await saveWorld();
   const firstDocument = JSON.parse(firstSave) as {
-    assets: Array<{ id: string; uri: string; contentHash: string; importer: { id: string } }>;
+    assets: Array<{
+      id: string;
+      kind: string;
+      uri: string;
+      contentHash: string;
+      importer: { id: string };
+      dependencies: string[];
+    }>;
     assetPayloads: Array<{ assetId: string; mimeType: string; encoding: string; data: string }>;
     world: {
       entities: Array<{
@@ -77,22 +94,35 @@ test('GLB imports register stable project assets and survive world save/reopen',
       }>;
     };
   };
-  expect(firstDocument.assets).toHaveLength(1);
-  const asset = firstDocument.assets[0]!;
+  expect(firstDocument.assets).toHaveLength(2);
+  const asset = firstDocument.assets.find((item) => item.kind === 'model')!;
+  const texture = firstDocument.assets.find((item) => item.kind === 'texture')!;
   expect(asset.uri).toBe('imports/triangle.glb');
   expect(asset.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   expect(asset.importer.id).toBe('engine.gltf.glb');
+  expect(asset.dependencies).toContain(texture.id);
+  expect(texture.uri).toBe('imports/triangle.glb.image-0.png');
+  expect(texture.importer.id).toBe('engine.gltf.embedded-image');
   const importedEntity = firstDocument.world.entities.find(
     (entity) => entity.components?.MeshRenderer?.assetId,
   );
   expect(importedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
-  expect(firstDocument.assetPayloads).toHaveLength(1);
-  expect(firstDocument.assetPayloads[0]).toMatchObject({
+  expect(firstDocument.assetPayloads).toHaveLength(2);
+  const modelPayload = firstDocument.assetPayloads.find((payload) => payload.assetId === asset.id)!;
+  const texturePayload = firstDocument.assetPayloads.find(
+    (payload) => payload.assetId === texture.id,
+  )!;
+  expect(modelPayload).toMatchObject({
     assetId: asset.id,
     mimeType: 'model/gltf-binary',
     encoding: 'base64',
   });
-  expect(Buffer.from(firstDocument.assetPayloads[0]!.data, 'base64')).toEqual(makeTriangleGlb());
+  expect(Buffer.from(modelPayload.data, 'base64')).toEqual(makeTriangleGlb());
+  expect(texturePayload).toMatchObject({
+    assetId: texture.id,
+    mimeType: 'image/png',
+    encoding: 'base64',
+  });
 
   await page.locator('input[accept=".world,application/json"]').setInputFiles({
     name: 'round-trip.world',
@@ -101,8 +131,9 @@ test('GLB imports register stable project assets and survive world save/reopen',
   });
   await expect(page.getByText('TriangleNode')).toBeVisible();
   const secondDocument = JSON.parse(await saveWorld()) as typeof firstDocument;
-  expect(secondDocument.assets).toHaveLength(1);
-  expect(secondDocument.assets[0]?.id).toBe(asset.id);
+  expect(secondDocument.assets).toHaveLength(2);
+  expect(secondDocument.assets.find((item) => item.kind === 'model')?.id).toBe(asset.id);
+  expect(secondDocument.assets.find((item) => item.kind === 'texture')?.id).toBe(texture.id);
   expect(secondDocument.assetPayloads).toEqual(firstDocument.assetPayloads);
   const reopenedEntity = secondDocument.world.entities.find(
     (entity) => entity.components?.MeshRenderer?.assetId,
