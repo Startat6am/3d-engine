@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import type { Matrix4 as Matrix4Type } from 'three';
 import { EditorHistory } from './EditorHistory.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
@@ -10,15 +10,13 @@ import {
   validateMeshData,
   type MeshData,
 } from '@engine/geometry';
-import { GlbImporter } from '@engine/gltf-importer';
 import {
   createDefaultCamera,
   createDefaultMaterial,
   lookAtQuaternion,
-  ThreeWebGLRendererAdapter,
-  type RenderObject,
-  type Vec3,
-} from '@engine/renderer';
+} from '@engine/renderer/contracts';
+import type { RenderObject, Vec3 } from '@engine/renderer/contracts';
+import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 
 type TransformNumberInputProps = {
   readonly value: number;
@@ -188,29 +186,36 @@ export function EditorApp() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    let renderer: ThreeWebGLRendererAdapter;
-    try {
-      renderer = new ThreeWebGLRendererAdapter(canvas);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      canvas.dataset.rendererError = message;
-      setRendererError(message);
-      console.error('WebGL2 renderer initialization failed', error);
-      return;
-    }
-    canvas.dataset.renderer = renderer.capabilities.backend;
-    rendererRef.current = renderer;
-    const resize = () => {
-      const bounds = canvas.getBoundingClientRect();
-      renderer.resize(bounds.width, bounds.height);
-      renderer.render(renderScene);
-    };
-    const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
-    resize();
+    let disposed = false;
+    let observer: ResizeObserver | null = null;
+    let renderer: ThreeWebGLRendererAdapter | null = null;
+    void import('@engine/renderer')
+      .then(({ ThreeWebGLRendererAdapter: Renderer }) => {
+        if (disposed) return;
+        renderer = new Renderer(canvas);
+        canvas.dataset.renderer = renderer.capabilities.backend;
+        rendererRef.current = renderer;
+        const resize = () => {
+          if (!renderer) return;
+          const bounds = canvas.getBoundingClientRect();
+          renderer.resize(bounds.width, bounds.height);
+          renderer.render(renderScene);
+        };
+        observer = new ResizeObserver(resize);
+        observer.observe(canvas);
+        resize();
+      })
+      .catch((error: unknown) => {
+        if (disposed) return;
+        const message = error instanceof Error ? error.message : String(error);
+        canvas.dataset.rendererError = message;
+        setRendererError(message);
+        console.error('WebGL2 renderer initialization failed', error);
+      });
     return () => {
-      observer.disconnect();
-      renderer.dispose();
+      disposed = true;
+      observer?.disconnect();
+      renderer?.dispose();
       rendererRef.current = null;
     };
     // Renderer lifetime is tied to the canvas; scene updates are handled below.
@@ -428,6 +433,10 @@ export function EditorApp() {
   const importGlb = async (file?: File) => {
     if (!file) return;
     try {
+      const [{ Matrix4, Quaternion, Vector3 }, { GlbImporter }] = await Promise.all([
+        import('three'),
+        import('@engine/gltf-importer'),
+      ]);
       const imported = await new GlbImporter().import(await file.arrayBuffer(), {
         uri: file.name || 'import.glb',
         settings: {},
@@ -451,7 +460,7 @@ export function EditorApp() {
       }[] = [];
       const visited = new Set<number>();
       const active = new Set<number>();
-      const visitNode = (nodeIndex: number, parentWorld: Matrix4) => {
+      const visitNode = (nodeIndex: number, parentWorld: Matrix4Type) => {
         if (active.has(nodeIndex))
           throw new Error(`GLB node hierarchy contains a cycle at node ${nodeIndex}`);
         if (visited.has(nodeIndex))
