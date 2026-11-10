@@ -41,6 +41,8 @@ export interface RendererAdapter {
   readonly capabilities: RendererCapabilities;
   resize(width: number, height: number): void;
   render(scene: RenderScene): void;
+  /** Return the nearest entity under viewport-local CSS pixel coordinates, or null. */
+  pick(x: number, y: number, width: number, height: number): string | null;
   dispose(): void;
 }
 export interface RendererOptions {

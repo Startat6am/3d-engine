@@ -48,7 +48,13 @@ export function EditorApp() {
   const [worldError, setWorldError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [camera, setCamera] = useState(() => createDefaultCamera());
-  const dragRef = useRef<{ x: number; y: number; pointerId: number } | null>(null);
+  const dragRef = useRef<{
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    pointerId: number;
+  } | null>(null);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
 
   const renderScene = useMemo(
@@ -282,7 +288,13 @@ export function EditorApp() {
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (event.button !== 0) return;
-    dragRef.current = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+    dragRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      startX: event.clientX,
+      startY: event.clientY,
+      pointerId: event.pointerId,
+    };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -393,8 +405,21 @@ export function EditorApp() {
             aria-label="3D scene viewport"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
-            onPointerUp={() => {
+            onPointerUp={(event) => {
+              const drag = dragRef.current;
               dragRef.current = null;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+              if (moved > 4) return;
+              const canvas = event.currentTarget;
+              const bounds = canvas.getBoundingClientRect();
+              const hit = rendererRef.current?.pick(
+                event.clientX - bounds.left,
+                event.clientY - bounds.top,
+                bounds.width,
+                bounds.height,
+              );
+              if (hit) setSelectedId(hit);
             }}
             onPointerCancel={() => {
               dragRef.current = null;
