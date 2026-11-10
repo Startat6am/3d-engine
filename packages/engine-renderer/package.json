@@ -20,6 +20,7 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@engine/assets": "workspace:*",
     "@engine/geometry": "workspace:*",
     "three": "0.187.0"
   }
