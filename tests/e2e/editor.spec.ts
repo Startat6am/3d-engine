@@ -111,3 +111,18 @@ test('mobile transform pad nudges the selected object on the chosen axis', async
   await page.getByRole('button', { name: 'Increase Y' }).click();
   await expect(page.getByLabel('scale Y')).toHaveValue('1.1');
 });
+
+test('mobile transform controls dock at the bottom in one compact row', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+  const viewport = page.getByLabel('3D scene viewport');
+  const panel = page.getByLabel('Transform controls');
+  const panelBox = await panel.boundingBox();
+  const viewportBox = await viewport.boundingBox();
+  expect(panelBox).not.toBeNull();
+  expect(viewportBox).not.toBeNull();
+  expect(panelBox!.height).toBeLessThanOrEqual(60);
+  expect(panelBox!.y).toBeGreaterThan(viewportBox!.y + viewportBox!.height * 0.65);
+  await expect(page.getByRole('button', { name: 'Move mode' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Increase X' })).toBeVisible();
+});
