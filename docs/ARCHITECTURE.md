@@ -38,6 +38,12 @@ The initial suggested layout is refined by adding `engine-geometry` and `engine-
 
 No dependency from core to a feature package; no dependency from runtime packages to editor UI. Cross-package communication uses public contracts/events, not private imports.
 
+## Contract-first subsystem design
+
+Every subsystem follows [Subsystem Contracts](SUBSYSTEM_CONTRACTS.md). Clear public contracts, machine-readable schemas where applicable, stable actionable errors, examples, and automated tests are required engineering artifacts—not documentation debt to defer until AI work begins. This does not change milestone order or authorize early implementation of AI features.
+
+The same domain contracts should be usable by editor UI, project/scene file workflows (including Git-backed projects), MCP, and future provider adapters. These are optional integration surfaces; none is the source of truth and none may bypass validation or engine invariants.
+
 ## AI authoring trust boundary
 
 Natural-language prompts are converted into versioned declarative operation plans. Plans are schema- and policy-validated, previewed, approved, and applied transactionally through editor commands. Model output is untrusted data, never executable code. The editor remains usable without an AI provider. See [AI Agent Authoring Specification](AI_AGENT_SPEC.md).
