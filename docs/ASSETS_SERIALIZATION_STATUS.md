@@ -1,25 +1,31 @@
 # Assets & Serialization Implementation Status
 
-**Status:** initial package slice; milestone exit gate remains open.
+**Status:** initial package slice plus editor, GLB, cache, and renderer integration; milestone exit gate remains open.
 
-## Delivered in this slice
+## Delivered
 
-- `@engine/assets`: project-scoped asset identity registry with typed asset kinds, normalized project-relative URIs, importer identity/settings, content hashes, metadata, dependency references, and guarded removal.
-- `@engine/serialization`: versioned `.world` document envelope, structural validation, deterministic key ordering, explicit migration registry, and parse/serialize APIs.
-- Unit tests for registry identity, URI traversal rejection, dependency integrity, document round-trip, malformed JSON, and migration behavior.
+- `@engine/assets`: project-scoped asset identity registry with typed asset kinds, normalized project-relative URIs, importer identity/settings, content hashes, metadata, dependency references, guarded removal, and a format-neutral importer dispatcher with cooperative cancellation.
+- `@engine/gltf-importer`: GLB 2.0 parsing for embedded binary buffers, indexed/non-indexed triangle primitives, supported float POSITION/NORMAL accessors, unsigned scalar indices, generated normals, node TRS/matrix metadata, metallic-roughness material factors, embedded image bytes, samplers, textures, and material texture references. Unsupported primitive modes and invalid accessor references produce typed diagnostics.
+- Editor GLB import registers stable asset IDs and SHA-256 source hashes, preserves source GLB payload bytes in the `.world` document, and restores payloads only after checking asset identity and content hash.
+- `@engine/serialization`: versioned `.world` envelope, structural validation, deterministic key ordering, explicit migration registry, embedded source-payload shape, and shared validation of entity-to-asset, payload-to-asset, and asset-dependency references (including duplicate IDs, missing dependencies, and cycles).
+- `AssetResourceCache`: asynchronous and synchronous resource acquisition, shared leases, reference counting, retry after failed creation, and disposal after the final lease. The renderer uses it for geometry/material resources and releases leases on replacement, removal, and renderer disposal.
+- Editor Save/Open uses the shared serializer. Browser E2E verifies GLB import, stable asset references, source-payload preservation, save/reopen, and asset identity continuity.
+- Serialization tests include a versioned golden world fixture with an embedded model asset.
 
-## Explicitly not delivered
+## Not yet delivered
 
-- `@engine/gltf-importer` now parses GLB 2.0 containers, embedded binary buffers, indexed/non-indexed triangle primitives, float POSITION/NORMAL accessors, unsigned scalar indices, generated normals, node TRS/matrix metadata, and core metallic-roughness material factors. It is registered in the workspace and implements the format-neutral importer contract.
-- GLB import currently retains embedded texture/image metadata and texture indices only; it does not decode pixels or upload GPU resources. External/data URI buffers and images, sparse/normalized accessors, non-triangle primitive modes, GLB v1, glTF JSON with external buffers, skins, morph targets, and animation channels are not supported. Cancellation is checked at importer boundaries and between mesh parses; synchronous parsing cannot be interrupted mid-accessor. No concrete async worker queue, texture/audio importer, content hashing implementation, cache, dependency scanner, or CPU/GPU resource retain/release lifecycle exists.
-- No JSON Schema artifact or generated runtime validators yet.
-- Editor Save/Open now calls `@engine/serialization` for envelope validation, parsing, and deterministic serialization; conversion of editor-specific entity payloads remains local.
-- Asset references are not yet integrated into Editor, Player, renderer resources, or AI authoring plans.
+- No published JSON Schema artifact or generated runtime validators yet; runtime validation is currently implemented in TypeScript.
+- GLB external/data URI buffers and images, sparse/normalized accessors, non-triangle primitive modes, GLB v1, glTF JSON with external buffers, skins, morph targets, and animation channels remain unsupported. Interleaved accessor coverage and broader conformance fixtures remain open.
+- Embedded image bytes are decoded/preserved by the importer, but renderer texture creation/upload and full material texture rendering are not integrated.
+- Cancellation is cooperative through `AbortSignal`; there is no worker-backed import job queue or mid-accessor interruption for synchronous parsing.
+- Editor-specific entity/component conversion remains local to the editor. Asset references are not yet integrated into player packaging or AI authoring plans.
+- No standalone binary project asset store or archive container exists; source GLB payloads are embedded in the `.world` JSON for the current workflow.
 
 ## Next gates
 
-1. Add golden fixtures and expand editor-specific round-trip coverage through the shared serializer.
-2. Expand GLB fixtures for interleaved accessors, embedded texture decoding, animation, and unsupported-extension diagnostics.
-3. Add cancellable import jobs, content-addressed cache, dependency graph validation, and deterministic disposal.
-4. Verify world round-trip with asset references and missing-asset diagnostics.
-5. Run full workspace format, lint, typecheck, unit tests, production builds, and browser acceptance before marking the milestone complete.
+1. Expand GLB conformance fixtures for interleaved accessors, unsupported extensions, and additional malformed inputs.
+2. Define JSON Schema artifacts and align generated/runtime validation with the TypeScript contracts.
+3. Add worker-backed cancellable import jobs when the job boundary is specified; preserve the current cooperative cancellation contract.
+4. Add texture upload/rendering and verify device/context-loss recreation and disposal.
+5. Keep player packaging and future AI authoring on the same asset identity/reference contracts.
+6. Run full workspace format, lint, typecheck, unit tests, production builds, and browser acceptance before marking the milestone complete.
