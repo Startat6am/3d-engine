@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   AssetImportError,
   AssetImportService,
+  AssetResourceCache,
   AssetRegistry,
   AssetRegistryError,
   normalizeAssetUri,
@@ -134,5 +135,48 @@ describe('AssetImportService', () => {
     await expect(
       service.import('ship.glb', new ArrayBuffer(0), { signal: controller.signal }),
     ).rejects.toMatchObject({ code: 'ABORTED' });
+  });
+});
+
+describe('AssetResourceCache', () => {
+  it('deduplicates concurrent loads and disposes after the final lease', async () => {
+    const cache = new AssetResourceCache<{ id: number }>();
+    const load = vi.fn(async () => ({ id: 7 }));
+    const dispose = vi.fn();
+    const [first, second] = await Promise.all([
+      cache.acquire('asset:model', load, dispose),
+      cache.acquire('asset:model', load, dispose),
+    ]);
+
+    expect(load).toHaveBeenCalledOnce();
+    expect(first.resource).toBe(second.resource);
+    expect(cache.referenceCount('asset:model')).toBe(2);
+    first.release();
+    first.release();
+    expect(dispose).not.toHaveBeenCalled();
+    second.release();
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(cache.size).toBe(0);
+  });
+
+  it('removes failed loads so a later acquire can retry', async () => {
+    const cache = new AssetResourceCache<number>();
+    await expect(
+      cache.acquire(
+        'asset:retry',
+        async () => {
+          throw new Error('decode failed');
+        },
+        () => {},
+      ),
+    ).rejects.toThrow('decode failed');
+    const lease = await cache.acquire(
+      'asset:retry',
+      () => 42,
+      () => {},
+    );
+    expect(lease.resource).toBe(42);
+    lease.release();
+    expect(cache.size).toBe(0);
   });
 });

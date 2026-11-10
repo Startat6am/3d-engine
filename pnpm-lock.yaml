@@ -237,21 +237,24 @@ importers:
 
   apps/editor:
     dependencies:
+      '@engine/assets':
+        specifier: workspace:*
+        version: link:../../packages/engine-assets
       '@engine/core':
         specifier: workspace:*
         version: link:../../packages/engine-core
       '@engine/geometry':
         specifier: workspace:*
         version: link:../../packages/engine-geometry
+      '@engine/gltf-importer':
+        specifier: workspace:*
+        version: link:../../packages/engine-gltf-importer
       '@engine/renderer':
         specifier: workspace:*
         version: link:../../packages/engine-renderer
       '@engine/serialization':
         specifier: workspace:*
         version: link:../../packages/engine-serialization
-      '@engine/gltf-importer':
-        specifier: workspace:*
-        version: link:../../packages/engine-gltf-importer
       '@vitejs/plugin-react':
         specifier: 5.1.4
         version: 5.1.4(vite@7.3.8(lightningcss@1.33.0))
@@ -294,9 +297,20 @@ importers:
         specifier: 7.3.8
         version: 7.3.8(lightningcss@1.33.0)
 
+  packages/engine-assets: {}
+
   packages/engine-core: {}
 
   packages/engine-geometry: {}
+
+  packages/engine-gltf-importer:
+    dependencies:
+      '@engine/assets':
+        specifier: workspace:*
+        version: link:../engine-assets
+      '@engine/geometry':
+        specifier: workspace:*
+        version: link:../engine-geometry
 
   packages/engine-renderer:
     dependencies:
@@ -307,18 +321,7 @@ importers:
         specifier: 0.187.0
         version: 0.187.0
 
-  packages/engine-assets: {}
-
   packages/engine-serialization: {}
-
-  packages/engine-gltf-importer:
-    dependencies:
-      '@engine/assets':
-        specifier: workspace:*
-        version: link:../engine-assets
-      '@engine/geometry':
-        specifier: workspace:*
-        version: link:../engine-geometry
 
 packages:
   '@babel/code-frame@7.29.7':

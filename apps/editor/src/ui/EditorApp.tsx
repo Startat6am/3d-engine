@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  AssetImportService,
+  AssetRegistry,
+  type AssetId,
+  type AssetKind,
+  type RegisterAssetInput,
+} from '@engine/assets';
 import type { Matrix4 as Matrix4Type } from 'three';
+import type { GlbAsset } from '@engine/gltf-importer';
 import { EditorHistory } from './EditorHistory.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
@@ -66,6 +74,7 @@ type TransformMode = 'position' | 'rotation' | 'scale';
 type SceneEntity = RenderObject & {
   readonly name: string;
   readonly primitive: Primitive | 'GLB';
+  readonly assetId?: AssetId;
   readonly rotationEuler?: readonly [number, number, number];
 };
 const geometryFor: Record<Primitive, () => MeshData> = {
@@ -84,6 +93,113 @@ const initialEntity = (): SceneEntity => ({
   rotation: [0, 0, 0, 1],
   scale: [1, 1, 1],
 });
+
+const ASSET_KINDS: readonly AssetKind[] = [
+  'model',
+  'mesh',
+  'material',
+  'texture',
+  'audio',
+  'animation',
+  'environment',
+  'other',
+];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readAssetMetadata(
+  value: unknown,
+  path: string,
+): Readonly<Record<string, string | number | boolean>> {
+  if (!isRecord(value)) throw new Error(`Invalid asset metadata at ${path}`);
+  for (const [key, item] of Object.entries(value)) {
+    if (
+      typeof item !== 'string' &&
+      typeof item !== 'boolean' &&
+      !(typeof item === 'number' && Number.isFinite(item))
+    ) {
+      throw new Error(`Invalid asset metadata value at ${path}.${key}`);
+    }
+  }
+  return value as Readonly<Record<string, string | number | boolean>>;
+}
+
+function parseAssetRecord(value: unknown, index: number): RegisterAssetInput {
+  const path = `$.assets[${index}]`;
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
+    throw new Error(`Invalid asset identity at ${path}`);
+  }
+  if (typeof value.kind !== 'string' || !ASSET_KINDS.includes(value.kind as AssetKind)) {
+    throw new Error(`Invalid asset kind at ${path}.kind`);
+  }
+  if (typeof value.uri !== 'string' || typeof value.contentHash !== 'string') {
+    throw new Error(`Invalid asset URI or content hash at ${path}`);
+  }
+  if (
+    !isRecord(value.importer) ||
+    typeof value.importer.id !== 'string' ||
+    typeof value.importer.version !== 'string'
+  ) {
+    throw new Error(`Invalid asset importer at ${path}.importer`);
+  }
+  if (
+    !Array.isArray(value.dependencies) ||
+    !value.dependencies.every((item) => typeof item === 'string')
+  ) {
+    throw new Error(`Invalid asset dependencies at ${path}.dependencies`);
+  }
+  return {
+    id: value.id as AssetId,
+    name: value.name,
+    kind: value.kind as AssetKind,
+    uri: value.uri,
+    contentHash: value.contentHash,
+    importer: {
+      id: value.importer.id,
+      version: value.importer.version,
+      settings: readAssetMetadata(value.importer.settings, `${path}.importer.settings`),
+    },
+    dependencies: value.dependencies as AssetId[],
+    metadata: readAssetMetadata(value.metadata, `${path}.metadata`),
+  };
+}
+
+function mergeAssetRegistry(current: AssetRegistry, serialized: readonly unknown[]): AssetRegistry {
+  const merged = new AssetRegistry();
+  for (const asset of current.list()) merged.register(asset);
+  const pending = serialized.map(parseAssetRecord);
+  while (pending.length) {
+    let progressed = false;
+    for (let index = pending.length - 1; index >= 0; index--) {
+      const asset = pending[index]!;
+      const existing = merged.get(asset.id!);
+      if (existing) {
+        if (existing.contentHash !== asset.contentHash || existing.uri !== asset.uri) {
+          throw new Error(`World asset identity conflicts with the current project: ${asset.id}`);
+        }
+        pending.splice(index, 1);
+        progressed = true;
+      } else if ((asset.dependencies ?? []).every((dependency) => merged.has(dependency))) {
+        merged.register(asset);
+        pending.splice(index, 1);
+        progressed = true;
+      }
+    }
+    if (!progressed)
+      throw new Error('World assets contain missing dependencies or a dependency cycle');
+  }
+  return merged;
+}
+
+async function sha256(source: ArrayBuffer): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', source);
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
+    '',
+  );
+  return `sha256:${hex}`;
+}
 
 export function EditorApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -152,6 +268,9 @@ export function EditorApp() {
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
+  const assetRegistryRef = useRef(new AssetRegistry());
+  const assetImportServiceRef = useRef(new AssetImportService());
+  const glbImporterRegisteredRef = useRef(false);
   const [camera, setCamera] = useState(() => createDefaultCamera());
   const [transformMode, setTransformMode] = useState<TransformMode>('position');
   const [transformAxis, setTransformAxis] = useState(0);
@@ -319,7 +438,7 @@ export function EditorApp() {
         name: worldName,
         settings: { gravity: [0, -9.81, 0], environment: {} },
         entities: entities.map(
-          ({ id, name, primitive, position, rotation, scale, material, geometry }) => ({
+          ({ id, name, primitive, assetId, position, rotation, scale, material, geometry }) => ({
             id,
             name,
             parent: null,
@@ -328,6 +447,7 @@ export function EditorApp() {
               MeshRenderer: {
                 primitive,
                 material,
+                ...(assetId ? { assetId } : {}),
                 ...(primitive === 'GLB'
                   ? {
                       geometry: {
@@ -342,7 +462,7 @@ export function EditorApp() {
           }),
         ),
       },
-      assets: [],
+      assets: assetRegistryRef.current.list(),
       extensions: {},
     };
     const blob = new Blob([serializeWorld(worldDocument)], { type: 'application/json' });
@@ -359,6 +479,7 @@ export function EditorApp() {
     if (!file) return;
     try {
       const root = parseWorld(await file.text());
+      const restoredAssetRegistry = mergeAssetRegistry(assetRegistryRef.current, root.assets);
       const parsed: SceneEntity[] = root.world.entities.map((entry, index) => {
         if (!entry || typeof entry !== 'object')
           throw new Error(`Invalid entity at index ${index}`);
@@ -369,6 +490,7 @@ export function EditorApp() {
             Transform?: { position?: number[]; rotation?: number[]; scale?: number[] };
             MeshRenderer?: {
               primitive?: Primitive | 'GLB';
+              assetId?: string;
               material?: SceneEntity['material'];
               geometry?: { positions?: number[]; normals?: number[]; indices?: number[] };
             };
@@ -402,6 +524,8 @@ export function EditorApp() {
         }
         if (!entity.id || !entity.name || !transform || !mesh || !primitive)
           throw new Error(`Entity ${index} is missing supported Transform or MeshRenderer data`);
+        if (mesh.assetId && !restoredAssetRegistry.has(mesh.assetId as AssetId))
+          throw new Error(`Entity ${entity.name} references an unknown asset: ${mesh.assetId}`);
         const vector = (value: number[] | undefined, length: number, fallback: number[]) => {
           if (!value) return fallback;
           if (value.length !== length || value.some((n) => !Number.isFinite(n)))
@@ -412,6 +536,7 @@ export function EditorApp() {
           id: entity.id,
           name: entity.name,
           primitive,
+          ...(mesh.assetId ? { assetId: mesh.assetId as AssetId } : {}),
           geometry,
           material: mesh.material ?? createDefaultMaterial(),
           position: vector(transform.position, 3, [0, 0, 0]) as [number, number, number],
@@ -421,6 +546,7 @@ export function EditorApp() {
       });
       if (new Set(parsed.map((item) => item.id)).size !== parsed.length)
         throw new Error('World contains duplicate entity IDs');
+      assetRegistryRef.current = restoredAssetRegistry;
       commitEntities(parsed);
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
@@ -433,15 +559,20 @@ export function EditorApp() {
   const importGlb = async (file?: File) => {
     if (!file) return;
     try {
-      const [{ Matrix4, Quaternion, Vector3 }, { GlbImporter }] = await Promise.all([
-        import('three'),
-        import('@engine/gltf-importer'),
-      ]);
-      const imported = await new GlbImporter().import(await file.arrayBuffer(), {
-        uri: file.name || 'import.glb',
-        settings: {},
+      const [three, gltf] = await Promise.all([import('three'), import('@engine/gltf-importer')]);
+      const { Matrix4, Quaternion, Vector3 } = three;
+      const importer = new gltf.GlbImporter();
+      if (!glbImporterRegisteredRef.current) {
+        assetImportServiceRef.current.register(importer);
+        glbImporterRegisteredRef.current = true;
+      }
+      const sourceBytes = await file.arrayBuffer();
+      const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'import.glb';
+      const uri = `imports/${safeFileName}`;
+      const imported = await assetImportServiceRef.current.import<GlbAsset>(uri, sourceBytes, {
         signal: new AbortController().signal,
       });
+      const contentHash = await sha256(sourceBytes);
       const asset = imported.data;
       const parentOf = new Map<number, number>();
       asset.nodes.forEach((node, parent) =>
@@ -527,7 +658,7 @@ export function EditorApp() {
         );
       }
       if (!sources.length) throw new Error('The GLB contains no renderable triangle meshes');
-      const importedEntities: SceneEntity[] = sources.map((source, index) => {
+      const importedEntitiesWithoutAsset: SceneEntity[] = sources.map((source, index) => {
         const pbr =
           source.primitive.material === null
             ? undefined
@@ -559,6 +690,19 @@ export function EditorApp() {
           scale: source.scale,
         };
       });
+      const assetRecord = assetRegistryRef.current.register({
+        name: file.name || safeFileName,
+        kind: imported.kind,
+        uri,
+        contentHash,
+        importer: { id: importer.id, version: importer.version, settings: {} },
+        dependencies: imported.dependencies as AssetId[],
+        metadata: { ...imported.metadata, fileSize: file.size },
+      });
+      const importedEntities = importedEntitiesWithoutAsset.map((entity) => ({
+        ...entity,
+        assetId: assetRecord.id,
+      }));
       commitEntities([...entitiesRef.current, ...importedEntities]);
       setSelectedId(importedEntities[0]!.id);
       setWorldError('');
