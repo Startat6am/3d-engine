@@ -13,7 +13,7 @@ Define a safe, provider-independent interface through which an AI agent can crea
 - modifying an existing scene without destroying unrelated content;
 - iterating on a result using visual and structural feedback.
 
-The feature is an authoring capability of the engine/editor, not an AI dependency of the runtime. Projects must remain fully usable when no model provider, network connection, or agent is available.
+The feature is an authoring capability of the engine/editor, not an AI dependency of the runtime. Projects must remain fully usable when no model provider, network connection, or agent is available. The design target is predictable execution even with modest models that have limited implicit 3D/world understanding: models should select from explicit, documented capabilities and produce typed specifications, while deterministic engine services validate and execute them. Do not rely on model intelligence to enforce invariants. Subsystem contracts and machine-readable specifications are a foundation-wide engineering requirement; see [Subsystem Contracts](SUBSYSTEM_CONTRACTS.md).
 
 ## 2. Non-goals
 

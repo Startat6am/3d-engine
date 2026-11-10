@@ -52,6 +52,8 @@ Normative operation protocol, validation, consent, privacy, provenance, and acce
 
 ## Rules
 
+- Follow [Subsystem Contracts](SUBSYSTEM_CONTRACTS.md): public API behavior, input/output shapes, invariants, stable errors, examples, compatibility, and tests are specified together. Persisted or externally exchanged payloads require versioned machine-readable schemas or equivalent validators.
+
 - Public imports come from package root exports; deep imports are unsupported.
 - IDs are opaque branded values, not array indexes.
 - Async I/O is explicit; cancellation uses AbortSignal where applicable.
