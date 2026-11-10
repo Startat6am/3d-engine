@@ -593,28 +593,6 @@ export function EditorApp() {
       <header className="topbar">
         <div className="brand-mark">◇</div>
         <strong>UNIVERSAL ENGINE</strong>
-        <input
-          className="world-name"
-          aria-label="World name"
-          value={worldName}
-          onChange={(event) => setWorldName(event.target.value)}
-        />
-        <button
-          className="toolbar-button"
-          onClick={undo}
-          disabled={!history.current.canUndo}
-          title="Undo (Ctrl/Cmd+Z)"
-        >
-          Undo
-        </button>
-        <button
-          className="toolbar-button"
-          onClick={redo}
-          disabled={!history.current.canRedo}
-          title="Redo (Ctrl/Cmd+Shift+Z)"
-        >
-          Redo
-        </button>
         <details className="file-menu" style={{ position: 'relative' }}>
           <summary className="toolbar-button" style={{ cursor: 'pointer', listStyle: 'none' }}>
             File ▾
@@ -657,6 +635,28 @@ export function EditorApp() {
             </button>
           </div>
         </details>
+        <input
+          className="world-name"
+          aria-label="World name"
+          value={worldName}
+          onChange={(event) => setWorldName(event.target.value)}
+        />
+        <button
+          className="toolbar-button"
+          onClick={undo}
+          disabled={!history.current.canUndo}
+          title="Undo (Ctrl/Cmd+Z)"
+        >
+          Undo
+        </button>
+        <button
+          className="toolbar-button"
+          onClick={redo}
+          disabled={!history.current.canRedo}
+          title="Redo (Ctrl/Cmd+Shift+Z)"
+        >
+          Redo
+        </button>
         <input
           ref={glbInputRef}
           hidden
