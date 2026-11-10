@@ -314,6 +314,9 @@ importers:
 
   packages/engine-renderer:
     dependencies:
+      '@engine/assets':
+        specifier: workspace:*
+        version: link:../engine-assets
       '@engine/geometry':
         specifier: workspace:*
         version: link:../engine-geometry
