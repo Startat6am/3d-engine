@@ -25,3 +25,17 @@ Core contracts precede all feature adapters. Every subsystem must follow [Subsys
 ## Release policy
 
 No milestone is marked complete based on code presence alone. Required tests, docs, acceptance scene, and known limitations must be recorded. Performance claims require reproducible benchmark output and hardware/runtime metadata.
+
+
+## Model-import expansion (planned; not yet scheduled)
+
+After the M5 asset identity, serialization, and import-lifecycle gates are stable, expand the model importer pool without changing the milestone order:
+
+1. Keep **glTF 2.0 / GLB 2.0** as the primary interoperable model interchange target and first fully supported importer.
+2. Add **.gltf JSON documents**, including external and data-URI resources, as the closest extension of the existing glTF importer.
+3. Add **.blend** through an optional Blender-assisted conversion adapter (for example, a controlled background/headless Blender export to GLB), rather than implementing Blender's native project format parser in engine-core. Blender availability, version compatibility, licensing, conversion diagnostics, and preservation of source files must be explicit.
+4. Evaluate **FBX** next for DCC/game-production workflows, using a maintained importer or controlled conversion path after license and deployment review.
+5. Support **OBJ** as a lower-complexity static-mesh interchange format where useful; it does not replace a rigged/animated character pipeline.
+6. Evaluate **USD/USDZ** for larger composed scenes and production pipelines as a separate, later capability; do not treat it as a drop-in replacement for GLB.
+
+All source formats must normalize into the same versioned, format-neutral Choreon asset representation. Importer support is capability-based: report what was actually imported (geometry, hierarchy, materials, textures, skinning, animation), and emit actionable diagnostics for unsupported features. Format names alone must never imply complete feature support. This list is a proposed direction, not a committed delivery date or promise; each importer requires a contract, fixtures, compatibility notes, security limits, and license review. See [Asset Pipeline](ASSET_PIPELINE.md).
