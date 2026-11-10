@@ -1,6 +1,13 @@
 export const WORLD_FORMAT = 'universal-3d-world' as const;
 export const CURRENT_WORLD_SCHEMA_VERSION = '1.0.0' as const;
 
+export interface WorldAssetPayload {
+  readonly assetId: string;
+  readonly mimeType: string;
+  readonly encoding: 'base64';
+  readonly data: string;
+}
+
 export interface WorldDocument {
   readonly format: typeof WORLD_FORMAT;
   readonly schemaVersion: string;
@@ -12,6 +19,7 @@ export interface WorldDocument {
     readonly entities: readonly unknown[];
   };
   readonly assets: readonly unknown[];
+  readonly assetPayloads?: readonly WorldAssetPayload[];
   readonly extensions: Readonly<Record<string, unknown>>;
   readonly [key: string]: unknown;
 }
@@ -91,6 +99,29 @@ export function validateWorldDocument(value: unknown): asserts value is WorldDoc
     throw new WorldSerializationError('Expected entities array', '$.world.entities');
   if (!Array.isArray(value.assets))
     throw new WorldSerializationError('Expected assets array', '$.assets');
+  if (value.assetPayloads !== undefined) {
+    if (!Array.isArray(value.assetPayloads)) {
+      throw new WorldSerializationError('Expected asset payloads array', '$.assetPayloads');
+    }
+    const assetIds = new Set<string>();
+    for (const [index, payload] of value.assetPayloads.entries()) {
+      const path = `$.assetPayloads[${index}]`;
+      if (
+        !isRecord(payload) ||
+        typeof payload.assetId !== 'string' ||
+        typeof payload.mimeType !== 'string' ||
+        payload.encoding !== 'base64' ||
+        typeof payload.data !== 'string' ||
+        payload.data.length === 0
+      ) {
+        throw new WorldSerializationError('Invalid embedded asset payload', path);
+      }
+      if (assetIds.has(payload.assetId)) {
+        throw new WorldSerializationError('Duplicate asset payload ID', `${path}.assetId`);
+      }
+      assetIds.add(payload.assetId);
+    }
+  }
   if (!isRecord(value.extensions))
     throw new WorldSerializationError('Expected extensions object', '$.extensions');
 }

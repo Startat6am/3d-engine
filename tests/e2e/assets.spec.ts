@@ -68,6 +68,7 @@ test('GLB imports register stable project assets and survive world save/reopen',
   const firstSave = await saveWorld();
   const firstDocument = JSON.parse(firstSave) as {
     assets: Array<{ id: string; uri: string; contentHash: string; importer: { id: string } }>;
+    assetPayloads: Array<{ assetId: string; mimeType: string; encoding: string; data: string }>;
     world: {
       entities: Array<{
         components?: {
@@ -85,6 +86,13 @@ test('GLB imports register stable project assets and survive world save/reopen',
     (entity) => entity.components?.MeshRenderer?.assetId,
   );
   expect(importedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
+  expect(firstDocument.assetPayloads).toHaveLength(1);
+  expect(firstDocument.assetPayloads[0]).toMatchObject({
+    assetId: asset.id,
+    mimeType: 'model/gltf-binary',
+    encoding: 'base64',
+  });
+  expect(Buffer.from(firstDocument.assetPayloads[0]!.data, 'base64')).toEqual(makeTriangleGlb());
 
   await page.locator('input[accept=".world,application/json"]').setInputFiles({
     name: 'round-trip.world',
@@ -95,6 +103,7 @@ test('GLB imports register stable project assets and survive world save/reopen',
   const secondDocument = JSON.parse(await saveWorld()) as typeof firstDocument;
   expect(secondDocument.assets).toHaveLength(1);
   expect(secondDocument.assets[0]?.id).toBe(asset.id);
+  expect(secondDocument.assetPayloads).toEqual(firstDocument.assetPayloads);
   const reopenedEntity = secondDocument.world.entities.find(
     (entity) => entity.components?.MeshRenderer?.assetId,
   );
