@@ -510,13 +510,36 @@ export function EditorApp() {
         <button className="toolbar-button" onClick={redo} disabled={!history.current.canRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
           Redo
         </button>
-        <button className="toolbar-button" onClick={saveWorld}>
-          Save .world
-        </button>
-        <button className="toolbar-button" onClick={() => fileInputRef.current?.click()}>
-          Open .world
-        </button>
-        <button className="toolbar-button" onClick={() => glbInputRef.current?.click()}>Import .glb</button>
+        <details className="file-menu" style={{ position: 'relative' }}>
+          <summary className="toolbar-button" style={{ cursor: 'pointer', listStyle: 'none' }}>
+            File ▾
+          </summary>
+          <div
+            className="file-menu-content"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              zIndex: 20,
+              minWidth: 180,
+              padding: 6,
+              border: '1px solid var(--panel-border, #354052)',
+              borderRadius: 8,
+              background: 'var(--panel-bg, #202936)',
+              boxShadow: '0 8px 24px rgba(0,0,0,.3)',
+            }}
+          >
+            <button className="toolbar-button" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={() => glbInputRef.current?.click()}>
+              Import GLB…
+            </button>
+            <button className="toolbar-button" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={() => fileInputRef.current?.click()}>
+              Open World…
+            </button>
+            <button className="toolbar-button" style={{ display: 'block', width: '100%', textAlign: 'left' }} onClick={saveWorld}>
+              Save World…
+            </button>
+          </div>
+        </details>
         <input ref={glbInputRef} hidden type="file" accept=".glb,model/gltf-binary" onChange={(event) => { void importGlb(event.target.files?.[0]); event.currentTarget.value = ''; }} />
         <input
           ref={fileInputRef}
