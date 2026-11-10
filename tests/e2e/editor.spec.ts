@@ -126,3 +126,24 @@ test('mobile transform controls dock at the bottom in one compact row', async ({
   await expect(page.getByRole('button', { name: 'Move mode' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Increase X' })).toBeVisible();
 });
+
+test('mobile transform panel collapses to a small translucent toggle and expands again', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.goto('/');
+  const panel = page.getByLabel('Transform controls');
+
+  await page.getByRole('button', { name: 'Collapse transform panel' }).click();
+  await expect(page.getByRole('button', { name: 'Expand transform panel' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move mode' })).toHaveCount(0);
+  const collapsedBox = await panel.boundingBox();
+  expect(collapsedBox).not.toBeNull();
+  expect(collapsedBox!.width).toBeLessThanOrEqual(44);
+  expect(collapsedBox!.height).toBeLessThanOrEqual(44);
+  expect(collapsedBox!.x).toBeLessThanOrEqual(10);
+
+  await page.getByRole('button', { name: 'Expand transform panel' }).click();
+  await expect(page.getByRole('button', { name: 'Move mode' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Collapse transform panel' })).toBeVisible();
+});
