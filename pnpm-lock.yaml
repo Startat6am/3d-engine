@@ -308,6 +308,15 @@ importers:
 
   packages/engine-serialization: {}
 
+  packages/engine-gltf-importer:
+    dependencies:
+      '@engine/assets':
+        specifier: workspace:*
+        version: link:../engine-assets
+      '@engine/geometry':
+        specifier: workspace:*
+        version: link:../engine-geometry
+
 packages:
   '@babel/code-frame@7.29.7':
     resolution:
