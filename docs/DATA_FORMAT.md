@@ -14,7 +14,7 @@ A `.world` file is UTF-8 JSON initially (human-diffable and streamable). Binary 
 
 ```json
 {
-  "$schema": "https://example.invalid/engine/world.schema.json",
+  "$schema": "https://choreon.dev/schemas/world-v1.schema.json",
   "format": "universal-3d-world",
   "schemaVersion": "1.0.0",
   "engineVersion": "0.1.0",
@@ -38,7 +38,7 @@ A `.world` file is UTF-8 JSON initially (human-diffable and streamable). Binary 
 }
 ```
 
-This is a normative shape sketch, not yet a published JSON Schema. Transform rotation is quaternion XYZW; units are meters, seconds, radians, and linear color unless a field says otherwise.
+The normative v1 envelope is defined by the [world-v1 JSON Schema](../packages/engine-serialization/src/schemas/world-v1.schema.json) and enforced by `@engine/serialization` at runtime. The schema deliberately leaves component and extension payloads open; cross-record invariants such as asset reference resolution and dependency acyclicity are enforced by semantic validation after schema validation. Transform rotation is quaternion XYZW; units are meters, seconds, radians, and linear color unless a field says otherwise.
 
 ## Component and extension rules
 
