@@ -3,14 +3,8 @@
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
-    "types": [
-      "vite/client"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
     "rootDir": "src",
     "outDir": "dist"
   },
@@ -31,7 +25,5 @@
       "path": "../../packages/engine-gltf-importer"
     }
   ],
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

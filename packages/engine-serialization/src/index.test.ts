@@ -38,13 +38,19 @@ describe('world serialization', () => {
       extensions: document.extensions ?? {},
     }));
     const legacy = { ...world(), schemaVersion: '0.9.0' };
-    expect(parseWorld(JSON.stringify(legacy), migrations).schemaVersion).toBe(CURRENT_WORLD_SCHEMA_VERSION);
+    expect(parseWorld(JSON.stringify(legacy), migrations).schemaVersion).toBe(
+      CURRENT_WORLD_SCHEMA_VERSION,
+    );
   });
 
   it('rejects missing migration paths and non-advancing migrations', () => {
-    expect(() => parseWorld(JSON.stringify({ ...world(), schemaVersion: '9.0.0' }))).toThrow('No migration registered');
+    expect(() => parseWorld(JSON.stringify({ ...world(), schemaVersion: '9.0.0' }))).toThrow(
+      'No migration registered',
+    );
     const migrations = new WorldMigrationRegistry();
     migrations.register('0.9.0', (document) => document);
-    expect(() => parseWorld(JSON.stringify({ ...world(), schemaVersion: '0.9.0' }), migrations)).toThrow('did not advance');
+    expect(() =>
+      parseWorld(JSON.stringify({ ...world(), schemaVersion: '0.9.0' }), migrations),
+    ).toThrow('did not advance');
   });
 });

@@ -36,7 +36,6 @@ The Editor currently has a bounded snapshot history for scene entity edits (100 
 
 Implementation and unit tests are tracked in PR #7. The Editor MVP exit gate remains open until the full command model, gizmos, asset workflow, save/reopen and browser E2E acceptance pass.
 
-
 ## GLB import integration slice
 
 The Editor exposes an `Import .glb` action backed by `@engine/gltf-importer`. Imported triangle primitives become selectable scene entities. Metallic-roughness base color, roughness, metalness and alpha factors are mapped into the current renderer material descriptor. Imported CPU mesh buffers are retained in `.world` save/open documents and participate in entity snapshot Undo/Redo.

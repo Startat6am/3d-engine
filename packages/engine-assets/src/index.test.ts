@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { AssetImportError, AssetImportService, AssetRegistry, AssetRegistryError, normalizeAssetUri, type AssetId } from './index.js';
+import {
+  AssetImportError,
+  AssetImportService,
+  AssetRegistry,
+  AssetRegistryError,
+  normalizeAssetUri,
+  type AssetId,
+} from './index.js';
 
 const input = (overrides: Partial<Parameters<AssetRegistry['register']>[0]> = {}) => ({
   name: 'Mesh',
@@ -32,7 +39,11 @@ describe('AssetRegistry', () => {
     const registry = new AssetRegistry();
     const asset = registry.register(input({ id: 'asset:mesh' as AssetId }));
     expect(() => registry.register(input({ id: asset.id }))).toThrow('already registered');
-    expect(() => registry.register(input({ id: 'asset:other' as AssetId, dependencies: ['asset:missing' as AssetId] }))).toThrow('Missing asset dependency');
+    expect(() =>
+      registry.register(
+        input({ id: 'asset:other' as AssetId, dependencies: ['asset:missing' as AssetId] }),
+      ),
+    ).toThrow('Missing asset dependency');
   });
 
   it('prevents removal while referenced', () => {
@@ -46,7 +57,9 @@ describe('AssetRegistry', () => {
     const registry = new AssetRegistry();
     const first = registry.register(input({ id: 'asset:first' as AssetId }));
     registry.register(input({ id: 'asset:second' as AssetId, dependencies: [first.id] }));
-    expect(() => registry.register(input({ id: first.id, dependencies: ['asset:second' as AssetId] }))).toThrow('already registered');
+    expect(() =>
+      registry.register(input({ id: first.id, dependencies: ['asset:second' as AssetId] })),
+    ).toThrow('already registered');
   });
 });
 
@@ -80,7 +93,9 @@ describe('AssetImportService', () => {
     };
     service.register(importer);
     expect(() => service.register({ ...importer, id: 'other.glb' })).toThrow(AssetImportError);
-    await expect(service.import('models/ship.obj', new ArrayBuffer(0))).rejects.toMatchObject({ code: 'UNSUPPORTED_FORMAT' });
+    await expect(service.import('models/ship.obj', new ArrayBuffer(0))).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FORMAT',
+    });
   });
 
   it('rejects work already cancelled before importer invocation', async () => {
@@ -97,8 +112,9 @@ describe('AssetImportService', () => {
     });
     const controller = new AbortController();
     controller.abort('cancelled');
-    await expect(service.import('ship.glb', new ArrayBuffer(0), { signal: controller.signal }))
-      .rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(
+      service.import('ship.glb', new ArrayBuffer(0), { signal: controller.signal }),
+    ).rejects.toMatchObject({ code: 'ABORTED' });
     expect(called).toBe(false);
   });
 
@@ -115,7 +131,8 @@ describe('AssetImportService', () => {
         return { kind: 'model', data: null, dependencies: [], metadata: {} };
       },
     });
-    await expect(service.import('ship.glb', new ArrayBuffer(0), { signal: controller.signal }))
-      .rejects.toMatchObject({ code: 'ABORTED' });
+    await expect(
+      service.import('ship.glb', new ArrayBuffer(0), { signal: controller.signal }),
+    ).rejects.toMatchObject({ code: 'ABORTED' });
   });
 });

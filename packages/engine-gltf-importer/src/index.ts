@@ -89,7 +89,12 @@ export class GlbImportError extends Error {
 interface GltfRoot {
   asset?: { version?: string; generator?: string };
   buffers?: { uri?: string; byteLength?: number }[];
-  bufferViews?: { buffer?: number; byteOffset?: number; byteLength?: number; byteStride?: number }[];
+  bufferViews?: {
+    buffer?: number;
+    byteOffset?: number;
+    byteLength?: number;
+    byteStride?: number;
+  }[];
   accessors?: {
     bufferView?: number;
     byteOffset?: number;
@@ -99,7 +104,15 @@ interface GltfRoot {
     normalized?: boolean;
     sparse?: unknown;
   }[];
-  meshes?: { name?: string; primitives?: { attributes?: Record<string, number>; indices?: number; material?: number; mode?: number }[] }[];
+  meshes?: {
+    name?: string;
+    primitives?: {
+      attributes?: Record<string, number>;
+      indices?: number;
+      material?: number;
+      mode?: number;
+    }[];
+  }[];
   materials?: {
     name?: string;
     pbrMetallicRoughness?: {
@@ -146,7 +159,8 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
   const view = new DataView(source);
   if (view.getUint32(0, true) !== GLB_MAGIC) fail('Invalid GLB magic');
   if (view.getUint32(4, true) !== 2) fail('Only GLB version 2 is supported', 'UNSUPPORTED_FEATURE');
-  if (view.getUint32(8, true) !== source.byteLength) fail('GLB declared length does not match input length');
+  if (view.getUint32(8, true) !== source.byteLength)
+    fail('GLB declared length does not match input length');
 
   let offset = 12;
   let json: string | undefined;
@@ -157,10 +171,16 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
     const length = view.getUint32(offset, true);
     const type = view.getUint32(offset + 4, true);
     offset += 8;
-    if (length % 4 !== 0 || offset + length > source.byteLength) fail('Invalid GLB chunk length or alignment');
+    if (length % 4 !== 0 || offset + length > source.byteLength)
+      fail('Invalid GLB chunk length or alignment');
     if (type === JSON_CHUNK) {
-      if (json !== undefined || offset !== 20) fail('GLB must contain exactly one JSON chunk first');
-      json = new TextDecoder().decode(new Uint8Array(source, offset, length)).replace(/[\u0000\u0020]+$/g, '');
+      if (json !== undefined || offset !== 20)
+        fail('GLB must contain exactly one JSON chunk first');
+      const decoded = new TextDecoder().decode(new Uint8Array(source, offset, length));
+      let end = decoded.length;
+      while (end > 0 && (decoded.charCodeAt(end - 1) === 0 || decoded.charCodeAt(end - 1) === 0x20))
+        end--;
+      json = decoded.slice(0, end);
     } else if (type === BIN_CHUNK) {
       if (sawBinary) fail('GLB contains more than one BIN chunk');
       binary = new Uint8Array(source, offset, length);
@@ -177,54 +197,101 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
   }
   if (root.asset?.version !== '2.0') fail('glTF asset.version must be 2.0', 'UNSUPPORTED_FEATURE');
   const buffers = root.buffers ?? [];
-  if (root.extensionsRequired?.length) fail(`Required glTF extensions are not supported: ${root.extensionsRequired.join(', ')}`, 'UNSUPPORTED_FEATURE');
+  if (root.extensionsRequired?.length)
+    fail(
+      `Required glTF extensions are not supported: ${root.extensionsRequired.join(', ')}`,
+      'UNSUPPORTED_FEATURE',
+    );
   if (buffers.length > 1) fail('Only one embedded GLB buffer is supported', 'UNSUPPORTED_FEATURE');
-  if (buffers[0]?.uri) fail('External/data URI buffers are not supported in GLB import', 'UNSUPPORTED_FEATURE');
-  if (buffers[0] && (!Number.isInteger(buffers[0].byteLength) || buffers[0].byteLength! > binary.byteLength)) {
+  if (buffers[0]?.uri)
+    fail('External/data URI buffers are not supported in GLB import', 'UNSUPPORTED_FEATURE');
+  if (
+    buffers[0] &&
+    (!Number.isInteger(buffers[0].byteLength) || buffers[0].byteLength! > binary.byteLength)
+  ) {
     fail('GLB BIN chunk is shorter than buffer.byteLength');
   }
-  if ((root.accessors?.length ?? 0) > 0 && !buffers[0]) fail('Accessors require an embedded GLB buffer');
+  if ((root.accessors?.length ?? 0) > 0 && !buffers[0])
+    fail('Accessors require an embedded GLB buffer');
   for (const [index, bufferView] of (root.bufferViews ?? []).entries()) {
     const start = bufferView.byteOffset ?? 0;
     const length = bufferView.byteLength;
-    if (bufferView.buffer !== 0 || !Number.isInteger(start) || start < 0 ||
-      !Number.isInteger(length) || length! < 0 || start + length! > (buffers[0]?.byteLength ?? 0)) {
+    if (
+      bufferView.buffer !== 0 ||
+      !Number.isInteger(start) ||
+      start < 0 ||
+      !Number.isInteger(length) ||
+      length! < 0 ||
+      start + length! > (buffers[0]?.byteLength ?? 0)
+    ) {
       fail(`bufferView ${index} is outside the declared embedded buffer`, 'INVALID_ACCESSOR');
     }
-    if (bufferView.byteStride !== undefined &&
-      (!Number.isInteger(bufferView.byteStride) || bufferView.byteStride < 4 || bufferView.byteStride > 252 || bufferView.byteStride % 4 !== 0)) {
+    if (
+      bufferView.byteStride !== undefined &&
+      (!Number.isInteger(bufferView.byteStride) ||
+        bufferView.byteStride < 4 ||
+        bufferView.byteStride > 252 ||
+        bufferView.byteStride % 4 !== 0)
+    ) {
       fail(`bufferView ${index} has an invalid byteStride`, 'INVALID_ACCESSOR');
     }
   }
   return { root, binary };
 }
 
-function readAccessor(root: GltfRoot, binary: Uint8Array, index: number, expectedType: 'VEC3' | 'SCALAR'): number[] {
+function readAccessor(
+  root: GltfRoot,
+  binary: Uint8Array,
+  index: number,
+  expectedType: 'VEC3' | 'SCALAR',
+): number[] {
   const accessor = root.accessors?.[index];
   if (!accessor) fail(`Accessor ${index} does not exist`, 'INVALID_ACCESSOR');
   if (accessor.sparse) fail('Sparse accessors are not supported', 'UNSUPPORTED_FEATURE');
   if (accessor.type !== expectedType || !Number.isInteger(accessor.count) || accessor.count! < 1) {
     fail(`Accessor ${index} has an invalid type or count`, 'INVALID_ACCESSOR');
   }
-  if (accessor.normalized) fail('Normalized vertex/index accessors are not supported', 'UNSUPPORTED_FEATURE');
+  if (accessor.normalized)
+    fail('Normalized vertex/index accessors are not supported', 'UNSUPPORTED_FEATURE');
   const componentType = accessor.componentType;
-  const bytes = componentType === 5126 ? 4 : componentType === 5123 ? 2 : componentType === 5121 ? 1 : componentType === 5125 ? 4 : 0;
-  if (!bytes || (expectedType === 'VEC3' && componentType !== 5126) || (expectedType === 'SCALAR' && ![5121, 5123, 5125].includes(componentType!))) {
+  const bytes =
+    componentType === 5126
+      ? 4
+      : componentType === 5123
+        ? 2
+        : componentType === 5121
+          ? 1
+          : componentType === 5125
+            ? 4
+            : 0;
+  if (
+    !bytes ||
+    (expectedType === 'VEC3' && componentType !== 5126) ||
+    (expectedType === 'SCALAR' && ![5121, 5123, 5125].includes(componentType!))
+  ) {
     fail(`Accessor ${index} uses an unsupported component type`, 'UNSUPPORTED_FEATURE');
   }
   const viewIndex = accessor.bufferView;
   const bufferView = root.bufferViews?.[viewIndex ?? -1];
-  if (!bufferView || bufferView.buffer !== 0) fail(`Accessor ${index} references an invalid bufferView`, 'INVALID_ACCESSOR');
+  if (!bufferView || bufferView.buffer !== 0)
+    fail(`Accessor ${index} references an invalid bufferView`, 'INVALID_ACCESSOR');
   const components = expectedType === 'VEC3' ? 3 : 1;
   const elementBytes = components * bytes;
   const stride = bufferView.byteStride ?? elementBytes;
   const accessorOffset = accessor.byteOffset ?? 0;
   const viewOffset = bufferView.byteOffset ?? 0;
   const viewLength = bufferView.byteLength ?? 0;
-  if (stride < elementBytes || stride % bytes !== 0 || accessorOffset < 0 || viewOffset < 0 || viewLength < 0) {
+  if (
+    stride < elementBytes ||
+    stride % bytes !== 0 ||
+    accessorOffset < 0 ||
+    viewOffset < 0 ||
+    viewLength < 0
+  ) {
     fail(`Accessor ${index} has invalid byte layout`, 'INVALID_ACCESSOR');
   }
-  const required = accessor.count! === 0 ? 0 : accessorOffset + (accessor.count! - 1) * stride + elementBytes;
+  const required =
+    accessor.count! === 0 ? 0 : accessorOffset + (accessor.count! - 1) * stride + elementBytes;
   if (required > viewLength || viewOffset + required > binary.byteLength) {
     fail(`Accessor ${index} reads beyond its bufferView`, 'INVALID_ACCESSOR');
   }
@@ -233,11 +300,16 @@ function readAccessor(root: GltfRoot, binary: Uint8Array, index: number, expecte
   for (let item = 0; item < accessor.count!; item++) {
     for (let component = 0; component < components; component++) {
       const at = viewOffset + accessorOffset + item * stride + component * bytes;
-      const value = componentType === 5126 ? data.getFloat32(at, true)
-        : componentType === 5123 ? data.getUint16(at, true)
-        : componentType === 5121 ? data.getUint8(at)
-        : data.getUint32(at, true);
-      if (!Number.isFinite(value)) fail(`Accessor ${index} contains a non-finite value`, 'INVALID_ACCESSOR');
+      const value =
+        componentType === 5126
+          ? data.getFloat32(at, true)
+          : componentType === 5123
+            ? data.getUint16(at, true)
+            : componentType === 5121
+              ? data.getUint8(at)
+              : data.getUint32(at, true);
+      if (!Number.isFinite(value))
+        fail(`Accessor ${index} contains a non-finite value`, 'INVALID_ACCESSOR');
       result.push(value);
     }
   }
@@ -247,35 +319,58 @@ function readAccessor(root: GltfRoot, binary: Uint8Array, index: number, expecte
 function makeNormals(positions: readonly number[], indices: readonly number[]): Float32Array {
   const normals = new Float64Array(positions.length);
   for (let i = 0; i < indices.length; i += 3) {
-    const a = indices[i]! * 3, b = indices[i + 1]! * 3, c = indices[i + 2]! * 3;
-    const abx = positions[b]! - positions[a]!, aby = positions[b + 1]! - positions[a + 1]!, abz = positions[b + 2]! - positions[a + 2]!;
-    const acx = positions[c]! - positions[a]!, acy = positions[c + 1]! - positions[a + 1]!, acz = positions[c + 2]! - positions[a + 2]!;
-    const nx = aby * acz - abz * acy, ny = abz * acx - abx * acz, nz = abx * acy - aby * acx;
-    for (const vertex of [a, b, c]) { normals[vertex] = normals[vertex]! + nx; normals[vertex + 1] = normals[vertex + 1]! + ny; normals[vertex + 2] = normals[vertex + 2]! + nz; }
+    const a = indices[i]! * 3,
+      b = indices[i + 1]! * 3,
+      c = indices[i + 2]! * 3;
+    const abx = positions[b]! - positions[a]!,
+      aby = positions[b + 1]! - positions[a + 1]!,
+      abz = positions[b + 2]! - positions[a + 2]!;
+    const acx = positions[c]! - positions[a]!,
+      acy = positions[c + 1]! - positions[a + 1]!,
+      acz = positions[c + 2]! - positions[a + 2]!;
+    const nx = aby * acz - abz * acy,
+      ny = abz * acx - abx * acz,
+      nz = abx * acy - aby * acx;
+    for (const vertex of [a, b, c]) {
+      normals[vertex] = normals[vertex]! + nx;
+      normals[vertex + 1] = normals[vertex + 1]! + ny;
+      normals[vertex + 2] = normals[vertex + 2]! + nz;
+    }
   }
   for (let i = 0; i < normals.length; i += 3) {
     const length = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!);
-    if (length > 1e-12) normals.set([normals[i]! / length, normals[i + 1]! / length, normals[i + 2]! / length], i);
+    if (length > 1e-12)
+      normals.set([normals[i]! / length, normals[i + 1]! / length, normals[i + 2]! / length], i);
     else normals.set([0, 1, 0], i);
   }
   return Float32Array.from(normals);
 }
 
-function decomposeNodeMatrix(matrix: readonly number[], index: number): {
+function decomposeNodeMatrix(
+  matrix: readonly number[],
+  index: number,
+): {
   translation: readonly [number, number, number];
   rotation: readonly [number, number, number, number];
   scale: readonly [number, number, number];
 } {
   const epsilon = 1e-5;
-  if (matrix.length !== 16 || !matrix.every(Number.isFinite) ||
-    Math.abs(matrix[3]!) > epsilon || Math.abs(matrix[7]!) > epsilon ||
-    Math.abs(matrix[11]!) > epsilon || Math.abs(matrix[15]! - 1) > epsilon) {
+  if (
+    matrix.length !== 16 ||
+    !matrix.every(Number.isFinite) ||
+    Math.abs(matrix[3]!) > epsilon ||
+    Math.abs(matrix[7]!) > epsilon ||
+    Math.abs(matrix[11]!) > epsilon ||
+    Math.abs(matrix[15]! - 1) > epsilon
+  ) {
     fail(`Node ${index} matrix must be a finite affine transform`, 'UNSUPPORTED_FEATURE');
   }
   const x = [matrix[0]!, matrix[1]!, matrix[2]!];
   const y = [matrix[4]!, matrix[5]!, matrix[6]!];
   const z = [matrix[8]!, matrix[9]!, matrix[10]!];
-  let sx = Math.hypot(...x), sy = Math.hypot(...y), sz = Math.hypot(...z);
+  let sx = Math.hypot(...x);
+  const sy = Math.hypot(...y);
+  const sz = Math.hypot(...z);
   if (sx < epsilon || sy < epsilon || sz < epsilon) {
     fail(`Node ${index} matrix contains a zero scale`, 'UNSUPPORTED_FEATURE');
   }
@@ -283,32 +378,61 @@ function decomposeNodeMatrix(matrix: readonly number[], index: number): {
   const nx = x.map((value) => value / sx);
   const ny = y.map((value) => value / sy);
   const nz = z.map((value) => value / sz);
-  if (Math.abs(dot(nx, ny)) > epsilon || Math.abs(dot(nx, nz)) > epsilon || Math.abs(dot(ny, nz)) > epsilon) {
-    fail(`Node ${index} matrix contains shear and cannot be represented by Editor TRS`, 'UNSUPPORTED_FEATURE');
+  if (
+    Math.abs(dot(nx, ny)) > epsilon ||
+    Math.abs(dot(nx, nz)) > epsilon ||
+    Math.abs(dot(ny, nz)) > epsilon
+  ) {
+    fail(
+      `Node ${index} matrix contains shear and cannot be represented by Editor TRS`,
+      'UNSUPPORTED_FEATURE',
+    );
   }
-  const cross = [ny[1]! * nz[2]! - ny[2]! * nz[1]!, ny[2]! * nz[0]! - ny[0]! * nz[2]!, ny[0]! * nz[1]! - ny[1]! * nz[0]!];
+  const cross = [
+    ny[1]! * nz[2]! - ny[2]! * nz[1]!,
+    ny[2]! * nz[0]! - ny[0]! * nz[2]!,
+    ny[0]! * nz[1]! - ny[1]! * nz[0]!,
+  ];
   if (dot(nx, cross) < 0) {
     sx = -sx;
     for (let i = 0; i < 3; i++) nx[i] = -nx[i]!;
   }
   // Rotation matrix entries are read by row from the column-major glTF matrix.
-  const r00 = nx[0]!, r01 = ny[0]!, r02 = nz[0]!;
-  const r10 = nx[1]!, r11 = ny[1]!, r12 = nz[1]!;
-  const r20 = nx[2]!, r21 = ny[2]!, r22 = nz[2]!;
+  const r00 = nx[0]!,
+    r01 = ny[0]!,
+    r02 = nz[0]!;
+  const r10 = nx[1]!,
+    r11 = ny[1]!,
+    r12 = nz[1]!;
+  const r20 = nx[2]!,
+    r21 = ny[2]!,
+    r22 = nz[2]!;
   const trace = r00 + r11 + r22;
   let qx: number, qy: number, qz: number, qw: number;
   if (trace > 0) {
     const t = Math.sqrt(trace + 1) * 2;
-    qw = 0.25 * t; qx = (r21 - r12) / t; qy = (r02 - r20) / t; qz = (r10 - r01) / t;
+    qw = 0.25 * t;
+    qx = (r21 - r12) / t;
+    qy = (r02 - r20) / t;
+    qz = (r10 - r01) / t;
   } else if (r00 > r11 && r00 > r22) {
     const t = Math.sqrt(1 + r00 - r11 - r22) * 2;
-    qw = (r21 - r12) / t; qx = 0.25 * t; qy = (r01 + r10) / t; qz = (r02 + r20) / t;
+    qw = (r21 - r12) / t;
+    qx = 0.25 * t;
+    qy = (r01 + r10) / t;
+    qz = (r02 + r20) / t;
   } else if (r11 > r22) {
     const t = Math.sqrt(1 + r11 - r00 - r22) * 2;
-    qw = (r02 - r20) / t; qx = (r01 + r10) / t; qy = 0.25 * t; qz = (r12 + r21) / t;
+    qw = (r02 - r20) / t;
+    qx = (r01 + r10) / t;
+    qy = 0.25 * t;
+    qz = (r12 + r21) / t;
   } else {
     const t = Math.sqrt(1 + r22 - r00 - r11) * 2;
-    qw = (r10 - r01) / t; qx = (r02 + r20) / t; qy = (r12 + r21) / t; qz = 0.25 * t;
+    qw = (r10 - r01) / t;
+    qx = (r02 + r20) / t;
+    qy = (r12 + r21) / t;
+    qz = 0.25 * t;
   }
   const qLength = Math.hypot(qx, qy, qz, qw);
   return {
@@ -318,7 +442,12 @@ function decomposeNodeMatrix(matrix: readonly number[], index: number): {
   };
 }
 
-function tuple<T extends readonly number[]>(values: number[] | undefined, defaults: T, length: number, label: string): T {
+function tuple<T extends readonly number[]>(
+  values: number[] | undefined,
+  defaults: T,
+  length: number,
+  label: string,
+): T {
   const result = values ?? defaults;
   if (result.length !== length || !result.every(Number.isFinite)) fail(`Invalid ${label}`);
   return result as T;
@@ -327,14 +456,18 @@ function tuple<T extends readonly number[]>(values: number[] | undefined, defaul
 function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal): GlbAsset {
   const textureCount = root.textures?.length ?? 0;
   const validateTextureRef = (textureIndex: number | undefined, materialIndex: number): void => {
-    if (textureIndex !== undefined && (!Number.isInteger(textureIndex) || textureIndex < 0 || textureIndex >= textureCount)) {
+    if (
+      textureIndex !== undefined &&
+      (!Number.isInteger(textureIndex) || textureIndex < 0 || textureIndex >= textureCount)
+    ) {
       fail(`Material ${materialIndex} references a missing texture`);
     }
   };
   const materials: GltfPbrMaterial[] = (root.materials ?? []).map((material, index) => {
     const pbr = material.pbrMetallicRoughness ?? {};
     const alphaMode = material.alphaMode ?? 'OPAQUE';
-    if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode)) fail(`Material ${index} has an invalid alphaMode`);
+    if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode))
+      fail(`Material ${index} has an invalid alphaMode`);
     validateTextureRef(pbr.baseColorTexture?.index, index);
     validateTextureRef(pbr.metallicRoughnessTexture?.index, index);
     validateTextureRef(material.normalTexture?.index, index);
@@ -342,19 +475,38 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     validateTextureRef(material.emissiveTexture?.index, index);
     const factor = tuple(pbr.baseColorFactor, [1, 1, 1, 1] as const, 4, 'baseColorFactor');
     const emissive = tuple(material.emissiveFactor, [0, 0, 0] as const, 3, 'emissiveFactor');
-    const metallic = pbr.metallicFactor ?? 1, roughness = pbr.roughnessFactor ?? 1, cutoff = material.alphaCutoff ?? 0.5;
-    if (![metallic, roughness, cutoff, ...factor, ...emissive].every(Number.isFinite) ||
-      metallic < 0 || metallic > 1 || roughness < 0 || roughness > 1 || cutoff < 0) fail(`Material ${index} has invalid PBR factors`);
+    const metallic = pbr.metallicFactor ?? 1,
+      roughness = pbr.roughnessFactor ?? 1,
+      cutoff = material.alphaCutoff ?? 0.5;
+    if (
+      ![metallic, roughness, cutoff, ...factor, ...emissive].every(Number.isFinite) ||
+      metallic < 0 ||
+      metallic > 1 ||
+      roughness < 0 ||
+      roughness > 1 ||
+      cutoff < 0
+    )
+      fail(`Material ${index} has invalid PBR factors`);
     return {
       name: material.name ?? `Material ${index}`,
       baseColorFactor: factor,
       metallicFactor: metallic,
       roughnessFactor: roughness,
-      ...(pbr.baseColorTexture?.index !== undefined ? { baseColorTexture: pbr.baseColorTexture.index } : {}),
-      ...(pbr.metallicRoughnessTexture?.index !== undefined ? { metallicRoughnessTexture: pbr.metallicRoughnessTexture.index } : {}),
-      ...(material.normalTexture?.index !== undefined ? { normalTexture: material.normalTexture.index } : {}),
-      ...(material.occlusionTexture?.index !== undefined ? { occlusionTexture: material.occlusionTexture.index } : {}),
-      ...(material.emissiveTexture?.index !== undefined ? { emissiveTexture: material.emissiveTexture.index } : {}),
+      ...(pbr.baseColorTexture?.index !== undefined
+        ? { baseColorTexture: pbr.baseColorTexture.index }
+        : {}),
+      ...(pbr.metallicRoughnessTexture?.index !== undefined
+        ? { metallicRoughnessTexture: pbr.metallicRoughnessTexture.index }
+        : {}),
+      ...(material.normalTexture?.index !== undefined
+        ? { normalTexture: material.normalTexture.index }
+        : {}),
+      ...(material.occlusionTexture?.index !== undefined
+        ? { occlusionTexture: material.occlusionTexture.index }
+        : {}),
+      ...(material.emissiveTexture?.index !== undefined
+        ? { emissiveTexture: material.emissiveTexture.index }
+        : {}),
       emissiveFactor: emissive,
       alphaMode: alphaMode as GltfPbrMaterial['alphaMode'],
       alphaCutoff: cutoff,
@@ -366,24 +518,44 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     abortIfNeeded(signal);
     if (!sourceMesh.primitives?.length) fail(`Mesh ${meshIndex} has no primitives`);
     const primitives = sourceMesh.primitives.map((primitive, primitiveIndex): GltfPrimitive => {
-      if ((primitive.mode ?? 4) !== 4) fail('Only triangle-list primitives are supported', 'UNSUPPORTED_FEATURE');
+      if ((primitive.mode ?? 4) !== 4)
+        fail('Only triangle-list primitives are supported', 'UNSUPPORTED_FEATURE');
       const positionAccessor = primitive.attributes?.POSITION;
-      if (positionAccessor === undefined) fail(`Mesh ${meshIndex} primitive ${primitiveIndex} has no POSITION`);
+      if (positionAccessor === undefined)
+        fail(`Mesh ${meshIndex} primitive ${primitiveIndex} has no POSITION`);
       const positions = readAccessor(root, binary, positionAccessor, 'VEC3');
       const vertexCount = positions.length / 3;
       if (vertexCount < 3) fail('A triangle primitive requires at least three vertices');
-      const indices = primitive.indices === undefined ? Array.from({ length: vertexCount }, (_, i) => i)
-        : readAccessor(root, binary, primitive.indices, 'SCALAR');
-      if (indices.length % 3 !== 0 || indices.some((value) => !Number.isInteger(value) || value < 0 || value >= vertexCount)) {
+      const indices =
+        primitive.indices === undefined
+          ? Array.from({ length: vertexCount }, (_, i) => i)
+          : readAccessor(root, binary, primitive.indices, 'SCALAR');
+      if (
+        indices.length % 3 !== 0 ||
+        indices.some((value) => !Number.isInteger(value) || value < 0 || value >= vertexCount)
+      ) {
         fail('Primitive indices must reference valid triangle vertices', 'INVALID_ACCESSOR');
       }
-      const normals = primitive.attributes?.NORMAL === undefined
-        ? makeNormals(positions, indices)
-        : Float32Array.from(readAccessor(root, binary, primitive.attributes.NORMAL, 'VEC3'));
-      if (normals.length !== positions.length) fail('NORMAL accessor count does not match POSITION', 'INVALID_ACCESSOR');
-      const mesh: MeshData = { positions: Float32Array.from(positions), normals, indices: Uint32Array.from(indices) };
-      try { validateMeshData(mesh); } catch (error) { fail(`Invalid primitive geometry: ${String(error)}`, 'INVALID_ACCESSOR'); }
-      if (primitive.material !== undefined && (!Number.isInteger(primitive.material) || !materials[primitive.material])) {
+      const normals =
+        primitive.attributes?.NORMAL === undefined
+          ? makeNormals(positions, indices)
+          : Float32Array.from(readAccessor(root, binary, primitive.attributes.NORMAL, 'VEC3'));
+      if (normals.length !== positions.length)
+        fail('NORMAL accessor count does not match POSITION', 'INVALID_ACCESSOR');
+      const mesh: MeshData = {
+        positions: Float32Array.from(positions),
+        normals,
+        indices: Uint32Array.from(indices),
+      };
+      try {
+        validateMeshData(mesh);
+      } catch (error) {
+        fail(`Invalid primitive geometry: ${String(error)}`, 'INVALID_ACCESSOR');
+      }
+      if (
+        primitive.material !== undefined &&
+        (!Number.isInteger(primitive.material) || !materials[primitive.material])
+      ) {
         fail(`Primitive references missing material ${primitive.material}`);
       }
       return { mesh, material: primitive.material ?? null, mode: 4 };
@@ -392,7 +564,10 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
   });
 
   const nodes: GltfNode[] = (root.nodes ?? []).map((node, index) => {
-    if (node.matrix && (node.translation !== undefined || node.rotation !== undefined || node.scale !== undefined)) {
+    if (
+      node.matrix &&
+      (node.translation !== undefined || node.rotation !== undefined || node.scale !== undefined)
+    ) {
       fail(`Node ${index} must use either matrix or TRS properties, not both`);
     }
     const transform = node.matrix
@@ -402,9 +577,15 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
           rotation: tuple(node.rotation, [0, 0, 0, 1] as const, 4, `node ${index} rotation`),
           scale: tuple(node.scale, [1, 1, 1] as const, 3, `node ${index} scale`),
         };
-    if (node.mesh !== undefined && !meshes[node.mesh]) fail(`Node ${index} references missing mesh ${node.mesh}`);
+    if (node.mesh !== undefined && !meshes[node.mesh])
+      fail(`Node ${index} references missing mesh ${node.mesh}`);
     const children = node.children ?? [];
-    if (children.some((child) => !Number.isInteger(child) || child < 0 || child >= (root.nodes?.length ?? 0))) fail(`Node ${index} references an invalid child`);
+    if (
+      children.some(
+        (child) => !Number.isInteger(child) || child < 0 || child >= (root.nodes?.length ?? 0),
+      )
+    )
+      fail(`Node ${index} references an invalid child`);
     return {
       name: node.name ?? `Node ${index}`,
       mesh: node.mesh ?? null,
@@ -416,9 +597,11 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
 
   const images: GltfImageAsset[] = (root.images ?? []).map((image, index) => {
     if (image.uri) fail('External/data URI images are not supported', 'UNSUPPORTED_FEATURE');
-    if (image.bufferView === undefined) fail(`Image ${index} must use an embedded bufferView`, 'UNSUPPORTED_FEATURE');
+    if (image.bufferView === undefined)
+      fail(`Image ${index} must use an embedded bufferView`, 'UNSUPPORTED_FEATURE');
     const bufferView = root.bufferViews?.[image.bufferView];
-    if (!bufferView || bufferView.buffer !== 0) fail(`Image ${index} references an invalid bufferView`);
+    if (!bufferView || bufferView.buffer !== 0)
+      fail(`Image ${index} references an invalid bufferView`);
     if (image.mimeType !== 'image/png' && image.mimeType !== 'image/jpeg') {
       fail(`Image ${index} has an unsupported or missing MIME type`, 'UNSUPPORTED_FEATURE');
     }
@@ -439,16 +622,22 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     const minFilter = sampler.minFilter ?? null;
     const wrapS = sampler.wrapS ?? 10497;
     const wrapT = sampler.wrapT ?? 10497;
-    if (magFilter !== null && ![9728, 9729].includes(magFilter)) fail(`Sampler ${index} has an invalid magFilter`);
-    if (minFilter !== null && ![9728, 9729, 9984, 9985, 9986, 9987].includes(minFilter)) fail(`Sampler ${index} has an invalid minFilter`);
-    if (![wrapS, wrapT].every((value) => [33071, 33648, 10497].includes(value))) fail(`Sampler ${index} has an invalid wrap mode`);
+    if (magFilter !== null && ![9728, 9729].includes(magFilter))
+      fail(`Sampler ${index} has an invalid magFilter`);
+    if (minFilter !== null && ![9728, 9729, 9984, 9985, 9986, 9987].includes(minFilter))
+      fail(`Sampler ${index} has an invalid minFilter`);
+    if (![wrapS, wrapT].every((value) => [33071, 33648, 10497].includes(value)))
+      fail(`Sampler ${index} has an invalid wrap mode`);
     return { magFilter, minFilter, wrapS, wrapT };
   });
 
   const textures: GltfTextureInfo[] = (root.textures ?? []).map((texture, index) => {
     const image = texture.source === undefined ? undefined : images[texture.source];
     if (texture.source !== undefined && !image) fail(`Texture ${index} references a missing image`);
-    if (texture.sampler !== undefined && (!Number.isInteger(texture.sampler) || !samplers[texture.sampler])) {
+    if (
+      texture.sampler !== undefined &&
+      (!Number.isInteger(texture.sampler) || !samplers[texture.sampler])
+    ) {
       fail(`Texture ${index} references a missing sampler`);
     }
     return {
@@ -462,7 +651,12 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
   return {
     version: 2,
     generator: root.asset?.generator ?? 'unknown',
-    meshes, materials, nodes, images, samplers, textures,
+    meshes,
+    materials,
+    nodes,
+    images,
+    samplers,
+    textures,
     extensionsUsed: root.extensionsUsed ?? [],
     extensionsRequired: root.extensionsRequired ?? [],
   };
