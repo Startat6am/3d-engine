@@ -20,7 +20,7 @@
 
 ## Sequencing constraints
 
-Core contracts precede all feature adapters. Geometry precedes renderer mesh ingestion. Asset identity and serialization schemas are agreed before editor save/load. Physics depends on transform synchronization. Chunk streaming depends on asset/resource lifecycle. Editor and player shell work can progress in parallel only after stable public API contracts. AI authoring depends on the component registry, serialization, editor commands/undo, and scene preview; it must not be implemented as a direct model-to-runtime mutation shortcut.
+Core contracts precede all feature adapters. Every subsystem must follow [Subsystem Contracts](SUBSYSTEM_CONTRACTS.md): clear interfaces, machine-readable specifications where applicable, stable actionable errors, examples, and tests are part of implementation—not deferred documentation. This is a cross-cutting engineering rule and does not reorder milestones or accelerate AI work. Geometry precedes renderer mesh ingestion. Asset identity and serialization schemas are agreed before editor save/load. Physics depends on transform synchronization. Chunk streaming depends on asset/resource lifecycle. Editor and player shell work can progress in parallel only after stable public API contracts. AI authoring depends on the component registry, serialization, editor commands/undo, and scene preview; it must not be implemented as a direct model-to-runtime mutation shortcut.
 
 ## Release policy
 
