@@ -30,9 +30,9 @@ The initial suggested layout is refined by adding `engine-geometry` and `engine-
 - `engine-core` owns IDs, lifecycle, world/entity/component contracts, transforms, events, clock, and service registration. It has no Three.js, React, DOM, Rapier, AI provider, or browser-global dependency.
 - `engine-geometry` owns CPU-side mesh/primitive/procedural data and optimization.
 - `engine-renderer` depends on core + geometry and owns renderer abstraction and backend adapters.
-- `engine-assets` owns asset identity, import orchestration, cache, and resource lifetime; format adapters plug into it.
+- `engine-assets` owns asset identity, import orchestration, cache, and resource lifetime; format adapters plug into it. The initial `AssetRegistry` slice is implemented; import orchestration/cache/resource lifetime remain open (see `ASSETS_SERIALIZATION_STATUS.md`).
 - Physics, animation, audio, input, and world packages depend on core contracts and their own narrow adapters.
-- Serialization maps stable data contracts to versioned files; it does not serialize runtime objects, GPU handles, closures, or physics engine internals.
+- Serialization maps stable data contracts to versioned files; it does not serialize runtime objects, GPU handles, closures, or physics engine internals. The initial `@engine/serialization` envelope validator, deterministic serializer, and explicit migration registry are implemented; Editor integration and migration fixtures remain open.
 - `engine-editor` composes public engine APIs; `apps/editor` owns React UI. `apps/player` composes runtime services without editor code.
 - `engine-agent-authoring` depends on editor command/undo contracts, serialization, component/asset registries, and a renderer preview interface. Provider SDK adapters are optional integrations and never dependencies of core or player.
 
