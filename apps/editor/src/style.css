@@ -841,7 +841,7 @@ input:focus-visible {
   .transform-pad.is-collapsed {
     left: 8px;
     bottom: max(10px, env(safe-area-inset-bottom));
-    width: 42px;
+    width: 21px;
     height: 42px;
     min-height: 42px;
     padding: 5px;

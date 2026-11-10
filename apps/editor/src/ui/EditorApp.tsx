@@ -802,7 +802,7 @@ export function EditorApp() {
               aria-expanded={!isTransformPadCollapsed}
               onClick={() => setIsTransformPadCollapsed((collapsed) => !collapsed)}
             >
-              {isTransformPadCollapsed ? '»»' : '««'}
+              {isTransformPadCollapsed ? '›' : '‹'}
             </button>
             {!isTransformPadCollapsed ? (
               <>
