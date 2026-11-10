@@ -653,3 +653,48 @@ input:focus-visible {
     width: 48px;
   }
 }
+
+/* The hierarchy add control opens a choice of scene primitives, not a default cube. */
+.hierarchy-add-menu {
+  position: absolute;
+  z-index: 20;
+  top: 42px;
+  right: 10px;
+  width: min(220px, calc(100% - 20px));
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  background: #202b3a;
+  border: 1px solid #3a4c63;
+  border-radius: 6px;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%);
+}
+
+.hierarchy-add-menu button {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  color: #d5e2f3;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  text-align: left;
+  font:
+    12px 'DM Mono',
+    monospace;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.hierarchy-add-menu button:hover,
+.hierarchy-add-menu button:focus-visible {
+  background: #30445e;
+}
+
+.hierarchy-add-menu small {
+  color: #8295ad;
+  font-size: 9px;
+}

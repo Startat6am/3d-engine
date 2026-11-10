@@ -150,6 +150,7 @@ export function EditorApp() {
   const [rendererError, setRendererError] = useState('');
   const [worldName, setWorldName] = useState('Untitled World');
   const [worldError, setWorldError] = useState('');
+  const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
   const [camera, setCamera] = useState(() => createDefaultCamera());
@@ -686,10 +687,31 @@ export function EditorApp() {
         <aside className="panel hierarchy">
           <div className="panel-heading">
             HIERARCHY{' '}
-            <button aria-label="Add entity" onClick={() => addEntity('Box')}>
+            <button
+              aria-label="Add object"
+              aria-expanded={isAddMenuOpen}
+              aria-controls="hierarchy-add-menu"
+              onClick={() => setIsAddMenuOpen((open) => !open)}
+            >
               ＋
             </button>
           </div>
+          {isAddMenuOpen ? (
+            <div className="hierarchy-add-menu" id="hierarchy-add-menu" aria-label="Add object">
+              {(['Box', 'Sphere', 'Plane', 'Cylinder'] as const).map((primitive) => (
+                <button
+                  key={primitive}
+                  onClick={() => {
+                    addEntity(primitive);
+                    setIsAddMenuOpen(false);
+                  }}
+                >
+                  <span>{primitive}</span>
+                  <small>3D primitive</small>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <div className="tree-row active">
             ▣ <span>Untitled World</span>
           </div>
@@ -702,12 +724,6 @@ export function EditorApp() {
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          <div className="tree-actions">
-            <button onClick={() => addEntity('Box')}>＋ Box</button>
-            <button onClick={() => addEntity('Sphere')}>＋ Sphere</button>
-            <button onClick={() => addEntity('Plane')}>＋ Plane</button>
-            <button onClick={() => addEntity('Cylinder')}>＋ Cylinder</button>
-          </div>
           {worldError ? (
             <div className="world-error" role="alert">
               {worldError}
