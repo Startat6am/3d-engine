@@ -246,6 +246,9 @@ importers:
       '@engine/renderer':
         specifier: workspace:*
         version: link:../../packages/engine-renderer
+      '@engine/serialization':
+        specifier: workspace:*
+        version: link:../../packages/engine-serialization
       '@vitejs/plugin-react':
         specifier: 5.1.4
         version: 5.1.4(vite@7.3.8(lightningcss@1.33.0))
@@ -300,6 +303,10 @@ importers:
       three:
         specifier: 0.187.0
         version: 0.187.0
+
+  packages/engine-assets: {}
+
+  packages/engine-serialization: {}
 
 packages:
   '@babel/code-frame@7.29.7':
