@@ -5,6 +5,12 @@ const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
 
+export interface GltfTextureTransform {
+  readonly offset: readonly [number, number];
+  readonly rotation: number;
+  readonly scale: readonly [number, number];
+}
+
 export interface GltfPbrMaterial {
   readonly name: string;
   readonly baseColorFactor: readonly [number, number, number, number];
@@ -15,6 +21,12 @@ export interface GltfPbrMaterial {
   readonly normalTexture?: number;
   readonly occlusionTexture?: number;
   readonly emissiveTexture?: number;
+  readonly textureTransforms?: Partial<
+    Record<
+      'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive',
+      GltfTextureTransform
+    >
+  >;
   readonly emissiveFactor: readonly [number, number, number];
   readonly alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
   readonly alphaCutoff: number;
@@ -86,6 +98,19 @@ export class GlbImportError extends Error {
   }
 }
 
+interface GltfTextureInfoInput {
+  index?: number;
+  texCoord?: number;
+  extensions?: {
+    KHR_texture_transform?: {
+      offset?: number[];
+      rotation?: number;
+      scale?: number[];
+      texCoord?: number;
+    };
+  };
+}
+
 interface GltfRoot {
   asset?: { version?: string; generator?: string };
   buffers?: { uri?: string; byteLength?: number }[];
@@ -119,12 +144,12 @@ interface GltfRoot {
       baseColorFactor?: number[];
       metallicFactor?: number;
       roughnessFactor?: number;
-      baseColorTexture?: { index?: number; texCoord?: number };
-      metallicRoughnessTexture?: { index?: number; texCoord?: number };
+      baseColorTexture?: GltfTextureInfoInput;
+      metallicRoughnessTexture?: GltfTextureInfoInput;
     };
-    normalTexture?: { index?: number; texCoord?: number };
-    occlusionTexture?: { index?: number; texCoord?: number };
-    emissiveTexture?: { index?: number; texCoord?: number };
+    normalTexture?: GltfTextureInfoInput;
+    occlusionTexture?: GltfTextureInfoInput;
+    emissiveTexture?: GltfTextureInfoInput;
     emissiveFactor?: number[];
     alphaMode?: string;
     alphaCutoff?: number;
@@ -197,9 +222,12 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
   }
   if (root.asset?.version !== '2.0') fail('glTF asset.version must be 2.0', 'UNSUPPORTED_FEATURE');
   const buffers = root.buffers ?? [];
-  if (root.extensionsRequired?.length)
+  const unsupportedRequiredExtensions = (root.extensionsRequired ?? []).filter(
+    (extension) => extension !== 'KHR_texture_transform',
+  );
+  if (unsupportedRequiredExtensions.length)
     fail(
-      `Required glTF extensions are not supported: ${root.extensionsRequired.join(', ')}`,
+      `Required glTF extensions are not supported: ${unsupportedRequiredExtensions.join(', ')}`,
       'UNSUPPORTED_FEATURE',
     );
   if (buffers.length > 1) fail('Only one embedded GLB buffer is supported', 'UNSUPPORTED_FEATURE');
@@ -465,19 +493,30 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
   };
   const materials: GltfPbrMaterial[] = (root.materials ?? []).map((material, index) => {
     const pbr = material.pbrMetallicRoughness ?? {};
-    const textureInfos = [
-      pbr.baseColorTexture,
-      pbr.metallicRoughnessTexture,
-      material.normalTexture,
-      material.occlusionTexture,
-      material.emissiveTexture,
-    ];
-    for (const [textureInfoIndex, textureInfo] of textureInfos.entries()) {
-      if (textureInfo?.texCoord !== undefined && textureInfo.texCoord !== 0) {
+    const textureInfos = {
+      baseColor: pbr.baseColorTexture,
+      metallicRoughness: pbr.metallicRoughnessTexture,
+      normal: material.normalTexture,
+      occlusion: material.occlusionTexture,
+      emissive: material.emissiveTexture,
+    };
+    const textureTransforms: NonNullable<GltfPbrMaterial['textureTransforms']> = {};
+    for (const [channel, textureInfo] of Object.entries(textureInfos)) {
+      const extension = textureInfo?.extensions?.KHR_texture_transform;
+      const texCoord = extension?.texCoord ?? textureInfo?.texCoord ?? 0;
+      if (texCoord !== 0) {
         fail(
-          `Material ${index} texture info ${textureInfoIndex} requires unsupported TEXCOORD_${textureInfo.texCoord}`,
+          `Material ${index} ${channel} texture requires unsupported TEXCOORD_${texCoord}`,
           'UNSUPPORTED_FEATURE',
         );
+      }
+      if (extension) {
+        const offset = tuple(extension.offset, [0, 0] as const, 2, `${channel} texture offset`);
+        const scale = tuple(extension.scale, [1, 1] as const, 2, `${channel} texture scale`);
+        const rotation = extension.rotation ?? 0;
+        if (!Number.isFinite(rotation))
+          fail(`Material ${index} ${channel} texture rotation is invalid`);
+        textureTransforms[channel as keyof typeof textureTransforms] = { offset, rotation, scale };
       }
     }
     const alphaMode = material.alphaMode ?? 'OPAQUE';
@@ -522,6 +561,7 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       ...(material.emissiveTexture?.index !== undefined
         ? { emissiveTexture: material.emissiveTexture.index }
         : {}),
+      ...(Object.keys(textureTransforms).length ? { textureTransforms } : {}),
       emissiveFactor: emissive,
       alphaMode: alphaMode as GltfPbrMaterial['alphaMode'],
       alphaCutoff: cutoff,
