@@ -83,7 +83,7 @@ type DiagnosticEntry = {
   message: string;
   details?: string;
 };
-type SceneEntity = RenderObject & {
+type SceneEntity = Extract<RenderObject, { readonly position: Vec3 }> & {
   readonly name: string;
   readonly primitive: Primitive | 'GLB';
   readonly assetId?: AssetId;
