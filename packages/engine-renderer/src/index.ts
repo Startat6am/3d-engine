@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AssetResourceCache, type AssetResourceLease } from '@engine/assets';
-import { validateMeshData } from '@engine/geometry';
+import { validateMeshData, type MeshData } from '@engine/geometry';
 import type {
   RendererAdapter,
   RendererCapabilities,
@@ -37,6 +37,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #materialCache = new AssetResourceCache<THREE.MeshStandardMaterial>();
   readonly #textureCache = new AssetResourceCache<THREE.Texture>();
   readonly #geometryKeys = new WeakMap<object, string>();
+  readonly #validatedGeometry = new WeakSet<object>();
   readonly #materialKeys = new WeakMap<object, string>();
   #nextResourceKey = 1;
   readonly #raycaster = new THREE.Raycaster();
@@ -44,6 +45,9 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   #activeCamera: THREE.Camera | null = null;
   #disposed = false;
   #lastScene: RenderScene | null = null;
+  #lastObjects: readonly RenderObject[] | null = null;
+  #width = 0;
+  #height = 0;
 
   constructor(canvas: HTMLCanvasElement, options: RendererOptions = {}) {
     try {
@@ -86,6 +90,9 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     this.#assertActive();
     const w = Math.max(1, Math.floor(width)),
       h = Math.max(1, Math.floor(height));
+    if (w === this.#width && h === this.#height) return;
+    this.#width = w;
+    this.#height = h;
     this.#renderer.setSize(w, h, false);
     this.#perspectiveCamera.aspect = w / h;
     this.#perspectiveCamera.updateProjectionMatrix();
@@ -94,7 +101,10 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   render(scene: RenderScene): void {
     this.#assertActive();
     this.#lastScene = scene;
-    this.#syncObjects(scene.objects);
+    if (scene.objects !== this.#lastObjects) {
+      this.#syncObjects(scene.objects);
+      this.#lastObjects = scene.objects;
+    }
     this.#scene.background = new THREE.Color(scene.background);
     const camera = this.#applyCamera(scene.camera);
     this.#activeCamera = camera;
@@ -122,6 +132,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     for (const entry of this.#objects.values()) this.#releaseObject(entry);
     this.#objects.clear();
     this.#lastScene = null;
+    this.#lastObjects = null;
     this.#scene.clear();
     this.#renderer.dispose();
     this.#disposed = true;
@@ -135,11 +146,12 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         this.#objects.delete(id);
       }
     for (const item of objects) {
-      validateMeshData(item.geometry);
       let entry = this.#objects.get(item.id);
+      let materialChanged = false;
       const geometryKey = this.#keyFor(item.geometry, this.#geometryKeys, 'geometry');
       const materialKey = this.#keyFor(item.material, this.#materialKeys, 'material');
       if (!entry) {
+        this.#validateGeometryOnce(item.geometry);
         const geometryLease = this.#geometryCache.acquireSync(
           geometryKey,
           () => {
@@ -174,6 +186,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
           geometryLease.release();
           throw error;
         }
+        materialChanged = true;
         entry = {
           mesh,
           active: true,
@@ -193,6 +206,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         let nextMaterialLease: AssetResourceLease<THREE.MeshStandardMaterial> | undefined;
         try {
           if (entry.geometrySource !== item.geometry) {
+            this.#validateGeometryOnce(item.geometry);
             nextGeometryLease = this.#geometryCache.acquireSync(
               geometryKey,
               () => {
@@ -236,6 +250,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
           previousLease.release();
         }
         if (nextMaterialLease) {
+          materialChanged = true;
           const previousLease = entry.materialLease;
           for (const textureLease of entry.textureLeases.values()) textureLease.release();
           entry.textureLeases.clear();
@@ -247,19 +262,21 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         }
       }
       const mesh = entry.mesh;
-      const material = entry.materialLease.resource;
-      material.color.setHex(item.material.color);
-      material.roughness = item.material.roughness;
-      material.metalness = item.material.metalness;
-      material.opacity = item.material.opacity;
-      material.transparent = item.material.transparent;
-      material.wireframe = item.material.wireframe;
-      material.emissive.setHex(item.material.emissiveColor ?? 0x000000);
-      this.#syncTexture(entry, 'baseColor', item.material.baseColorTexture);
-      this.#syncTexture(entry, 'metallicRoughness', item.material.metallicRoughnessTexture);
-      this.#syncTexture(entry, 'normal', item.material.normalTexture);
-      this.#syncTexture(entry, 'occlusion', item.material.occlusionTexture);
-      this.#syncTexture(entry, 'emissive', item.material.emissiveTexture);
+      if (materialChanged) {
+        const material = entry.materialLease.resource;
+        material.color.setHex(item.material.color);
+        material.roughness = item.material.roughness;
+        material.metalness = item.material.metalness;
+        material.opacity = item.material.opacity;
+        material.transparent = item.material.transparent;
+        material.wireframe = item.material.wireframe;
+        material.emissive.setHex(item.material.emissiveColor ?? 0x000000);
+        this.#syncTexture(entry, 'baseColor', item.material.baseColorTexture);
+        this.#syncTexture(entry, 'metallicRoughness', item.material.metallicRoughnessTexture);
+        this.#syncTexture(entry, 'normal', item.material.normalTexture);
+        this.#syncTexture(entry, 'occlusion', item.material.occlusionTexture);
+        this.#syncTexture(entry, 'emissive', item.material.emissiveTexture);
+      }
       if (item.worldMatrix !== undefined) {
         if (item.worldMatrix.length !== 16) {
           throw new RendererError('INVALID_SCENE', 'Render object has an invalid world matrix');
@@ -433,6 +450,12 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       this.#orthographicCamera.updateProjectionMatrix();
       return this.#orthographicCamera;
     }
+  }
+
+  #validateGeometryOnce(geometry: MeshData): void {
+    if (this.#validatedGeometry.has(geometry)) return;
+    validateMeshData(geometry);
+    this.#validatedGeometry.add(geometry);
   }
 
   #keyFor(value: object, keys: WeakMap<object, string>, prefix: string): string {
