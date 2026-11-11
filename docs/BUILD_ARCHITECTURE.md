@@ -25,7 +25,7 @@ This document defines the browser-app build boundaries. It is an architectural c
 3. Editor must preserve the dynamic import boundaries for Renderer and GLB Importer.
 4. Player's renderer-neutral scene data must remain sufficient for another renderer backend; no Three.js object instances may cross the adapter boundary.
 5. Three.js runtime and type package versions are pinned through the pnpm workspace catalog.
-6. Production builds must keep renderer and decoder chunks independently cacheable. Review gzip sizes and the emitted import graph when dependencies change; do not silence size regressions by arbitrarily raising warning limits.
+6. Production builds must keep renderer and decoder chunks independently cacheable. Review gzip sizes and the emitted import graph when dependencies change; do not silence size regressions by arbitrarily raising warning limits.\n7. MeshData is an immutable snapshot after ingestion. Validate each geometry object once, when it is first introduced or replaced, not on camera frames or resize. Camera-only updates reuse the same render-object snapshot; resize calls are no-ops when the physical viewport dimensions are unchanged.
 
 ## Current production build baseline
 
