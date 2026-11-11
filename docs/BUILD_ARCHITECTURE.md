@@ -20,7 +20,7 @@ This document defines the browser-app build boundaries. It is an architectural c
 
 ## Compatibility invariants
 
-1. No Three.js import in Core, Geometry, Assets, Serialization, GLTF Importer, or Player application source. Renderer implementation is the only runtime owner of Three.js; Editor may use type-only Three.js imports for glTF math while parsing.
+1. No Three.js import in Core, Geometry, Assets, Serialization, GLTF Importer, or Player application source. Runtime Three.js use is limited to the Renderer adapter and the Editor's GLB node-transform flattening path; no Three.js objects enter scene contracts or serialized data.
 2. No GLTF importer or meshopt decoder in Player's dependency graph.
 3. Editor must preserve the dynamic import boundaries for Renderer and GLB Importer.
 4. Player's renderer-neutral scene data must remain sufficient for another renderer backend; no Three.js object instances may cross the adapter boundary.
