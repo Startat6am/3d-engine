@@ -45,14 +45,28 @@ export interface MaterialDescriptor {
   readonly occlusionTexture?: TextureSource;
   readonly emissiveTexture?: TextureSource;
 }
-export interface RenderObject {
+interface RenderObjectBase {
   readonly id: string;
   readonly geometry: MeshData;
   readonly material: MaterialDescriptor;
-  readonly position: Vec3;
-  readonly rotation: Quaternion;
-  readonly scale: Vec3;
 }
+
+/** Backend-neutral render input: local TRS or a propagated column-major world matrix. */
+export type RenderObject = RenderObjectBase &
+  (
+    | {
+        readonly worldMatrix: ArrayLike<number>;
+        readonly position?: never;
+        readonly rotation?: never;
+        readonly scale?: never;
+      }
+    | {
+        readonly worldMatrix?: never;
+        readonly position: Vec3;
+        readonly rotation: Quaternion;
+        readonly scale: Vec3;
+      }
+  );
 export interface RenderScene {
   readonly camera: CameraDescriptor;
   readonly objects: readonly RenderObject[];
