@@ -89,6 +89,7 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
   if (!Array.isArray(assets)) return;
 
   const assetIds = new Set<string>();
+  const assetKinds = new Map<string, unknown>();
   const assetIndexes = new Map<string, number>();
   const dependencies = new Map<string, string[]>();
   for (const [index, asset] of assets.entries()) {
@@ -100,6 +101,7 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
       throw new WorldSerializationError('Duplicate asset ID', `${path}.id`);
     }
     assetIds.add(asset.id);
+    assetKinds.set(asset.id, asset.kind);
     assetIndexes.set(asset.id, index);
     if (asset.dependencies !== undefined) {
       if (
@@ -158,16 +160,26 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
       );
     }
     const material = meshRenderer.material;
-    if (
-      isRecord(material) &&
-      material.baseColorTextureAssetId !== undefined &&
-      (typeof material.baseColorTextureAssetId !== 'string' ||
-        !assetIds.has(material.baseColorTextureAssetId))
-    ) {
-      throw new WorldSerializationError(
-        `Material references an unknown texture asset: ${String(material.baseColorTextureAssetId)}`,
-        `$.world.entities[${index}].components.MeshRenderer.material.baseColorTextureAssetId`,
-      );
+    if (isRecord(material)) {
+      for (const channel of ['baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive']) {
+        const field = `${channel}TextureAssetId`;
+        const textureAssetId = material[field];
+        if (
+          textureAssetId !== undefined &&
+          (typeof textureAssetId !== 'string' || !assetIds.has(textureAssetId))
+        ) {
+          throw new WorldSerializationError(
+            `Material references an unknown texture asset: ${String(textureAssetId)}`,
+            `$.world.entities[${index}].components.MeshRenderer.material.${field}`,
+          );
+        }
+        if (typeof textureAssetId === 'string' && assetKinds.get(textureAssetId) !== 'texture') {
+          throw new WorldSerializationError(
+            `Material reference must resolve to a texture asset: ${textureAssetId}`,
+            `$.world.entities[${index}].components.MeshRenderer.material.${field}`,
+          );
+        }
+      }
     }
   }
 
