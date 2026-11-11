@@ -22,6 +22,6 @@
   "dependencies": {
     "@engine/assets": "workspace:*",
     "@engine/geometry": "workspace:*",
-    "three": "0.187.0"
+    "three": "catalog:"
   }
 }
