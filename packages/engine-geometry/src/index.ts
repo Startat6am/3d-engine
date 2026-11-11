@@ -2,6 +2,8 @@ export interface MeshData {
   readonly positions: Float32Array;
   readonly normals: Float32Array;
   readonly indices: Uint32Array;
+  /** Optional glTF TEXCOORD_0 values, two floats per vertex. */
+  readonly uvs?: Float32Array;
 }
 
 /** A renderer-independent CPU mesh primitive. */
@@ -162,6 +164,11 @@ export function validateMeshData(data: MeshData): void {
   if (data.positions.length % 3 !== 0 || data.normals.length !== data.positions.length)
     throw new TypeError('Mesh positions and normals must contain matching XYZ triples');
   const vertexCount = data.positions.length / 3;
+  if (data.uvs && data.uvs.length !== vertexCount * 2)
+    throw new TypeError('Mesh UVs must contain matching XY pairs for every vertex');
+  if (data.uvs)
+    for (const value of data.uvs)
+      if (!Number.isFinite(value)) throw new TypeError('Mesh UVs must be finite');
   if (data.indices.length % 3 !== 0) throw new TypeError('Mesh indices must describe triangles');
   for (const value of data.positions)
     if (!Number.isFinite(value)) throw new TypeError('Mesh positions must be finite');
