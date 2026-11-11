@@ -11,12 +11,25 @@ export interface CameraDescriptor {
   readonly fovY?: number;
   readonly orthographicHeight?: number;
 }
+export interface TextureSamplerDescriptor {
+  readonly magFilter: number | null;
+  readonly minFilter: number | null;
+  readonly wrapS: number;
+  readonly wrapT: number;
+}
+export interface TextureTransformDescriptor {
+  readonly offset: readonly [number, number];
+  readonly rotation: number;
+  readonly scale: readonly [number, number];
+}
 export interface TextureSource {
   readonly assetId: string;
   /** Content hash used for decoded/GPU resource deduplication across project assets. */
   readonly cacheKey: string;
   readonly mimeType: 'image/png' | 'image/jpeg';
   readonly data: Uint8Array;
+  readonly sampler?: TextureSamplerDescriptor;
+  readonly transform?: TextureTransformDescriptor;
 }
 export interface MaterialDescriptor {
   readonly color: number;
