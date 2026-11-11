@@ -198,6 +198,21 @@ type MutableGlbJson = {
   accessors?: { count: number }[];
   bufferViews?: { byteOffset?: number }[];
   buffers?: { byteLength: number }[];
+  materials?: {
+    pbrMetallicRoughness?: {
+      baseColorTexture?: {
+        extensions?: {
+          KHR_texture_transform?: {
+            offset?: number[];
+            rotation?: number;
+            scale?: number[];
+            texCoord?: number;
+          };
+        };
+      };
+    };
+  }[];
+  samplers?: { magFilter?: number; minFilter?: number; wrapS?: number; wrapT?: number }[];
 };
 
 function rewriteGlbJson(source: ArrayBuffer, update: (root: MutableGlbJson) => void): ArrayBuffer {
@@ -276,6 +291,47 @@ describe('GlbImporter', () => {
     const mesh = result.data.meshes[0]!.primitives[0]!.mesh;
     expect(mesh.positions).toEqual(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]));
     expect(mesh.normals).toEqual(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]));
+  });
+
+  it('imports KHR_texture_transform and required declarations with sampler settings', async () => {
+    const glb = rewriteGlbJson(
+      makeGlb({ imageBytes: [1, 2, 3, 4], uvs: [0, 0, 1, 0, 0, 1] }),
+      (root) => {
+        root.extensionsUsed = ['KHR_texture_transform'];
+        root.extensionsRequired = ['KHR_texture_transform'];
+        root.samplers![0] = { magFilter: 9728, minFilter: 9985, wrapS: 33648, wrapT: 33071 };
+        root.materials![0]!.pbrMetallicRoughness!.baseColorTexture!.extensions = {
+          KHR_texture_transform: { offset: [0.25, 0.5], rotation: Math.PI / 2, scale: [2, 3] },
+        };
+      },
+    );
+    const result = await new GlbImporter().import(glb, context);
+    expect(result.data.samplers[0]).toEqual({
+      magFilter: 9728,
+      minFilter: 9985,
+      wrapS: 33648,
+      wrapT: 33071,
+    });
+    expect(result.data.materials[0]?.textureTransforms?.baseColor).toEqual({
+      offset: [0.25, 0.5],
+      rotation: Math.PI / 2,
+      scale: [2, 3],
+    });
+  });
+
+  it('rejects KHR_texture_transform requests for unsupported UV sets', async () => {
+    const glb = rewriteGlbJson(
+      makeGlb({ imageBytes: [1, 2, 3, 4], uvs: [0, 0, 1, 0, 0, 1] }),
+      (root) => {
+        root.materials![0]!.pbrMetallicRoughness!.baseColorTexture!.extensions = {
+          KHR_texture_transform: { texCoord: 1 },
+        };
+      },
+    );
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FEATURE',
+      message: expect.stringContaining('TEXCOORD_1'),
+    });
   });
 
   it('rejects documents that require an unsupported extension', async () => {
