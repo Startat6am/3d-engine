@@ -280,6 +280,28 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     const material = entry.materialLease.resource;
     const colorSpace =
       channel === 'baseColor' || channel === 'emissive' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    const sampler = source?.sampler;
+    const magFilter = sampler?.magFilter ?? 9729;
+    const minFilter = sampler?.minFilter ?? 9987;
+    const wrapS = sampler?.wrapS ?? 10497;
+    const wrapT = sampler?.wrapT ?? 10497;
+    const minFilterMap = new Map<number, THREE.MinificationTextureFilter>([
+      [9728, THREE.NearestFilter],
+      [9729, THREE.LinearFilter],
+      [9984, THREE.NearestMipmapNearestFilter],
+      [9985, THREE.LinearMipmapNearestFilter],
+      [9986, THREE.NearestMipmapLinearFilter],
+      [9987, THREE.LinearMipmapLinearFilter],
+    ]);
+    const wrapMap = new Map([
+      [33071, THREE.ClampToEdgeWrapping],
+      [33648, THREE.MirroredRepeatWrapping],
+      [10497, THREE.RepeatWrapping],
+    ]);
+    const textureSettingsKey = JSON.stringify({
+      sampler: { magFilter, minFilter, wrapS, wrapT },
+      transform: source?.transform ?? null,
+    });
     const setTexture = (texture: THREE.Texture | null) => {
       switch (channel) {
         case 'baseColor':
@@ -311,7 +333,14 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       }
       return;
     }
-    if (previous?.assetId === source.assetId && previous.cacheKey === source.cacheKey) return;
+    if (
+      previous?.assetId === source.assetId &&
+      previous.cacheKey === source.cacheKey &&
+      JSON.stringify(previous.sampler) === JSON.stringify(source.sampler) &&
+      JSON.stringify(previous.transform) === JSON.stringify(source.transform)
+    ) {
+      return;
+    }
     if (previous) {
       setTexture(null);
       entry.textureLeases.get(channel)?.release();
@@ -320,7 +349,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     entry.textureSources.set(channel, source);
     void this.#textureCache
       .acquire(
-        `${source.cacheKey}:${colorSpace}`,
+        `${source.cacheKey}:${colorSpace}:${textureSettingsKey}`,
         async () => {
           const bitmap = await createImageBitmap(
             new Blob([source.data.slice().buffer as ArrayBuffer], { type: source.mimeType }),
@@ -328,6 +357,19 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
           const texture = new THREE.Texture(bitmap);
           texture.colorSpace = colorSpace;
           texture.flipY = false;
+          texture.magFilter = magFilter === 9728 ? THREE.NearestFilter : THREE.LinearFilter;
+          texture.minFilter = minFilterMap.get(minFilter) ?? THREE.LinearMipmapLinearFilter;
+          texture.wrapS = wrapMap.get(wrapS) ?? THREE.RepeatWrapping;
+          texture.wrapT = wrapMap.get(wrapT) ?? THREE.RepeatWrapping;
+          texture.generateMipmaps = minFilter >= 9984;
+          const transform = source.transform;
+          if (transform) {
+            texture.offset.set(...transform.offset);
+            texture.repeat.set(...transform.scale);
+            texture.rotation = transform.rotation;
+            texture.center.set(0, 0);
+            texture.updateMatrix();
+          }
           texture.needsUpdate = true;
           return texture;
         },
