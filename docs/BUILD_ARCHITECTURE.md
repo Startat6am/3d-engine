@@ -31,12 +31,12 @@ This document defines the browser-app build boundaries. It is an architectural c
 
 Measured with Node 22.23.4 and pnpm 12.18.0 on this branch:
 
-| App / chunk | Minified | gzip | Loading |
-| --- | ---: | ---: | --- |
-| Editor app entry | 395.28 KB | 124.50 KB | Initial |
-| Editor Three.js | 753.31 KB | 192.54 KB | Viewport renderer import |
-| Editor meshoptimizer | 26.48 KB | 7.26 KB | GLB import path |
-| Player app entry | 23.74 KB | 8.55 KB | Initial |
-| Player Three.js | 521.18 KB | 129.27 KB | Initial runtime renderer |
+| App / chunk          |  Minified |      gzip | Loading                  |
+| -------------------- | --------: | --------: | ------------------------ |
+| Editor app entry     | 395.28 KB | 124.50 KB | Initial                  |
+| Editor Three.js      | 753.31 KB | 192.54 KB | Viewport renderer import |
+| Editor meshoptimizer |  26.48 KB |   7.26 KB | GLB import path          |
+| Player app entry     |  23.74 KB |   8.55 KB | Initial                  |
+| Player Three.js      | 521.18 KB | 129.27 KB | Initial runtime renderer |
 
 These are build artifacts, not claims about exact production transfer size; hosting compression and browser cache affect transfer. The Three.js raw chunk exceeds Vite's default 500 KB warning threshold while its gzip size is about 193 KB. The shared config sets an 800 KB raw threshold with limited headroom; the gzip figures above remain the review metric.
