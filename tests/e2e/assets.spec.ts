@@ -8,24 +8,45 @@ function makeTriangleGlb(): Buffer {
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==',
     'base64',
   );
-  const binary = Buffer.concat([positions, normals, image]);
+  const uvs = Buffer.from(new Float32Array([0, 0, 1, 0, 0, 1]).buffer);
+  const binary = Buffer.concat([positions, normals, uvs, image]);
   const document = {
     asset: { version: '2.0', generator: 'editor-assets-e2e' },
     buffers: [{ byteLength: binary.length }],
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: positions.length },
       { buffer: 0, byteOffset: positions.length, byteLength: normals.length },
-      { buffer: 0, byteOffset: positions.length + normals.length, byteLength: image.length },
+      { buffer: 0, byteOffset: positions.length + normals.length, byteLength: uvs.length },
+      {
+        buffer: 0,
+        byteOffset: positions.length + normals.length + uvs.length,
+        byteLength: image.length,
+      },
     ],
     accessors: [
       { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' },
       { bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: 2, componentType: 5126, count: 3, type: 'VEC2' },
     ],
-    images: [{ name: 'One pixel', mimeType: 'image/png', bufferView: 2 }],
+    images: [{ name: 'One pixel', mimeType: 'image/png', bufferView: 3 }],
     textures: [{ source: 0 }],
-    materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+    materials: [
+      {
+        pbrMetallicRoughness: {
+          baseColorTexture: { index: 0 },
+          metallicRoughnessTexture: { index: 0 },
+        },
+        normalTexture: { index: 0 },
+        occlusionTexture: { index: 0 },
+        emissiveTexture: { index: 0 },
+        emissiveFactor: [0.1, 0.2, 0.3],
+      },
+    ],
     meshes: [
-      { name: 'Triangle', primitives: [{ attributes: { POSITION: 0, NORMAL: 1 }, material: 0 }] },
+      {
+        name: 'Triangle',
+        primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, material: 0 }],
+      },
     ],
     nodes: [{ name: 'TriangleNode', mesh: 0, translation: [1, 0, 0] }],
   };
@@ -95,7 +116,17 @@ test('GLB imports register stable project assets and survive world save/reopen',
     world: {
       entities: Array<{
         components?: {
-          MeshRenderer?: { assetId?: string; material?: { baseColorTextureAssetId?: string } };
+          MeshRenderer?: {
+            assetId?: string;
+            geometry?: { uvs?: number[] };
+            material?: {
+              baseColorTextureAssetId?: string;
+              metallicRoughnessTextureAssetId?: string;
+              normalTextureAssetId?: string;
+              occlusionTextureAssetId?: string;
+              emissiveTextureAssetId?: string;
+            };
+          };
         };
       }>;
     };
@@ -116,6 +147,13 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(importedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
     texture.id,
   );
+  expect(importedEntity?.components?.MeshRenderer?.material).toMatchObject({
+    metallicRoughnessTextureAssetId: texture.id,
+    normalTextureAssetId: texture.id,
+    occlusionTextureAssetId: texture.id,
+    emissiveTextureAssetId: texture.id,
+  });
+  expect(importedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
   expect(firstDocument.assetPayloads).toHaveLength(2);
   const modelPayload = firstDocument.assetPayloads.find((payload) => payload.assetId === asset.id)!;
   const texturePayload = firstDocument.assetPayloads.find(
@@ -151,6 +189,13 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(reopenedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
     texture.id,
   );
+  expect(reopenedEntity?.components?.MeshRenderer?.material).toMatchObject({
+    metallicRoughnessTextureAssetId: texture.id,
+    normalTextureAssetId: texture.id,
+    occlusionTextureAssetId: texture.id,
+    emissiveTextureAssetId: texture.id,
+  });
+  expect(reopenedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
   await page.waitForTimeout(250);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

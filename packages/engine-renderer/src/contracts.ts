@@ -25,7 +25,12 @@ export interface MaterialDescriptor {
   readonly opacity: number;
   readonly transparent: boolean;
   readonly wireframe: boolean;
+  readonly emissiveColor?: number;
   readonly baseColorTexture?: TextureSource;
+  readonly metallicRoughnessTexture?: TextureSource;
+  readonly normalTexture?: TextureSource;
+  readonly occlusionTexture?: TextureSource;
+  readonly emissiveTexture?: TextureSource;
 }
 export interface RenderObject {
   readonly id: string;

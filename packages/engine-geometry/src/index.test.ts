@@ -49,6 +49,19 @@ describe('primitive geometry', () => {
     expect(createCylinderGeometry(0, 1, 2).positions.length).toBeGreaterThan(0);
     expect(() => createCylinderGeometry(0, 0)).toThrow(RangeError);
   });
+  it('validates optional UV coordinates as finite pairs for every vertex', () => {
+    const mesh = createBoxGeometry();
+    expect(() => validateMeshData({ ...mesh, uvs: new Float32Array([0, 1]) })).toThrow(
+      'Mesh UVs must contain matching XY pairs',
+    );
+    expect(() =>
+      validateMeshData({
+        ...mesh,
+        uvs: new Float32Array((mesh.positions.length / 3) * 2).fill(Number.NaN),
+      }),
+    ).toThrow('Mesh UVs must be finite');
+  });
+
   it('rejects malformed mesh buffers', () => {
     expect(() =>
       validateMeshData({

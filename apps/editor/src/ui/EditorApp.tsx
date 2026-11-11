@@ -483,8 +483,21 @@ export function EditorApp() {
                   opacity: material.opacity,
                   transparent: material.transparent,
                   wireframe: material.wireframe,
+                  emissiveColor: material.emissiveColor ?? 0,
                   ...(material.baseColorTexture
                     ? { baseColorTextureAssetId: material.baseColorTexture.assetId }
+                    : {}),
+                  ...(material.metallicRoughnessTexture
+                    ? { metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId }
+                    : {}),
+                  ...(material.normalTexture
+                    ? { normalTextureAssetId: material.normalTexture.assetId }
+                    : {}),
+                  ...(material.occlusionTexture
+                    ? { occlusionTextureAssetId: material.occlusionTexture.assetId }
+                    : {}),
+                  ...(material.emissiveTexture
+                    ? { emissiveTextureAssetId: material.emissiveTexture.assetId }
                     : {}),
                 },
                 ...(assetId ? { assetId } : {}),
@@ -494,6 +507,7 @@ export function EditorApp() {
                         positions: Array.from(geometry.positions),
                         normals: Array.from(geometry.normals),
                         indices: Array.from(geometry.indices),
+                        ...(geometry.uvs ? { uvs: Array.from(geometry.uvs) } : {}),
                       },
                     }
                   : {}),
@@ -551,7 +565,12 @@ export function EditorApp() {
               primitive?: Primitive | 'GLB';
               assetId?: string;
               material?: SceneEntity['material'] & { readonly baseColorTextureAssetId?: string };
-              geometry?: { positions?: number[]; normals?: number[]; indices?: number[] };
+              geometry?: {
+                positions?: number[];
+                normals?: number[];
+                indices?: number[];
+                uvs?: number[];
+              };
             };
           };
         };
@@ -566,7 +585,10 @@ export function EditorApp() {
             !Array.isArray(source.positions) ||
             !Array.isArray(source.normals) ||
             !Array.isArray(source.indices) ||
-            ![...source.positions, ...source.normals].every(Number.isFinite) ||
+            (source.uvs !== undefined && !Array.isArray(source.uvs)) ||
+            ![...source.positions, ...source.normals, ...(source.uvs ?? [])].every(
+              Number.isFinite,
+            ) ||
             !source.indices.every((index) => Number.isInteger(index) && index >= 0)
           )
             throw new Error(`Entity ${entity.name} has invalid imported mesh buffers`);
@@ -574,6 +596,7 @@ export function EditorApp() {
             positions: Float32Array.from(source.positions),
             normals: Float32Array.from(source.normals),
             indices: Uint32Array.from(source.indices),
+            ...(source.uvs ? { uvs: Float32Array.from(source.uvs) } : {}),
           };
           validateMeshData(geometry);
         } else if (primitive && primitive in geometryFor) {
@@ -594,17 +617,35 @@ export function EditorApp() {
         const storedMaterial = (mesh.material ??
           createDefaultMaterial()) as SceneEntity['material'] & {
           readonly baseColorTextureAssetId?: string;
+          readonly metallicRoughnessTextureAssetId?: string;
+          readonly normalTextureAssetId?: string;
+          readonly occlusionTextureAssetId?: string;
+          readonly emissiveTextureAssetId?: string;
         };
-        const textureAssetId = storedMaterial.baseColorTextureAssetId;
-        const texturePayload = textureAssetId
-          ? restoredAssetPayloads.get(textureAssetId as AssetId)
-          : undefined;
-        const textureMimeType = texturePayload?.mimeType;
-        const textureRecord = textureAssetId
-          ? restoredAssetRegistry.require(textureAssetId as AssetId)
-          : undefined;
-        if (textureRecord && textureRecord.kind !== 'texture')
-          throw new Error(`Material reference is not a texture asset: ${textureAssetId}`);
+        const restoreTexture = (assetId: string | undefined) => {
+          if (!assetId) return undefined;
+          const textureRecord = restoredAssetRegistry.require(assetId as AssetId);
+          if (textureRecord.kind !== 'texture')
+            throw new Error(`Material reference is not a texture asset: ${assetId}`);
+          const payload = restoredAssetPayloads.get(assetId as AssetId);
+          if (!payload)
+            throw new Error(`Material references a missing embedded texture payload: ${assetId}`);
+          if (payload.mimeType !== 'image/png' && payload.mimeType !== 'image/jpeg')
+            throw new Error(`Material references an unsupported texture payload: ${assetId}`);
+          return {
+            assetId,
+            cacheKey: textureRecord.contentHash,
+            mimeType: payload.mimeType,
+            data: new Uint8Array(decodeBase64(payload.data)),
+          } as const;
+        };
+        const baseColorTexture = restoreTexture(storedMaterial.baseColorTextureAssetId);
+        const metallicRoughnessTexture = restoreTexture(
+          storedMaterial.metallicRoughnessTextureAssetId,
+        );
+        const normalTexture = restoreTexture(storedMaterial.normalTextureAssetId);
+        const occlusionTexture = restoreTexture(storedMaterial.occlusionTextureAssetId);
+        const emissiveTexture = restoreTexture(storedMaterial.emissiveTextureAssetId);
         const material = {
           color: storedMaterial.color,
           roughness: storedMaterial.roughness,
@@ -612,23 +653,13 @@ export function EditorApp() {
           opacity: storedMaterial.opacity,
           transparent: storedMaterial.transparent,
           wireframe: storedMaterial.wireframe,
-          ...(textureAssetId &&
-          texturePayload &&
-          (textureMimeType === 'image/png' || textureMimeType === 'image/jpeg')
-            ? {
-                baseColorTexture: {
-                  assetId: textureAssetId,
-                  cacheKey: textureRecord!.contentHash,
-                  mimeType: textureMimeType as 'image/png' | 'image/jpeg',
-                  data: new Uint8Array(decodeBase64(texturePayload.data)),
-                },
-              }
-            : {}),
+          emissiveColor: storedMaterial.emissiveColor ?? 0,
+          ...(baseColorTexture ? { baseColorTexture } : {}),
+          ...(metallicRoughnessTexture ? { metallicRoughnessTexture } : {}),
+          ...(normalTexture ? { normalTexture } : {}),
+          ...(occlusionTexture ? { occlusionTexture } : {}),
+          ...(emissiveTexture ? { emissiveTexture } : {}),
         };
-        if (textureAssetId && !texturePayload)
-          throw new Error(
-            `Material references a missing embedded texture payload: ${textureAssetId}`,
-          );
         return {
           id: entity.id,
           name: entity.name,
@@ -779,6 +810,10 @@ export function EditorApp() {
           .slice(0, 3)
           .reduce((hex, value) => (hex << 8) | Math.round(toSrgb(value!) * 255), 0);
         const alpha = Math.min(1, Math.max(0, factor[3] ?? 1));
+        const emissiveColor = (pbr?.emissiveFactor ?? [0, 0, 0]).reduce(
+          (hex, value) => (hex << 8) | Math.round(toSrgb(value) * 255),
+          0,
+        );
         return {
           id: `glb-${Date.now()}-${index}-${source.key}`,
           name: sources.length === 1 ? source.name : `${source.name} · ${index + 1}`,
@@ -791,6 +826,7 @@ export function EditorApp() {
             opacity: alpha,
             transparent: pbr?.alphaMode === 'BLEND' || alpha < 1,
             wireframe: false,
+            emissiveColor,
           },
           position: source.position,
           rotation: source.rotation,
@@ -836,39 +872,44 @@ export function EditorApp() {
         dependencies: [...(imported.dependencies as AssetId[]), ...textureRecords],
         metadata: { ...imported.metadata, fileSize: file.size },
       });
+      const resolveTextureSource = (textureIndex: number | undefined) => {
+        if (textureIndex === undefined) return undefined;
+        const texture = asset.textures[textureIndex];
+        if (!texture || texture.source === null)
+          throw new Error(`GLB material references an unavailable texture: ${textureIndex}`);
+        const image = asset.images[texture.source];
+        const textureAssetId = textureRecords[texture.source];
+        if (!image || !textureAssetId)
+          throw new Error(`GLB material references an unavailable image: ${textureIndex}`);
+        return {
+          assetId: textureAssetId,
+          cacheKey: stagedRegistry.require(textureAssetId).contentHash,
+          mimeType: image.mimeType,
+          data: image.data.slice(),
+        } as const;
+      };
       const importedEntities = importedEntitiesWithoutAsset.map((entity, entityIndex) => {
         const source = sources[entityIndex]!;
         const pbr =
           source.primitive.material === null
             ? undefined
             : asset.materials[source.primitive.material];
-        const textureIndex = pbr?.baseColorTexture;
-        const imageIndex =
-          textureIndex === undefined ? undefined : asset.textures[textureIndex]?.source;
-        const image =
-          imageIndex === null || imageIndex === undefined ? undefined : asset.images[imageIndex];
-        const textureAssetId =
-          imageIndex === null || imageIndex === undefined ? undefined : textureRecords[imageIndex];
-        if (textureIndex !== undefined && (!image || !textureAssetId))
-          throw new Error(
-            `GLB material references an unavailable base color image: ${textureIndex}`,
-          );
+        const baseColorTexture = resolveTextureSource(pbr?.baseColorTexture);
+        const metallicRoughnessTexture = resolveTextureSource(pbr?.metallicRoughnessTexture);
+        const normalTexture = resolveTextureSource(pbr?.normalTexture);
+        const occlusionTexture = resolveTextureSource(pbr?.occlusionTexture);
+        const emissiveTexture = resolveTextureSource(pbr?.emissiveTexture);
         return {
           ...entity,
           assetId: assetRecord.id,
-          ...(image && textureAssetId
-            ? {
-                material: {
-                  ...entity.material,
-                  baseColorTexture: {
-                    assetId: textureAssetId,
-                    cacheKey: stagedRegistry.require(textureAssetId).contentHash,
-                    mimeType: image.mimeType,
-                    data: image.data.slice(),
-                  },
-                },
-              }
-            : {}),
+          material: {
+            ...entity.material,
+            ...(baseColorTexture ? { baseColorTexture } : {}),
+            ...(metallicRoughnessTexture ? { metallicRoughnessTexture } : {}),
+            ...(normalTexture ? { normalTexture } : {}),
+            ...(occlusionTexture ? { occlusionTexture } : {}),
+            ...(emissiveTexture ? { emissiveTexture } : {}),
+          },
         };
       });
       stagedPayloads.set(assetRecord.id, {
