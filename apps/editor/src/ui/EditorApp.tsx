@@ -334,19 +334,20 @@ export function EditorApp() {
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
 
-  const renderScene = useMemo(
-    () => ({
-      camera,
-      background: 0x151a23,
-      objects: entities.map((entity) => ({
+  const renderObjects = useMemo(
+    () =>
+      entities.map((entity) => ({
         ...entity,
         material:
           entity.id === selectedId
             ? { ...entity.material, color: entity.material.color }
             : entity.material,
       })),
-    }),
-    [camera, entities, selectedId],
+    [entities, selectedId],
+  );
+  const renderScene = useMemo(
+    () => ({ camera, background: 0x151a23, objects: renderObjects }),
+    [camera, renderObjects],
   );
 
   const renderSceneRef = useRef(renderScene);
