@@ -7,6 +7,8 @@ function makeGlb(
     mode?: number;
     normals?: boolean;
     imageBytes?: number[];
+    uvs?: number[];
+    allTextureChannels?: boolean;
     nodeMatrix?: number[];
   } = {},
 ): ArrayBuffer {
@@ -25,6 +27,7 @@ function makeGlb(
   };
   const positions = addFloats([0, 0, 0, 1, 0, 0, 0, 1, 0]);
   const normals = options.normals === false ? undefined : addFloats([0, 0, 1, 0, 0, 1, 0, 0, 1]);
+  const uvs = options.uvs ? addFloats(options.uvs) : undefined;
   let indices: number | undefined;
   if (options.indices) {
     const bytes = new Uint8Array(options.indices);
@@ -61,6 +64,9 @@ function makeGlb(
       ...(normals === undefined
         ? []
         : [{ bufferView: normals, componentType: 5126, count: 3, type: 'VEC3' }]),
+      ...(uvs === undefined
+        ? []
+        : [{ bufferView: uvs, componentType: 5126, count: 3, type: 'VEC2' }]),
       ...(indices === undefined
         ? []
         : [
@@ -77,8 +83,13 @@ function makeGlb(
         name: 'Triangle',
         primitives: [
           {
-            attributes: { POSITION: 0, ...(normals === undefined ? {} : { NORMAL: 1 }) },
+            attributes: {
+              POSITION: 0,
+              ...(normals === undefined ? {} : { NORMAL: 1 }),
+              ...(uvs === undefined ? {} : { TEXCOORD_0: normals === undefined ? 1 : 2 }),
+            },
             ...(indices === undefined ? {} : { indices: normals === undefined ? 1 : 2 }),
+            ...(imageView === undefined ? {} : { material: 0 }),
             ...(options.mode === undefined ? {} : { mode: options.mode }),
           },
         ],
@@ -91,8 +102,20 @@ function makeGlb(
           baseColorFactor: [0.2, 0.4, 0.6, 1],
           metallicFactor: 0.3,
           roughnessFactor: 0.8,
-          ...(imageView === undefined ? {} : { baseColorTexture: { index: 0 } }),
+          ...(imageView === undefined
+            ? {}
+            : {
+                baseColorTexture: { index: 0 },
+                ...(options.allTextureChannels ? { metallicRoughnessTexture: { index: 0 } } : {}),
+              }),
         },
+        ...(imageView === undefined || !options.allTextureChannels
+          ? {}
+          : {
+              normalTexture: { index: 0 },
+              occlusionTexture: { index: 0 },
+              emissiveTexture: { index: 0 },
+            }),
       },
     ],
     ...(imageView === undefined
@@ -222,6 +245,32 @@ describe('GlbImporter', () => {
     expect(result.metadata.primitiveCount).toBe(1);
   });
 
+  it('imports TEXCOORD_0 and exposes every supported embedded PBR texture channel', async () => {
+    const result = await new GlbImporter().import(
+      makeGlb({
+        imageBytes: [1, 2, 3, 4],
+        uvs: [0, 0, 1, 0, 0, 1],
+        allTextureChannels: true,
+      }),
+      context,
+    );
+    const mesh = result.data.meshes[0]!.primitives[0]!.mesh;
+    expect(mesh.uvs).toEqual(new Float32Array([0, 0, 1, 0, 0, 1]));
+    expect(result.data.materials[0]).toMatchObject({
+      baseColorTexture: 0,
+      metallicRoughnessTexture: 0,
+      normalTexture: 0,
+      occlusionTexture: 0,
+      emissiveTexture: 0,
+    });
+  });
+
+  it('rejects textured materials when TEXCOORD_0 is absent', async () => {
+    await expect(
+      new GlbImporter().import(makeGlb({ imageBytes: [1, 2, 3, 4] }), context),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_FEATURE' });
+  });
+
   it('reads interleaved POSITION and NORMAL accessors using byteStride and accessor byteOffset', async () => {
     const result = await new GlbImporter().import(makeInterleavedGlb(), context);
     const mesh = result.data.meshes[0]!.primitives[0]!.mesh;
@@ -283,7 +332,10 @@ describe('GlbImporter', () => {
 
   it('retains embedded image bytes and resolves texture sampler/material references', async () => {
     const bytes = [137, 80, 78, 71, 13, 10, 26, 10];
-    const result = await new GlbImporter().import(makeGlb({ imageBytes: bytes }), context);
+    const result = await new GlbImporter().import(
+      makeGlb({ imageBytes: bytes, uvs: [0, 0, 1, 0, 0, 1] }),
+      context,
+    );
     expect(result.data.images).toHaveLength(1);
     expect(result.data.images[0]?.mimeType).toBe('image/png');
     expect(Array.from(result.data.images[0]!.data)).toEqual(bytes);
