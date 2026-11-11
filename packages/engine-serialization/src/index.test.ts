@@ -135,6 +135,24 @@ describe('world serialization', () => {
     ).toThrow('Material references an unknown texture asset');
   });
 
+  it('requires material texture references to target assets of kind texture', () => {
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        assets: [{ id: 'asset:model', kind: 'model' }],
+        world: {
+          ...world().world,
+          entities: [
+            {
+              id: 'entity:mesh',
+              components: { MeshRenderer: { material: { normalTextureAssetId: 'asset:model' } } },
+            },
+          ],
+        },
+      }),
+    ).toThrow('Material reference must resolve to a texture asset');
+  });
+
   it('rejects malformed base64 asset payloads through the shared schema', () => {
     expect(() =>
       validateWorldDocument({
