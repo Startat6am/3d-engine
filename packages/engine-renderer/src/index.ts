@@ -260,9 +260,24 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       this.#syncTexture(entry, 'normal', item.material.normalTexture);
       this.#syncTexture(entry, 'occlusion', item.material.occlusionTexture);
       this.#syncTexture(entry, 'emissive', item.material.emissiveTexture);
-      mesh.position.set(...item.position);
-      mesh.quaternion.set(...item.rotation);
-      mesh.scale.set(...item.scale);
+      if (item.worldMatrix !== undefined) {
+        if (item.worldMatrix.length !== 16) {
+          throw new RendererError('INVALID_SCENE', 'Render object has an invalid world matrix');
+        }
+        for (let index = 0; index < 16; index += 1) {
+          if (!Number.isFinite(item.worldMatrix[index])) {
+            throw new RendererError('INVALID_SCENE', 'Render object has an invalid world matrix');
+          }
+        }
+        mesh.matrix.fromArray(item.worldMatrix);
+        mesh.matrixAutoUpdate = false;
+        mesh.matrixWorldNeedsUpdate = true;
+      } else {
+        mesh.matrixAutoUpdate = true;
+        mesh.position.set(...item.position);
+        mesh.quaternion.set(...item.rotation);
+        mesh.scale.set(...item.scale);
+      }
     }
   }
 
