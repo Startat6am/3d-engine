@@ -1,3 +1,4 @@
+import { MeshoptEncoder } from 'meshoptimizer';
 import { describe, expect, it } from 'vitest';
 import { GlbImportError, GlbImporter } from './index.js';
 
@@ -246,7 +247,93 @@ function rewriteGlbJson(source: ArrayBuffer, update: (root: MutableGlbJson) => v
 
 const context = { uri: 'models/triangle.glb', settings: {}, signal: new AbortController().signal };
 
+async function makeMeshoptGlb(): Promise<ArrayBuffer> {
+  await MeshoptEncoder.ready;
+  const positions = new Uint8Array(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
+  const indices = new Uint8Array(new Uint16Array([0, 1, 2]).buffer);
+  const encodedPositions = MeshoptEncoder.encodeGltfBuffer(positions, 3, 12, 'ATTRIBUTES');
+  const encodedIndices = MeshoptEncoder.encodeGltfBuffer(indices, 3, 2, 'TRIANGLES');
+  const binary = new Uint8Array(encodedPositions.length + encodedIndices.length);
+  binary.set(encodedPositions);
+  binary.set(encodedIndices, encodedPositions.length);
+  const document = {
+    asset: { version: '2.0' },
+    extensionsUsed: ['EXT_meshopt_compression'],
+    extensionsRequired: ['EXT_meshopt_compression'],
+    buffers: [
+      { byteLength: binary.length },
+      {
+        byteLength: positions.length + indices.length,
+        extensions: { EXT_meshopt_compression: { fallback: true } },
+      },
+    ],
+    bufferViews: [
+      {
+        buffer: 1,
+        byteOffset: 0,
+        byteLength: positions.length,
+        extensions: {
+          EXT_meshopt_compression: {
+            buffer: 0,
+            byteOffset: 0,
+            byteLength: encodedPositions.length,
+            byteStride: 12,
+            count: 3,
+            mode: 'ATTRIBUTES',
+          },
+        },
+      },
+      {
+        buffer: 1,
+        byteOffset: positions.length,
+        byteLength: indices.length,
+        extensions: {
+          EXT_meshopt_compression: {
+            buffer: 0,
+            byteOffset: encodedPositions.length,
+            byteLength: encodedIndices.length,
+            byteStride: 2,
+            count: 3,
+            mode: 'TRIANGLES',
+          },
+        },
+      },
+    ],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: 1, componentType: 5123, count: 3, type: 'SCALAR' },
+    ],
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1 }] }],
+    nodes: [{ mesh: 0 }],
+  };
+  const json = new TextEncoder().encode(JSON.stringify(document));
+  const jsonLength = Math.ceil(json.length / 4) * 4;
+  const binLength = Math.ceil(binary.length / 4) * 4;
+  const total = 12 + 8 + jsonLength + 8 + binLength;
+  const output = new ArrayBuffer(total);
+  const header = new DataView(output);
+  header.setUint32(0, 0x46546c67, true);
+  header.setUint32(4, 2, true);
+  header.setUint32(8, total, true);
+  header.setUint32(12, jsonLength, true);
+  header.setUint32(16, 0x4e4f534a, true);
+  new Uint8Array(output, 20, json.length).set(json);
+  new Uint8Array(output, 20 + json.length, jsonLength - json.length).fill(0x20);
+  const binHeader = 20 + jsonLength;
+  header.setUint32(binHeader, binLength, true);
+  header.setUint32(binHeader + 4, 0x004e4942, true);
+  new Uint8Array(output, binHeader + 8, binary.length).set(binary);
+  return output;
+}
+
 describe('GlbImporter', () => {
+  it('decodes required EXT_meshopt_compression buffers', async () => {
+    const result = await new GlbImporter().import(await makeMeshoptGlb(), context);
+    expect(result.data.meshes[0]?.primitives[0]?.mesh.positions).toEqual(
+      new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+    );
+    expect(result.data.meshes[0]?.primitives[0]?.mesh.indices).toEqual(new Uint32Array([0, 1, 2]));
+  });
   it('imports GLB positions, normals, indices, nodes and PBR material factors', async () => {
     const result = await new GlbImporter().import(makeGlb({ indices: [0, 1, 2] }), context);
     expect(result.kind).toBe('model');
