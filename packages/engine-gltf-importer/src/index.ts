@@ -119,12 +119,12 @@ interface GltfRoot {
       baseColorFactor?: number[];
       metallicFactor?: number;
       roughnessFactor?: number;
-      baseColorTexture?: { index?: number };
-      metallicRoughnessTexture?: { index?: number };
+      baseColorTexture?: { index?: number; texCoord?: number };
+      metallicRoughnessTexture?: { index?: number; texCoord?: number };
     };
-    normalTexture?: { index?: number };
-    occlusionTexture?: { index?: number };
-    emissiveTexture?: { index?: number };
+    normalTexture?: { index?: number; texCoord?: number };
+    occlusionTexture?: { index?: number; texCoord?: number };
+    emissiveTexture?: { index?: number; texCoord?: number };
     emissiveFactor?: number[];
     alphaMode?: string;
     alphaCutoff?: number;
@@ -243,7 +243,7 @@ function readAccessor(
   root: GltfRoot,
   binary: Uint8Array,
   index: number,
-  expectedType: 'VEC3' | 'SCALAR',
+  expectedType: 'VEC2' | 'VEC3' | 'SCALAR',
 ): number[] {
   const accessor = root.accessors?.[index];
   if (!accessor) fail(`Accessor ${index} does not exist`, 'INVALID_ACCESSOR');
@@ -266,7 +266,7 @@ function readAccessor(
             : 0;
   if (
     !bytes ||
-    (expectedType === 'VEC3' && componentType !== 5126) ||
+    (expectedType !== 'SCALAR' && componentType !== 5126) ||
     (expectedType === 'SCALAR' && ![5121, 5123, 5125].includes(componentType!))
   ) {
     fail(`Accessor ${index} uses an unsupported component type`, 'UNSUPPORTED_FEATURE');
@@ -275,7 +275,7 @@ function readAccessor(
   const bufferView = root.bufferViews?.[viewIndex ?? -1];
   if (!bufferView || bufferView.buffer !== 0)
     fail(`Accessor ${index} references an invalid bufferView`, 'INVALID_ACCESSOR');
-  const components = expectedType === 'VEC3' ? 3 : 1;
+  const components = expectedType === 'VEC3' ? 3 : expectedType === 'VEC2' ? 2 : 1;
   const elementBytes = components * bytes;
   const stride = bufferView.byteStride ?? elementBytes;
   const accessorOffset = accessor.byteOffset ?? 0;
@@ -465,6 +465,21 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
   };
   const materials: GltfPbrMaterial[] = (root.materials ?? []).map((material, index) => {
     const pbr = material.pbrMetallicRoughness ?? {};
+    const textureInfos = [
+      pbr.baseColorTexture,
+      pbr.metallicRoughnessTexture,
+      material.normalTexture,
+      material.occlusionTexture,
+      material.emissiveTexture,
+    ];
+    for (const [textureInfoIndex, textureInfo] of textureInfos.entries()) {
+      if (textureInfo?.texCoord !== undefined && textureInfo.texCoord !== 0) {
+        fail(
+          `Material ${index} texture info ${textureInfoIndex} requires unsupported TEXCOORD_${textureInfo.texCoord}`,
+          'UNSUPPORTED_FEATURE',
+        );
+      }
+    }
     const alphaMode = material.alphaMode ?? 'OPAQUE';
     if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode))
       fail(`Material ${index} has an invalid alphaMode`);
@@ -540,12 +555,17 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
         primitive.attributes?.NORMAL === undefined
           ? makeNormals(positions, indices)
           : Float32Array.from(readAccessor(root, binary, primitive.attributes.NORMAL, 'VEC3'));
+      const uvs =
+        primitive.attributes?.TEXCOORD_0 === undefined
+          ? undefined
+          : Float32Array.from(readAccessor(root, binary, primitive.attributes.TEXCOORD_0, 'VEC2'));
       if (normals.length !== positions.length)
         fail('NORMAL accessor count does not match POSITION', 'INVALID_ACCESSOR');
       const mesh: MeshData = {
         positions: Float32Array.from(positions),
         normals,
         indices: Uint32Array.from(indices),
+        ...(uvs ? { uvs } : {}),
       };
       try {
         validateMeshData(mesh);
@@ -557,6 +577,21 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
         (!Number.isInteger(primitive.material) || !materials[primitive.material])
       ) {
         fail(`Primitive references missing material ${primitive.material}`);
+      }
+      const material = primitive.material === undefined ? undefined : materials[primitive.material];
+      if (
+        material &&
+        (material.baseColorTexture !== undefined ||
+          material.metallicRoughnessTexture !== undefined ||
+          material.normalTexture !== undefined ||
+          material.occlusionTexture !== undefined ||
+          material.emissiveTexture !== undefined) &&
+        !uvs
+      ) {
+        fail(
+          `Mesh ${meshIndex} primitive ${primitiveIndex} uses a textured material without TEXCOORD_0`,
+          'UNSUPPORTED_FEATURE',
+        );
       }
       return { mesh, material: primitive.material ?? null, mode: 4 };
     });
@@ -647,6 +682,23 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       embedded: image !== undefined,
     };
   });
+
+  for (const [materialIndex, material] of materials.entries()) {
+    for (const [channel, textureIndex] of Object.entries({
+      baseColor: material.baseColorTexture,
+      metallicRoughness: material.metallicRoughnessTexture,
+      normal: material.normalTexture,
+      occlusion: material.occlusionTexture,
+      emissive: material.emissiveTexture,
+    })) {
+      if (
+        textureIndex !== undefined &&
+        (!Number.isInteger(textureIndex) || textureIndex < 0 || !textures[textureIndex])
+      ) {
+        fail(`Material ${materialIndex} ${channel} references missing texture ${textureIndex}`);
+      }
+    }
+  }
 
   return {
     version: 2,
