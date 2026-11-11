@@ -13,7 +13,6 @@ import {
   type MaterialDescriptor,
   type RenderObject,
 } from '@engine/renderer';
-import * as THREE from 'three';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#player');
 if (!canvas) throw new Error('Player canvas was not found');
@@ -70,18 +69,12 @@ const renderFrame = (now: number) => {
     const renderable = renderableValue as { geometry: MeshData; material: MaterialDescriptor };
     const worldMatrix = runtime.hierarchy.getWorldMatrix(entity);
     if (!worldMatrix) return;
-    const matrix = new THREE.Matrix4().fromArray(Array.from(worldMatrix));
-    const position = new THREE.Vector3();
-    const rotation = new THREE.Quaternion();
-    const scale = new THREE.Vector3();
-    matrix.decompose(position, rotation, scale);
     objects.push({
       id: entity,
       geometry: renderable.geometry,
       material: renderable.material,
-      position: [position.x, position.y, position.z],
-      rotation: [rotation.x, rotation.y, rotation.z, rotation.w],
-      scale: [scale.x, scale.y, scale.z],
+      // The renderer adapter owns backend-specific matrix handling.
+      worldMatrix,
     });
   });
 
