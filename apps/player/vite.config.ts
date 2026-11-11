@@ -1,2 +1,7 @@
 import { defineConfig } from 'vite';
-export default defineConfig({ server: { port: 5174 } });
+import { engineBuildConfig } from '../../vite.shared';
+
+export default defineConfig({
+  server: { port: 5174 },
+  build: engineBuildConfig,
+});
