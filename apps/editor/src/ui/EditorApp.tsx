@@ -27,7 +27,7 @@ import {
   createDefaultMaterial,
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
-import type { RenderObject, Vec3 } from '@engine/renderer/contracts';
+import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 
 type TransformNumberInputProps = {
@@ -485,19 +485,69 @@ export function EditorApp() {
                   wireframe: material.wireframe,
                   emissiveColor: material.emissiveColor ?? 0,
                   ...(material.baseColorTexture
-                    ? { baseColorTextureAssetId: material.baseColorTexture.assetId }
+                    ? {
+                        baseColorTextureAssetId: material.baseColorTexture.assetId,
+                        baseColorTextureSettings: {
+                          ...(material.baseColorTexture.sampler
+                            ? { sampler: material.baseColorTexture.sampler }
+                            : {}),
+                          ...(material.baseColorTexture.transform
+                            ? { transform: material.baseColorTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.metallicRoughnessTexture
-                    ? { metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId }
+                    ? {
+                        metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId,
+                        metallicRoughnessTextureSettings: {
+                          ...(material.metallicRoughnessTexture.sampler
+                            ? { sampler: material.metallicRoughnessTexture.sampler }
+                            : {}),
+                          ...(material.metallicRoughnessTexture.transform
+                            ? { transform: material.metallicRoughnessTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.normalTexture
-                    ? { normalTextureAssetId: material.normalTexture.assetId }
+                    ? {
+                        normalTextureAssetId: material.normalTexture.assetId,
+                        normalTextureSettings: {
+                          ...(material.normalTexture.sampler
+                            ? { sampler: material.normalTexture.sampler }
+                            : {}),
+                          ...(material.normalTexture.transform
+                            ? { transform: material.normalTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.occlusionTexture
-                    ? { occlusionTextureAssetId: material.occlusionTexture.assetId }
+                    ? {
+                        occlusionTextureAssetId: material.occlusionTexture.assetId,
+                        occlusionTextureSettings: {
+                          ...(material.occlusionTexture.sampler
+                            ? { sampler: material.occlusionTexture.sampler }
+                            : {}),
+                          ...(material.occlusionTexture.transform
+                            ? { transform: material.occlusionTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.emissiveTexture
-                    ? { emissiveTextureAssetId: material.emissiveTexture.assetId }
+                    ? {
+                        emissiveTextureAssetId: material.emissiveTexture.assetId,
+                        emissiveTextureSettings: {
+                          ...(material.emissiveTexture.sampler
+                            ? { sampler: material.emissiveTexture.sampler }
+                            : {}),
+                          ...(material.emissiveTexture.transform
+                            ? { transform: material.emissiveTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                 },
                 ...(assetId ? { assetId } : {}),
@@ -564,7 +614,10 @@ export function EditorApp() {
             MeshRenderer?: {
               primitive?: Primitive | 'GLB';
               assetId?: string;
-              material?: SceneEntity['material'] & { readonly baseColorTextureAssetId?: string };
+              material?: SceneEntity['material'] &
+                Record<string, unknown> & {
+                  readonly baseColorTextureAssetId?: string;
+                };
               geometry?: {
                 positions?: number[];
                 normals?: number[];
@@ -621,8 +674,16 @@ export function EditorApp() {
           readonly normalTextureAssetId?: string;
           readonly occlusionTextureAssetId?: string;
           readonly emissiveTextureAssetId?: string;
+          readonly baseColorTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly metallicRoughnessTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly normalTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly occlusionTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly emissiveTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
         };
-        const restoreTexture = (assetId: string | undefined) => {
+        const restoreTexture = (
+          assetId: string | undefined,
+          settings?: Pick<TextureSource, 'sampler' | 'transform'>,
+        ) => {
           if (!assetId) return undefined;
           const textureRecord = restoredAssetRegistry.require(assetId as AssetId);
           if (textureRecord.kind !== 'texture')
@@ -637,15 +698,30 @@ export function EditorApp() {
             cacheKey: textureRecord.contentHash,
             mimeType: payload.mimeType,
             data: new Uint8Array(decodeBase64(payload.data)),
+            ...(settings?.sampler ? { sampler: settings.sampler } : {}),
+            ...(settings?.transform ? { transform: settings.transform } : {}),
           } as const;
         };
-        const baseColorTexture = restoreTexture(storedMaterial.baseColorTextureAssetId);
+        const baseColorTexture = restoreTexture(
+          storedMaterial.baseColorTextureAssetId,
+          storedMaterial.baseColorTextureSettings,
+        );
         const metallicRoughnessTexture = restoreTexture(
           storedMaterial.metallicRoughnessTextureAssetId,
+          storedMaterial.metallicRoughnessTextureSettings,
         );
-        const normalTexture = restoreTexture(storedMaterial.normalTextureAssetId);
-        const occlusionTexture = restoreTexture(storedMaterial.occlusionTextureAssetId);
-        const emissiveTexture = restoreTexture(storedMaterial.emissiveTextureAssetId);
+        const normalTexture = restoreTexture(
+          storedMaterial.normalTextureAssetId,
+          storedMaterial.normalTextureSettings,
+        );
+        const occlusionTexture = restoreTexture(
+          storedMaterial.occlusionTextureAssetId,
+          storedMaterial.occlusionTextureSettings,
+        );
+        const emissiveTexture = restoreTexture(
+          storedMaterial.emissiveTextureAssetId,
+          storedMaterial.emissiveTextureSettings,
+        );
         const material = {
           color: storedMaterial.color,
           roughness: storedMaterial.roughness,
@@ -872,7 +948,15 @@ export function EditorApp() {
         dependencies: [...(imported.dependencies as AssetId[]), ...textureRecords],
         metadata: { ...imported.metadata, fileSize: file.size },
       });
-      const resolveTextureSource = (textureIndex: number | undefined) => {
+      const resolveTextureSource = (
+        textureIndex: number | undefined,
+        channel: 'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive',
+        transform?: {
+          offset: readonly [number, number];
+          rotation: number;
+          scale: readonly [number, number];
+        },
+      ) => {
         if (textureIndex === undefined) return undefined;
         const texture = asset.textures[textureIndex];
         if (!texture || texture.source === null)
@@ -886,6 +970,8 @@ export function EditorApp() {
           cacheKey: stagedRegistry.require(textureAssetId).contentHash,
           mimeType: image.mimeType,
           data: image.data.slice(),
+          ...(texture.sampler === null ? {} : { sampler: asset.samplers[texture.sampler]! }),
+          ...(transform ? { transform } : {}),
         } as const;
       };
       const importedEntities = importedEntitiesWithoutAsset.map((entity, entityIndex) => {
@@ -894,11 +980,31 @@ export function EditorApp() {
           source.primitive.material === null
             ? undefined
             : asset.materials[source.primitive.material];
-        const baseColorTexture = resolveTextureSource(pbr?.baseColorTexture);
-        const metallicRoughnessTexture = resolveTextureSource(pbr?.metallicRoughnessTexture);
-        const normalTexture = resolveTextureSource(pbr?.normalTexture);
-        const occlusionTexture = resolveTextureSource(pbr?.occlusionTexture);
-        const emissiveTexture = resolveTextureSource(pbr?.emissiveTexture);
+        const baseColorTexture = resolveTextureSource(
+          pbr?.baseColorTexture,
+          'baseColor',
+          pbr?.textureTransforms?.baseColor,
+        );
+        const metallicRoughnessTexture = resolveTextureSource(
+          pbr?.metallicRoughnessTexture,
+          'metallicRoughness',
+          pbr?.textureTransforms?.metallicRoughness,
+        );
+        const normalTexture = resolveTextureSource(
+          pbr?.normalTexture,
+          'normal',
+          pbr?.textureTransforms?.normal,
+        );
+        const occlusionTexture = resolveTextureSource(
+          pbr?.occlusionTexture,
+          'occlusion',
+          pbr?.textureTransforms?.occlusion,
+        );
+        const emissiveTexture = resolveTextureSource(
+          pbr?.emissiveTexture,
+          'emissive',
+          pbr?.textureTransforms?.emissive,
+        );
         return {
           ...entity,
           assetId: assetRecord.id,
