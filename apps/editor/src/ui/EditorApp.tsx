@@ -75,6 +75,14 @@ function TransformNumberInput({ value, label, onCommit }: TransformNumberInputPr
 
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
 type TransformMode = 'position' | 'rotation' | 'scale';
+type DiagnosticEntry = {
+  id: number;
+  time: string;
+  level: 'info' | 'warning' | 'error';
+  source: string;
+  message: string;
+  details?: string;
+};
 type SceneEntity = RenderObject & {
   readonly name: string;
   readonly primitive: Primitive | 'GLB';
@@ -283,8 +291,17 @@ export function EditorApp() {
   }, [redo, undo]);
   const [selectedId, setSelectedId] = useState('entity-1');
   const [rendererError, setRendererError] = useState('');
+  const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
+  const pushDiagnostic = useCallback((entry: Omit<DiagnosticEntry, 'id' | 'time'>) => {
+    setDiagnostics((current) =>
+      [
+        { ...entry, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString() },
+        ...current,
+      ].slice(0, 200),
+    );
+  }, []);
   const [worldName, setWorldName] = useState('Untitled World');
-  const [worldError, setWorldError] = useState('');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
@@ -332,6 +349,9 @@ export function EditorApp() {
     [camera, entities, selectedId],
   );
 
+  const renderSceneRef = useRef(renderScene);
+  renderSceneRef.current = renderScene;
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -348,7 +368,7 @@ export function EditorApp() {
           if (!renderer) return;
           const bounds = canvas.getBoundingClientRect();
           renderer.resize(bounds.width, bounds.height);
-          renderer.render(renderScene);
+          renderer.render(renderSceneRef.current);
         };
         observer = new ResizeObserver(resize);
         observer.observe(canvas);
@@ -359,6 +379,12 @@ export function EditorApp() {
         const message = error instanceof Error ? error.message : String(error);
         canvas.dataset.rendererError = message;
         setRendererError(message);
+        pushDiagnostic({
+          level: 'error',
+          source: 'Renderer',
+          message: 'WebGL2 renderer initialization failed',
+          details: message,
+        });
         console.error('WebGL2 renderer initialization failed', error);
       });
     return () => {
@@ -368,7 +394,7 @@ export function EditorApp() {
       rendererRef.current = null;
     };
     // Renderer lifetime is tied to the canvas; scene updates are handled below.
-  }, []);
+  }, [pushDiagnostic]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -577,7 +603,6 @@ export function EditorApp() {
     anchor.download = `${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'world'}.world`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setWorldError('');
   };
 
   const loadWorld = async (file?: File) => {
@@ -691,7 +716,11 @@ export function EditorApp() {
           const payload = restoredAssetPayloads.get(assetId as AssetId);
           if (!payload)
             throw new Error(`Material references a missing embedded texture payload: ${assetId}`);
-          if (payload.mimeType !== 'image/png' && payload.mimeType !== 'image/jpeg')
+          if (
+            payload.mimeType !== 'image/png' &&
+            payload.mimeType !== 'image/jpeg' &&
+            payload.mimeType !== 'image/webp'
+          )
             throw new Error(`Material references an unsupported texture payload: ${assetId}`);
           return {
             assetId,
@@ -755,9 +784,14 @@ export function EditorApp() {
       commitEntities(parsed);
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
-      setWorldError('');
     } catch (error) {
-      setWorldError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      pushDiagnostic({
+        level: 'error',
+        source: 'World',
+        message: `Could not open ${file.name}`,
+        details: message,
+      });
     }
   };
 
@@ -921,7 +955,8 @@ export function EditorApp() {
           imageBytes.byteOffset + imageBytes.byteLength,
         ) as ArrayBuffer;
         const imageHash = await sha256(imageBuffer);
-        const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
+        const extension =
+          image.mimeType === 'image/png' ? 'png' : image.mimeType === 'image/webp' ? 'webp' : 'jpg';
         const textureRecord = stagedRegistry.register({
           name: image.name,
           kind: 'texture',
@@ -1030,10 +1065,21 @@ export function EditorApp() {
       pendingLease = null;
       commitEntities([...entitiesRef.current, ...importedEntities]);
       setSelectedId(importedEntities[0]!.id);
-      setWorldError('');
+      pushDiagnostic({
+        level: 'info',
+        source: 'GLB Importer',
+        message: `Imported ${file.name}`,
+        details: `${importedEntities.length} scene object(s) created`,
+      });
     } catch (error) {
       pendingLease?.release();
-      setWorldError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      pushDiagnostic({
+        level: 'error',
+        source: 'GLB Importer',
+        message: 'Importer engine.gltf.glb failed',
+        details: `${file.name}\n${message}`,
+      });
     }
   };
 
@@ -1211,6 +1257,16 @@ export function EditorApp() {
             event.currentTarget.value = '';
           }}
         />
+        <button
+          className="toolbar-button diagnostics-trigger"
+          onClick={() => setIsDiagnosticsOpen((open) => !open)}
+          aria-expanded={isDiagnosticsOpen}
+        >
+          Console{' '}
+          {diagnostics.filter((entry) => entry.level === 'error').length
+            ? `· ${diagnostics.filter((entry) => entry.level === 'error').length}`
+            : ''}
+        </button>
         <span className="spacer" />
         <span className="status">
           <i /> EDITOR · INTERACTIVE PREVIEW
@@ -1257,11 +1313,6 @@ export function EditorApp() {
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          {worldError ? (
-            <div className="world-error" role="alert">
-              {worldError}
-            </div>
-          ) : null}
           <div className="panel-foot">{entities.length} OBJECTS · SCENE 01</div>
         </aside>
         <section className="viewport">
@@ -1449,6 +1500,37 @@ export function EditorApp() {
           <div className="panel-foot">FOUNDATION BUILD · 0.1.0</div>
         </aside>
       </div>
+      {isDiagnosticsOpen ? (
+        <section className="diagnostics-panel" aria-label="Technical console" aria-live="polite">
+          <div className="diagnostics-heading">
+            <strong>CONSOLE / DIAGNOSTICS</strong>
+            <span>{diagnostics.length} EVENTS</span>
+            <button onClick={() => setDiagnostics([])}>Clear</button>
+            <button aria-label="Close console" onClick={() => setIsDiagnosticsOpen(false)}>
+              ×
+            </button>
+          </div>
+          <div className="diagnostics-list">
+            {diagnostics.length ? (
+              diagnostics.map((entry) => (
+                <article className={`diagnostic-entry level-${entry.level}`} key={entry.id}>
+                  <time>{entry.time}</time>
+                  <b>{entry.level.toUpperCase()}</b>
+                  <span className="diagnostic-source">{entry.source}</span>
+                  <div>
+                    <strong>{entry.message}</strong>
+                    {entry.details ? <pre>{entry.details}</pre> : null}
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="diagnostics-empty">
+                No events yet. Import, load or edit a scene to see diagnostics.
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null}
       <footer className="bottombar">
         <span>● READY</span>
         <span>WebGL2 · Three.js adapter</span>
