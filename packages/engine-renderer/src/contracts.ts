@@ -26,7 +26,7 @@ export interface TextureSource {
   readonly assetId: string;
   /** Content hash used for decoded/GPU resource deduplication across project assets. */
   readonly cacheKey: string;
-  readonly mimeType: 'image/png' | 'image/jpeg';
+  readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
   readonly data: Uint8Array;
   readonly sampler?: TextureSamplerDescriptor;
   readonly transform?: TextureTransformDescriptor;
