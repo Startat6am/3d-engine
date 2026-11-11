@@ -330,7 +330,7 @@ importers:
         specifier: workspace:*
         version: link:../engine-geometry
       three:
-        specifier: 0.187.0
+        specifier: 'catalog:'
         version: 0.187.0
 
   packages/engine-serialization:
