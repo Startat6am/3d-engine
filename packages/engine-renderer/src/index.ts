@@ -12,6 +12,8 @@ import type {
 import { RendererError } from './contracts.js';
 export * from './contracts.js';
 
+type TextureChannel = 'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive';
+
 /** Three.js is deliberately contained behind this adapter; no Three.js types escape the package API. */
 export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly capabilities: RendererCapabilities;
@@ -26,8 +28,8 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       materialSource: object;
       geometryLease: AssetResourceLease<THREE.BufferGeometry>;
       materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
-      textureSource?: TextureSource;
-      textureLease?: AssetResourceLease<THREE.Texture>;
+      textureSources: Map<TextureChannel, TextureSource>;
+      textureLeases: Map<TextureChannel, AssetResourceLease<THREE.Texture>>;
       active: boolean;
     }
   >();
@@ -147,6 +149,11 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
               new THREE.BufferAttribute(item.geometry.positions, 3),
             );
             geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
+            if (item.geometry.uvs) {
+              const uv = new THREE.BufferAttribute(item.geometry.uvs, 2);
+              geometry.setAttribute('uv', uv);
+              geometry.setAttribute('uv2', uv);
+            }
             geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
             return geometry;
           },
@@ -170,6 +177,8 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         entry = {
           mesh,
           active: true,
+          textureSources: new Map(),
+          textureLeases: new Map(),
           geometrySource: item.geometry,
           materialSource: item.material,
           geometryLease,
@@ -196,6 +205,11 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
                   'normal',
                   new THREE.BufferAttribute(item.geometry.normals, 3),
                 );
+                if (item.geometry.uvs) {
+                  const uv = new THREE.BufferAttribute(item.geometry.uvs, 2);
+                  geometry.setAttribute('uv', uv);
+                  geometry.setAttribute('uv2', uv);
+                }
                 geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
                 return geometry;
               },
@@ -223,6 +237,9 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         }
         if (nextMaterialLease) {
           const previousLease = entry.materialLease;
+          for (const textureLease of entry.textureLeases.values()) textureLease.release();
+          entry.textureLeases.clear();
+          entry.textureSources.clear();
           entry.materialLease = nextMaterialLease;
           entry.materialSource = item.material;
           entry.mesh.material = nextMaterialLease.resource;
@@ -237,7 +254,12 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       material.opacity = item.material.opacity;
       material.transparent = item.material.transparent;
       material.wireframe = item.material.wireframe;
-      this.#syncTexture(entry, item.material.baseColorTexture);
+      material.emissive.setHex(item.material.emissiveColor ?? 0x000000);
+      this.#syncTexture(entry, 'baseColor', item.material.baseColorTexture);
+      this.#syncTexture(entry, 'metallicRoughness', item.material.metallicRoughnessTexture);
+      this.#syncTexture(entry, 'normal', item.material.normalTexture);
+      this.#syncTexture(entry, 'occlusion', item.material.occlusionTexture);
+      this.#syncTexture(entry, 'emissive', item.material.emissiveTexture);
       mesh.position.set(...item.position);
       mesh.quaternion.set(...item.rotation);
       mesh.scale.set(...item.scale);
@@ -248,40 +270,63 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     entry: {
       readonly mesh: THREE.Mesh;
       readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
-      textureSource?: TextureSource;
-      textureLease?: AssetResourceLease<THREE.Texture>;
+      textureSources: Map<TextureChannel, TextureSource>;
+      textureLeases: Map<TextureChannel, AssetResourceLease<THREE.Texture>>;
       active: boolean;
     },
+    channel: TextureChannel,
     source: TextureSource | undefined,
   ): void {
     const material = entry.materialLease.resource;
+    const colorSpace =
+      channel === 'baseColor' || channel === 'emissive' ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    const setTexture = (texture: THREE.Texture | null) => {
+      switch (channel) {
+        case 'baseColor':
+          material.map = texture;
+          break;
+        case 'metallicRoughness':
+          material.metalnessMap = texture;
+          material.roughnessMap = texture;
+          break;
+        case 'normal':
+          material.normalMap = texture;
+          break;
+        case 'occlusion':
+          material.aoMap = texture;
+          break;
+        case 'emissive':
+          material.emissiveMap = texture;
+          break;
+      }
+      material.needsUpdate = true;
+    };
+    const previous = entry.textureSources.get(channel);
     if (!source) {
-      delete entry.textureSource;
-      entry.textureLease?.release();
-      delete entry.textureLease;
-      if (material.map) {
-        material.map = null;
-        material.needsUpdate = true;
+      if (previous) {
+        entry.textureSources.delete(channel);
+        entry.textureLeases.get(channel)?.release();
+        entry.textureLeases.delete(channel);
+        setTexture(null);
       }
       return;
     }
-    if (entry.textureSource?.assetId === source.assetId) return;
-    if (material.map) {
-      material.map = null;
-      material.needsUpdate = true;
+    if (previous?.assetId === source.assetId && previous.cacheKey === source.cacheKey) return;
+    if (previous) {
+      setTexture(null);
+      entry.textureLeases.get(channel)?.release();
+      entry.textureLeases.delete(channel);
     }
-    entry.textureLease?.release();
-    delete entry.textureLease;
-    entry.textureSource = source;
+    entry.textureSources.set(channel, source);
     void this.#textureCache
       .acquire(
-        source.cacheKey,
+        `${source.cacheKey}:${colorSpace}`,
         async () => {
           const bitmap = await createImageBitmap(
             new Blob([source.data.slice().buffer as ArrayBuffer], { type: source.mimeType }),
           );
           const texture = new THREE.Texture(bitmap);
-          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.colorSpace = colorSpace;
           texture.flipY = false;
           texture.needsUpdate = true;
           return texture;
@@ -293,19 +338,18 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         },
       )
       .then((lease) => {
-        if (this.#disposed || !entry.active || entry.textureSource !== source) {
+        if (this.#disposed || !entry.active || entry.textureSources.get(channel) !== source) {
           lease.release();
           return;
         }
-        entry.textureLease = lease;
-        material.map = lease.resource;
-        material.needsUpdate = true;
+        entry.textureLeases.set(channel, lease);
+        setTexture(lease.resource);
         const scene = this.#lastScene;
         if (scene && !this.#disposed) this.render(scene);
       })
       .catch((error: unknown) => {
-        if (entry.textureSource === source) delete entry.textureSource;
-        console.error(`Failed to decode texture asset ${source.assetId}`, error);
+        if (entry.textureSources.get(channel) === source) entry.textureSources.delete(channel);
+        console.error(`Failed to decode ${channel} texture asset ${source.assetId}`, error);
       });
   }
 
@@ -347,12 +391,15 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     readonly mesh: THREE.Mesh;
     readonly geometryLease: AssetResourceLease<THREE.BufferGeometry>;
     readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
-    textureLease?: AssetResourceLease<THREE.Texture>;
+    textureSources: Map<TextureChannel, TextureSource>;
+    textureLeases: Map<TextureChannel, AssetResourceLease<THREE.Texture>>;
     active: boolean;
   }): void {
     entry.active = false;
     this.#scene.remove(entry.mesh);
-    entry.textureLease?.release();
+    for (const lease of entry.textureLeases.values()) lease.release();
+    entry.textureLeases.clear();
+    entry.textureSources.clear();
     entry.geometryLease.release();
     entry.materialLease.release();
   }
