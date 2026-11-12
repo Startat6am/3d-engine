@@ -17,13 +17,14 @@ This file is the durable handoff point for continuing work after a chat/session 
 
 ## Active PR stack — all open, do not merge without explicit approval
 
-| Order | PR | Branch | Base | Known head | Purpose |
-|---|---:|---|---|---|---|
-| 1 | [#44](https://github.com/Startat6am/3d-engine/pull/44) | `feat/glb-sampler-texture-transform` | `main` | `01a0fdbfefc56c4297b68a747ff4097a1f372374` | GLB sampler/texture transform, compressed asset support, diagnostics, editor/render performance fixes |
-| 2 | [#45](https://github.com/Startat6am/3d-engine/pull/45) | `fix/glb-import-memory` | #44 branch | `42630a865b772192995f726e7713783152f75ea4` | Reduce peak memory in accessor decode, meshopt decompression, textures, and payload encoding |
-| 3 | [#46](https://github.com/Startat6am/3d-engine/pull/46) | `feat/glb-import-budget` | #45 branch | `793c430afd28ff40f1e1712228143a94bc82f73a` | Configurable import budgets, typed resource-limit errors, diagnostics, typed-array allocation improvements |
-| 4 | [#47](https://github.com/Startat6am/3d-engine/pull/47) | `feat/glb-import-stress-tests` | #46 branch | current PR head | Budget/repeat-import reliability tests and durable M5 execution handoff |
-| 5 | [#48](https://github.com/Startat6am/3d-engine/pull/48) | `feat/glb-import-benchmark` | #47 branch | current PR head | Synthetic GLB stress runner and measured Node memory/timing baseline |
+| Order |                                                     PR | Branch                               | Base       | Known head                                 | Purpose                                                                                                    |
+| ----- | -----------------------------------------------------: | ------------------------------------ | ---------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| 1     | [#44](https://github.com/Startat6am/3d-engine/pull/44) | `feat/glb-sampler-texture-transform` | `main`     | `01a0fdbfefc56c4297b68a747ff4097a1f372374` | GLB sampler/texture transform, compressed asset support, diagnostics, editor/render performance fixes      |
+| 2     | [#45](https://github.com/Startat6am/3d-engine/pull/45) | `fix/glb-import-memory`              | #44 branch | `42630a865b772192995f726e7713783152f75ea4` | Reduce peak memory in accessor decode, meshopt decompression, textures, and payload encoding               |
+| 3     | [#46](https://github.com/Startat6am/3d-engine/pull/46) | `feat/glb-import-budget`             | #45 branch | `793c430afd28ff40f1e1712228143a94bc82f73a` | Configurable import budgets, typed resource-limit errors, diagnostics, typed-array allocation improvements |
+| 4     | [#47](https://github.com/Startat6am/3d-engine/pull/47) | `feat/glb-import-stress-tests`       | #46 branch | current PR head                            | Budget/repeat-import reliability tests and durable M5 execution handoff                                    |
+| 5     | [#48](https://github.com/Startat6am/3d-engine/pull/48) | `feat/glb-import-benchmark`          | #47 branch | current PR head                            | Synthetic GLB stress runner and measured Node memory/timing baseline                                       |
+| 6     | [#49](https://github.com/Startat6am/3d-engine/pull/49) | `fix/editor-glb-import-cancellation` | #48 branch | current PR head                            | Cancel in-flight GLB imports on editor unmount and release pending leases                                  |
 
 These are stacked dependencies. Preserve their order and do not merge a later PR before its base changes are integrated. User approval to merge a separate `dl-models-test` PR was not actionable: repository inspection shows the folder arrived directly on `main` via commit `5ed26d5` (`Add files via upload`), not through an identifiable PR. No PR was merged as part of that request.
 
