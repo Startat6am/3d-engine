@@ -460,30 +460,81 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
   const path = await download.path();
   if (!path) throw new Error('World export did not produce a file');
   const document = JSON.parse(await readFile(path, 'utf8')) as {
-    assets: Array<{ id: string; contentHash: string; kind: string }>;
+    assets: Array<{
+      id: string;
+      contentHash: string;
+      kind: string;
+      uri?: string;
+      dependencies?: string[];
+    }>;
     assetPayloads: Array<{ assetId: string; mimeType: string; encoding: string; data: string }>;
+    world: {
+      name: string;
+      entities: Array<{ components?: { MeshRenderer?: { material?: Record<string, unknown> } } }>;
+    };
   };
   const texture = document.assets.find((asset) => asset.kind === 'texture');
   if (!texture) throw new Error('Saved world does not contain a texture asset');
+  const originalTextureId = texture.id;
+  const replacementTextureId = `replacement-${originalTextureId}`;
   const replacementPng = makeSolidPng(220, 30, 90);
-  const payload = document.assetPayloads.find((item) => item.assetId === texture.id);
+  const payload = document.assetPayloads.find((item) => item.assetId === originalTextureId);
   if (!payload) throw new Error('Saved world does not contain the embedded texture payload');
+  payload.assetId = replacementTextureId;
   payload.data = replacementPng.toString('base64');
+  texture.id = replacementTextureId;
+  texture.uri = 'imports/replacement-texture.png';
   texture.contentHash = `sha256:${createHash('sha256').update(replacementPng).digest('hex')}`;
+  for (const asset of document.assets) {
+    if (asset.dependencies) {
+      asset.dependencies = asset.dependencies.map((id) =>
+        id === originalTextureId ? replacementTextureId : id,
+      );
+    }
+  }
+  const replaceTextureReferences = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(replaceTextureReferences);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key.endsWith('TextureAssetId') && child === originalTextureId) {
+        (value as Record<string, unknown>)[key] = replacementTextureId;
+      } else {
+        replaceTextureReferences(child);
+      }
+    }
+  };
+  replaceTextureReferences(document.world);
+  document.world.name = 'Replacement World';
+  const callsBeforeReplacement = await page.evaluate(
+    () => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls,
+  );
+  const successesBeforeReplacement = await page.evaluate(
+    () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
+  );
 
   await page.locator('input[accept=".world,application/json"]').setInputFiles({
     name: 'replacement.world',
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify(document)),
   });
-  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await expect(page.getByLabel('World name')).toHaveValue('Replacement World');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls,
+      ),
+    )
+    .toBeGreaterThan(callsBeforeReplacement);
   await expect
     .poll(() =>
       page.evaluate(
         () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
       ),
     )
-    .toBeGreaterThanOrEqual(3);
+    .toBeGreaterThan(successesBeforeReplacement);
 
   // Complete the original decode only after the replacement has decoded successfully.
   await page.evaluate(() => {
