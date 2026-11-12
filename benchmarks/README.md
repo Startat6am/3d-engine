@@ -54,6 +54,24 @@ GLB_STRESS_TEXTURE_BYTES=16777216 node --expose-gc benchmarks/glb-import-stress.
 
 This confirms that the importer returns to the source-fixture ArrayBuffer baseline after each result is released in this Node diagnostic run. It is not an image-decoding or GPU upload test, nor a sampled peak-memory profile.
 
+## Supported Node 22 CI baseline (2026-11-12, GitHub Actions run #120)
+
+Environment: Node 22.23.4, Linux x64, 4 CPUs, 15,983 MiB reported host memory, explicit GC enabled. Both fixtures ran three times in the same CI job. Full run: [GitHub Actions #120](https://github.com/Startat6am/3d-engine/actions/runs/43171730974).
+
+| Measurement | Geometry only | 16 MiB embedded image |
+| --- | ---: | ---: |
+| Source GLB | 12,000,396 bytes | 28,777,756 bytes |
+| Geometry output | 28,000,056 bytes | 28,000,056 bytes |
+| Embedded image payload | 0 bytes | 16,777,216 bytes |
+| Import wall time, run 1 | 246.96 ms | 261.55 ms |
+| Import wall time, run 2 | 207.29 ms | 202.07 ms |
+| Import wall time, run 3 | 215.32 ms | 214.50 ms |
+| ArrayBuffers while result retained | 38.17 MiB | 70.17 MiB |
+| ArrayBuffers after result release + GC | 11.47 MiB (source fixture only) | 27.47 MiB (source fixture only) |
+| ArrayBuffers after source release + GC | 0.02 MiB | 0.02 MiB |
+
+These are supported-runtime diagnostic baselines, not a peak-memory profile. ArrayBuffers return to the source-fixture footprint after the imported result is released and to the near-zero baseline after the source fixture is released. RSS remains higher due to process/runtime allocator retention. The 16 MiB image bufferView is a deterministic payload with an image/png MIME label but is not a valid PNG; this case measures payload retention/copying, not image decoding or GPU upload.
+
 ## Limitations
 
 - This fixture measures geometry decode/build only: no embedded textures, image decode, GPU allocation, editor entity lifecycle, or WebGL context loss.
