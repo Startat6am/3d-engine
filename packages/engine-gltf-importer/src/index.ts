@@ -259,10 +259,22 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
   )
     fail('GLB BIN chunk is shorter than buffer.byteLength');
   const views = root.bufferViews ?? [];
-  const decodedParts: Uint8Array[] = [];
-  let totalLength = sourceBinary.byteLength;
   if (views.some((view) => view.buffer !== 0 && !view.extensions?.EXT_meshopt_compression))
     fail('GLB bufferView references an unavailable buffer', 'UNSUPPORTED_FEATURE');
+
+  // First reserve the final output ranges from metadata alone. Keeping every
+  // decompressed meshopt buffer in an array while also allocating the combined
+  // BIN buffer would temporarily retain two full copies of the decoded model.
+  const compressedViews: {
+    readonly index: number;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+    readonly byteStride: number;
+    readonly count: number;
+    readonly mode: string;
+    readonly filter?: string;
+  }[] = [];
+  let totalLength = sourceBinary.byteLength;
   for (const [index, view] of views.entries()) {
     const compression = view.extensions?.EXT_meshopt_compression;
     if (!compression) continue;
@@ -283,51 +295,59 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
       fail(`bufferView ${index} has invalid EXT_meshopt_compression metadata`, 'INVALID_ACCESSOR');
     if (filter && !['NONE', 'OCTAHEDRAL', 'QUATERNION', 'EXPONENTIAL', 'COLOR'].includes(filter))
       fail(`bufferView ${index} uses unsupported meshopt filter ${filter}`, 'UNSUPPORTED_FEATURE');
-    let decoded: Uint8Array;
-    try {
-      await MeshoptDecoder.ready;
-      decoded = await MeshoptDecoder.decodeGltfBufferAsync(
-        count!,
-        byteStride!,
-        sourceBinary.subarray(byteOffset, byteOffset + byteLength!),
-        mode!,
-        filter,
-      );
-    } catch (error) {
-      fail(
-        `bufferView ${index} meshopt decompression failed: ${error instanceof Error ? error.message : String(error)}`,
-        'INVALID_ACCESSOR',
-      );
-    }
-    if (decoded.byteLength !== count! * byteStride!)
+    const decodedByteLength = count! * byteStride!;
+    if (!Number.isSafeInteger(decodedByteLength) || decodedByteLength <= 0)
       fail(`bufferView ${index} decoded size is invalid`, 'INVALID_ACCESSOR');
     totalLength = (totalLength + 3) & ~3;
+    const outputOffset = totalLength;
     view.buffer = 0;
-    view.byteOffset = totalLength;
-    view.byteLength = decoded.byteLength;
+    view.byteOffset = outputOffset;
+    view.byteLength = decodedByteLength;
     if (mode === 'ATTRIBUTES') view.byteStride = byteStride!;
     else delete view.byteStride;
     delete view.extensions;
-    decodedParts.push(decoded);
-    totalLength += decoded.byteLength;
+    compressedViews.push({
+      index,
+      byteOffset,
+      byteLength: byteLength!,
+      byteStride: byteStride!,
+      count: count!,
+      mode: mode!,
+      ...(filter ? { filter } : {}),
+    });
+    totalLength += decodedByteLength;
   }
   if (!buffers[0] && (root.accessors?.length ?? 0) > 0)
     fail('Accessors require an embedded GLB buffer');
   root.buffers = [{ byteLength: totalLength }];
-  // Most GLBs need no decompression: retain the original BIN view instead of
-  // allocating and copying the entire payload a second time.
-  if (decodedParts.length === 0) return sourceBinary;
+  if (compressedViews.length === 0) return sourceBinary;
+
   const binary = new Uint8Array(totalLength);
   binary.set(sourceBinary);
-  let cursor = sourceBinary.byteLength;
-  for (const part of decodedParts) {
-    cursor = (cursor + 3) & ~3;
-    binary.set(part, cursor);
-    cursor += part.byteLength;
+  // Decompress one view at a time directly into its reserved final range.
+  for (const entry of compressedViews) {
+    let decoded: Uint8Array;
+    try {
+      await MeshoptDecoder.ready;
+      decoded = await MeshoptDecoder.decodeGltfBufferAsync(
+        entry.count,
+        entry.byteStride,
+        sourceBinary.subarray(entry.byteOffset, entry.byteOffset + entry.byteLength),
+        entry.mode,
+        entry.filter,
+      );
+    } catch (error) {
+      fail(
+        `bufferView ${entry.index} meshopt decompression failed: ${error instanceof Error ? error.message : String(error)}`,
+        'INVALID_ACCESSOR',
+      );
+    }
+    if (decoded.byteLength !== entry.count * entry.byteStride)
+      fail(`bufferView ${entry.index} decoded size is invalid`, 'INVALID_ACCESSOR');
+    binary.set(decoded, views[entry.index]!.byteOffset);
   }
   return binary;
 }
-
 function validateGlbBufferViews(root: GltfRoot, binary: Uint8Array): void {
   for (const [index, view] of (root.bufferViews ?? []).entries()) {
     const start = view.byteOffset ?? 0;
