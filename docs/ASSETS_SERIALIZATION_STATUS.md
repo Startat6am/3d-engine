@@ -53,6 +53,5 @@
 5. Keep player packaging and future AI authoring on the same asset identity/reference contracts.
 6. Run full workspace format, lint, typecheck, unit tests, production builds, and browser acceptance before marking the milestone complete.
 
-
 - PR #58 (`test/renderer-texture-replacement-race`) adds deterministic coverage for a texture decode completing with an error after its scene source has been replaced. It holds the first `createImageBitmap`, opens a replacement `.world` with a valid PNG payload and matching SHA-256, waits for the replacement decode to succeed, then rejects the stale decode and asserts no renderer diagnostic/page error. Local formatting, ESLint, TypeScript, 83/83 unit tests, Editor/Player builds, and `git diff --check` pass. Chromium is not installed locally, and no GitHub Actions run is currently associated with the latest PR head.
 - PR #59 (`fix/renderer-rerender-after-context-restore`) adds a `webglcontextrestored` listener after Three.js's internal listener and re-renders the last scene, removing the listener on renderer disposal. Its browser acceptance test checks actual `texImage2D` uploads increase after context restoration while the imported scene remains present. Local formatting, ESLint, TypeScript, 83/83 unit tests, Editor/Player production builds, and `git diff --check` pass; Chromium CI is pending.
