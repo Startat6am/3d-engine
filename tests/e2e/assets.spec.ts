@@ -224,6 +224,29 @@ test('GLB imports register stable project assets and survive world save/reopen',
     emissiveTextureAssetId: texture.id,
   });
   expect(reopenedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
+  // A tampered embedded texture payload must fail hash verification before
+  // committing any of the staged world state.
+  const tamperedDocument = JSON.parse(firstSave) as typeof firstDocument;
+  const tamperedTexturePayload = tamperedDocument.assetPayloads.find(
+    (payload) => payload.assetId === texture.id,
+  )!;
+  tamperedTexturePayload.data = Buffer.from('tampered image bytes').toString('base64');
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'tampered.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(tamperedDocument)),
+  });
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Could not open tampered.world', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Embedded asset payload hash mismatch/)).toBeVisible();
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  // The rejected load must leave the previous scene and its valid asset payloads intact.
+  const afterRejectedLoad = JSON.parse(await saveWorld()) as typeof firstDocument;
+  expect(afterRejectedLoad.assets.map((item) => item.id)).toContain(asset.id);
+  expect(afterRejectedLoad.assets.map((item) => item.id)).toContain(texture.id);
+  expect(afterRejectedLoad.assetPayloads).toEqual(firstDocument.assetPayloads);
+
   await page.waitForTimeout(250);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
