@@ -78,10 +78,10 @@ function memorySnapshot() {
 }
 
 function peakRssSnapshotMiB() {
+  if (process.platform === 'win32') return null;
   const { maxRSS } = process.resourceUsage();
-  // Node reports maxRSS in KiB (ru_maxrss units).
-  const bytes = maxRSS * 1024;
-  return Number((bytes / 1024 / 1024).toFixed(2));
+  // Node reports maxRSS in KiB (ru_maxrss units) on supported Unix platforms.
+  return Number((maxRSS / 1024).toFixed(2));
 }
 
 async function importOnce(importer, source, run) {
@@ -160,7 +160,7 @@ const output = {
   runs: report.results,
   notes: [
     'process.memoryUsage values are point-in-time snapshots; peakRss fields use the OS process high-water mark and include runtime startup plus the synthetic fixture.',
-    'Peak RSS is reported as evidence but no hard ceiling is enforced until supported-runner baselines are reviewed.',
+    'Peak RSS is unavailable on Windows; no hard ceiling is enforced until supported-runner baselines are reviewed.',
     'Run with --expose-gc for comparable post-release snapshots.',
     'Synthetic image payload bytes are copied as embedded image data; no image decode or GPU allocation is measured.',
   ],
