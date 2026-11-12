@@ -557,6 +557,57 @@ describe('GlbImporter', () => {
     ).rejects.toMatchObject({ code: 'INVALID_ACCESSOR' });
   });
 
+  it('enforces triangle and embedded texture budgets before building imported assets', async () => {
+    const twoTriangles = makeGlb({ indices: [0, 1, 2, 0, 2, 1] });
+    await expect(
+      new GlbImporter().import(twoTriangles, {
+        ...context,
+        settings: { maxTriangles: 1 },
+      }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+
+    const textured = makeGlb({ imageBytes: [1, 2, 3, 4], uvs: [0, 0, 1, 0, 0, 1] });
+    await expect(
+      new GlbImporter().import(textured, {
+        ...context,
+        settings: { maxTextureBytes: 3 },
+      }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+  });
+
+  it('rejects hostile declared accessor sizes before allocating geometry output', async () => {
+    const oversized = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.count = 1_000_000;
+    });
+    await expect(
+      new GlbImporter().import(oversized, {
+        ...context,
+        settings: { maxVertices: 100_000 },
+      }),
+    ).rejects.toMatchObject({
+      code: 'RESOURCE_LIMIT',
+      message: expect.stringContaining('vertices'),
+    });
+  });
+
+  it('keeps concurrent repeated imports isolated and does not mutate the source GLB', async () => {
+    const source = makeGlb({ imageBytes: [1, 2, 3, 4], uvs: [0, 0, 1, 0, 0, 1] });
+    const originalBytes = new Uint8Array(source).slice();
+    const importer = new GlbImporter();
+    const results = await Promise.all(
+      Array.from({ length: 24 }, () => importer.import(source, context)),
+    );
+    const positionBuffers = results.map(
+      (result) => result.data.meshes[0]!.primitives[0]!.mesh.positions,
+    );
+    expect(new Uint8Array(source)).toEqual(originalBytes);
+    expect(new Set(positionBuffers).size).toBe(results.length);
+
+    positionBuffers[0]![0] = 123;
+    expect(positionBuffers.slice(1).every((positions) => positions[0] === 0)).toBe(true);
+    expect(results.every((result) => result.data.images[0]?.data.length === 4)).toBe(true);
+  });
+
   it('honors an already-aborted signal', async () => {
     const controller = new AbortController();
     controller.abort();
