@@ -223,6 +223,102 @@ describe('AssetResourceCache', () => {
     expect(cache.size).toBe(0);
   });
 
+  it('does not start a load for a consumer whose signal is already aborted', async () => {
+    const cache = new AssetResourceCache<number>();
+    const controller = new AbortController();
+    const load = vi.fn(async () => 5);
+    controller.abort('cancelled before acquire');
+
+    await expect(
+      cache.acquire('asset:pre-aborted', load, () => {}, controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(load).not.toHaveBeenCalled();
+    expect(cache.size).toBe(0);
+  });
+
+  it('keeps a shared load alive when one consumer aborts', async () => {
+    const cache = new AssetResourceCache<{ id: number }>();
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    let sharedSignal: AbortSignal | undefined;
+    let resolveLoad!: (resource: { id: number }) => void;
+    const load = vi.fn((signal: AbortSignal) => {
+      sharedSignal = signal;
+      return new Promise<{ id: number }>((resolve) => {
+        resolveLoad = resolve;
+      });
+    });
+    const dispose = vi.fn();
+    const first = cache.acquire('asset:shared-abort', load, dispose, firstController.signal);
+    const second = cache.acquire('asset:shared-abort', load, dispose, secondController.signal);
+    await Promise.resolve();
+
+    firstController.abort('first consumer left');
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sharedSignal?.aborted).toBe(false);
+    expect(cache.referenceCount('asset:shared-abort')).toBe(1);
+
+    resolveLoad({ id: 23 });
+    const secondLease = await second;
+    expect(secondLease.resource).toEqual({ id: 23 });
+    secondLease.release();
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(cache.size).toBe(0);
+  });
+
+  it('aborts the shared loader when every consumer leaves', async () => {
+    const cache = new AssetResourceCache<number>();
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    let sharedSignal: AbortSignal | undefined;
+    const load = vi.fn(
+      (signal: AbortSignal) =>
+        new Promise<number>((_resolve, reject) => {
+          sharedSignal = signal;
+          signal.addEventListener('abort', () => reject(new Error('shared loader aborted')), {
+            once: true,
+          });
+        }),
+    );
+    const first = cache.acquire('asset:all-abort', load, () => {}, firstController.signal);
+    const second = cache.acquire('asset:all-abort', load, () => {}, secondController.signal);
+    await Promise.resolve();
+
+    firstController.abort('first consumer left');
+    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sharedSignal?.aborted).toBe(false);
+    secondController.abort('last consumer left');
+    await expect(second).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sharedSignal?.aborted).toBe(true);
+    expect(cache.size).toBe(0);
+  });
+
+  it('disposes a late resource when every consumer aborts before the load settles', async () => {
+    const cache = new AssetResourceCache<{ id: number }>();
+    const controller = new AbortController();
+    const resource = { id: 31 };
+    let resolveLoad!: (value: { id: number }) => void;
+    const dispose = vi.fn();
+    const pending = cache.acquire(
+      'asset:late-abort',
+      () =>
+        new Promise<{ id: number }>((resolve) => {
+          resolveLoad = resolve;
+        }),
+      dispose,
+      controller.signal,
+    );
+    await Promise.resolve();
+    controller.abort('cancelled before decode settled');
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(cache.size).toBe(0);
+
+    resolveLoad(resource);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(dispose).toHaveBeenCalledWith(resource);
+  });
+
   it('shares synchronous resources and disposes only after the final lease', () => {
     const cache = new AssetResourceCache<{ id: number }>();
     const load = vi.fn(() => ({ id: 11 }));
