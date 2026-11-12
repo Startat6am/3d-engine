@@ -29,10 +29,11 @@ These are stacked dependencies. Preserve their order and do not merge a later PR
 
 ## Current work in progress
 
+- PR: [#49](https://github.com/Startat6am/3d-engine/pull/49), stacked on PR #48; branch `fix/editor-glb-import-cancellation`. It adds editor-lifetime cancellation for active GLB imports and tests the reusable import scope.
 - PR: [#48](https://github.com/Startat6am/3d-engine/pull/48), stacked on PR #47; branch `feat/glb-import-benchmark`. This adds a generated geometry-only stress benchmark and records a first local baseline.
 - PR: [#47](https://github.com/Startat6am/3d-engine/pull/47), open and mergeable, stacked on PR #46. Branch: `feat/glb-import-stress-tests`; use the PR page for its current head SHA and check state.
 - Added importer tests for triangle and embedded texture budgets, hostile declared accessor sizes rejected before geometry allocation, and 24 concurrent imports with isolated output buffers and an unchanged source GLB.
-- The importer test file passes: 24/24 tests. Full workspace unit suite passes: 78/78 tests across 7 files. Full ESLint, TypeScript project build, and Prettier checks for the changed files pass. Editor and Player production Vite builds pass.
+- PR #47 baseline: importer 24/24; workspace 78/78. PR #49 adds three AssetImportScope tests; full workspace now passes 81/81 across 7 files. TypeScript project build, full ESLint, and full Prettier pass. Editor/Player production builds are being rechecked on the cancellation branch.
 - Initial concurrency fixture exposed a fixture-construction mismatch (index accessor layout when normals are omitted); corrected the fixture to test the intended repeated-import invariant. No importer implementation change was needed.
 - This is a focused reliability-test slice, not proof of bounded peak memory, GPU resource cleanup, or cancellation during synchronous parsing.
 
@@ -40,7 +41,7 @@ These are stacked dependencies. Preserve their order and do not merge a later PR
 
 1. Importer budget/repeat-import slice is covered by PR #47: budget rejection, hostile accessor preflight, concurrent repeated imports, and source immutability. More malformed-metadata and failure-path cases remain.
 2. Synthetic geometry-only benchmark is implemented in `benchmarks/glb-import-stress.mjs`, with invocation and first measurements in `benchmarks/README.md`. First 1,000,002-vertex run set: 180.31 ms, then 140.93/140.83 ms; 12,000,396-byte source and 28,000,056-byte geometry output. ArrayBuffers returned from 38.18 MiB while result retained to 11.48 MiB after result release + GC (source fixture only), then 0.03 MiB after source release. This is Node 25.9.0/Linux arm64 diagnostic data, not the supported Node 22 baseline; it samples memory rather than capturing a true peak and has no textures/GPU. Next: repeat on Node 22 and add a texture-heavy case. Do not claim measured peak-memory reduction without actual peak sampling and a comparable baseline.
-3. Audit Editor import lifecycle: repeated replacement/removal, abort/failure cleanup, decoded texture completion after entity removal, renderer disposal, and WebGL context-loss behavior. Add tests at the owning subsystem boundary.
+3. PR #49 closes one lifecycle gap: editor unmount now aborts active GLB import controllers; pending leases are released on cancellation and cancelled work does not emit post-unmount diagnostics. Remaining: repeated replacement/removal, GPU texture disposal/late decode, renderer disposal, and WebGL context-loss behavior.
 4. Verify serialization path: source-payload hash validation, asset identity/reference semantics, save/reopen, migration fixtures, and cache lease lifetime.
 5. Run full quality gates and browser acceptance; inspect Vercel Preview for the exact final commit. Record unsupported memory APIs or unavailable GPU/browser instrumentation explicitly.
 6. Update `ASSETS_SERIALIZATION_STATUS.md` and `ROADMAP.md` with evidence. Only then decide whether M5 exit gate is satisfied and move to M6.
@@ -51,6 +52,7 @@ These are stacked dependencies. Preserve their order and do not merge a later PR
 - The available sandbox previously ran Node 25 and had a broken pnpm shim; checked-in `node_modules/.bin` executables were used directly. Treat CI on the supported Node range as authoritative.
 - Latest verification on PR #47's code-bearing commit: importer suite 24/24; full workspace suite 78/78 across 7 files; `tsc -b` passes; full ESLint passes; changed-file Prettier check passes; Editor and Player TypeScript + Vite production builds pass; `git diff --check` passes. A first Vite invocation from repository root failed because the app entry is relative to each app directory; rerunning each build from its correct app directory succeeded. This is a command working-directory issue, not a source failure.
 - Benchmark script was executed successfully 3 times on the synthetic 1,000,002-vertex fixture; see `benchmarks/README.md` for environment and limitations.
+- PR #49 cancellation branch: `tsc -b`, full Vitest (81/81), ESLint, and Prettier pass. Editor/Player production build and latest Vercel Preview remain to be confirmed.
 - PR #46 Preview was previously `READY`: https://3d-engine-git-feat-glb-import-budget-callback5.vercel.app (commit `793c430afd28ff40f1e1712228143a94bc82f73a`). PR #47 code-bearing commit `e7ba9edcd5e623d989cab34964074bf4b97927f5` reached `READY` and its GitHub Vercel check passed; a later handoff-doc-only update was pushed, so check PR #47 for the latest Preview before browser testing.
 - User's Momo import feedback: “Ускорилось все. Ок”. No numeric benchmark or memory profile was supplied.
 
