@@ -252,7 +252,6 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(pageErrors).toEqual([]);
 });
 
-
 test('renderer releases uploaded texture resources when an imported object is removed', async ({
   page,
 }) => {
