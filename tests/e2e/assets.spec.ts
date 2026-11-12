@@ -111,7 +111,7 @@ test('GLB imports register stable project assets and survive world save/reopen',
       await page.locator('.file-menu summary').click();
     }
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Save World…' }).click();
+    await page.getByRole('button', { name: 'Save Worldâ¦' }).click();
     const download = await downloadPromise;
     const path = await download.path();
     if (!path) throw new Error('World export did not produce a file');
@@ -360,10 +360,44 @@ test('renderer keeps a shared texture alive until the final object lease is rele
     .toBeGreaterThan(0);
 });
 
-test('renderer restores its WebGL context after a browser context-loss event', async ({ page }) => {
+test('renderer restores its WebGL context and reuploads scene textures after context loss', async ({
+  page,
+}) => {
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const prototype = WebGL2RenderingContext.prototype;
+    const texImage2D = prototype.texImage2D;
+    const state = window as Window & { __textureUploadCount: number };
+    state.__textureUploadCount = 0;
+    prototype.texImage2D = function (...args: Parameters<typeof texImage2D>) {
+      state.__textureUploadCount += 1;
+      return texImage2D.apply(this, args);
+    };
+  });
   await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  await glbInput.setInputFiles({
+    name: 'context-restore.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __textureUploadCount: number }).__textureUploadCount,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await page.waitForTimeout(350);
+  const uploadsBeforeLoss = await page.evaluate(
+    () => (window as Window & { __textureUploadCount: number }).__textureUploadCount,
+  );
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
 
@@ -444,5 +478,14 @@ test('renderer restores its WebGL context after a browser context-loss event', a
     )
     .toBe(false);
   await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __textureUploadCount: number }).__textureUploadCount,
+      ),
+    )
+    .toBeGreaterThan(uploadsBeforeLoss);
+  await expect(page.getByText('TriangleNode')).toBeVisible();
   expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
 });
