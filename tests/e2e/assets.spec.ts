@@ -147,8 +147,8 @@ test('GLB imports register stable project assets and survive world save/reopen',
     }
     const downloadPromise = page.waitForEvent('download');
     const saveButton = menu.locator('.file-menu-content button').nth(2);
-  await expect(saveButton).toBeVisible();
-  await saveButton.click();
+    await expect(saveButton).toBeVisible();
+    await saveButton.click();
     const download = await downloadPromise;
     const path = await download.path();
     if (!path) throw new Error('World export did not produce a file');
