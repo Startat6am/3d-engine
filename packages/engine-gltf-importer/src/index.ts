@@ -20,7 +20,9 @@ export interface GltfPbrMaterial {
   readonly baseColorTexture?: number;
   readonly metallicRoughnessTexture?: number;
   readonly normalTexture?: number;
+  readonly normalScale: number;
   readonly occlusionTexture?: number;
+  readonly occlusionStrength: number;
   readonly emissiveTexture?: number;
   readonly textureTransforms?: Partial<
     Record<
@@ -103,6 +105,8 @@ export class GlbImportError extends Error {
 interface GltfTextureInfoInput {
   index?: number;
   texCoord?: number;
+  scale?: number;
+  strength?: number;
   extensions?: {
     KHR_texture_transform?: {
       offset?: number[];
@@ -844,14 +848,20 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     const emissive = tuple(material.emissiveFactor, [0, 0, 0] as const, 3, 'emissiveFactor');
     const metallic = pbr.metallicFactor ?? 1,
       roughness = pbr.roughnessFactor ?? 1,
-      cutoff = material.alphaCutoff ?? 0.5;
+      cutoff = material.alphaCutoff ?? 0.5,
+      normalScale = material.normalTexture?.scale ?? 1,
+      occlusionStrength = material.occlusionTexture?.strength ?? 1;
     if (
-      ![metallic, roughness, cutoff, ...factor, ...emissive].every(Number.isFinite) ||
+      ![metallic, roughness, cutoff, normalScale, occlusionStrength, ...factor, ...emissive].every(
+        Number.isFinite,
+      ) ||
       metallic < 0 ||
       metallic > 1 ||
       roughness < 0 ||
       roughness > 1 ||
-      cutoff < 0
+      cutoff < 0 ||
+      occlusionStrength < 0 ||
+      occlusionStrength > 1
     )
       fail(`Material ${index} has invalid PBR factors`);
     return {
@@ -879,6 +889,8 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       alphaMode: alphaMode as GltfPbrMaterial['alphaMode'],
       alphaCutoff: cutoff,
       doubleSided: material.doubleSided ?? false,
+      normalScale,
+      occlusionStrength,
     };
   });
 
