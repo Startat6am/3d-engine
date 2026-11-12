@@ -13,7 +13,7 @@ Controls:
 - `GLB_STRESS_RUNS`: sequential import count from 1 to 20; defaults to 3.
 - `GLB_STRESS_TEXTURE_BYTES`: embedded image payload bytes, from 0 to 128 MiB; defaults to 0.
 
-The script generates a deterministic GLB in memory, imports it repeatedly, records importer phase timings and Node process memory snapshots, drops each imported result, and forces several GC passes when `--expose-gc` is available. Set `GLB_STRESS_TEXTURE_BYTES` to add one embedded image bufferView. The synthetic image bytes use a PNG MIME label but are not a valid encoded PNG; the importer copies their payload but this benchmark does not decode them. It outputs one JSON report to stdout and does not write a generated model file. The repository CI runs both the geometry-only and 16 MiB embedded-image cases on the supported Node 22 runtime after the workspace build; use those logs as the supported-runtime baseline.
+The script generates a deterministic GLB in memory, imports it repeatedly, records importer phase timings and Node process memory snapshots, drops each imported result, and forces several GC passes when `--expose-gc` is available. It also records `process.resourceUsage().maxRSS` as an OS process high-water mark at baseline, after fixture creation, while each result is retained, and after release; this captures peak process RSS between snapshots rather than sampling it on a timer. Set `GLB_STRESS_TEXTURE_BYTES` to add one embedded image bufferView. The synthetic image bytes use a PNG MIME label but are not a valid encoded PNG; the importer copies their payload but this benchmark does not decode them. It outputs one JSON report to stdout and does not write a generated model file. The repository CI runs both the geometry-only and 16 MiB embedded-image cases on the supported Node 22 runtime after the workspace build; use those logs as the supported-runtime baseline.
 
 ## Recorded baseline (2026-11-12)
 
@@ -70,11 +70,11 @@ Environment: Node 22.23.4, Linux x64, 4 CPUs, 15,983 MiB reported host memory, e
 | ArrayBuffers after result release + GC | 11.47 MiB (source fixture only) | 27.47 MiB (source fixture only) |
 | ArrayBuffers after source release + GC |                        0.02 MiB |                        0.02 MiB |
 
-These are supported-runtime diagnostic baselines, not a peak-memory profile. ArrayBuffers return to the source-fixture footprint after the imported result is released and to the near-zero baseline after the source fixture is released. RSS remains higher due to process/runtime allocator retention. The 16 MiB image bufferView is a deterministic payload with an image/png MIME label but is not a valid PNG; this case measures payload retention/copying, not image decoding or GPU upload.
+These are supported-runtime diagnostic baselines. ArrayBuffers return to the source-fixture footprint after the imported result is released and to the near-zero baseline after the source fixture is released. The new `peakRss*MiB` fields report the process high-water mark, which includes Node startup, the fixture, and import work; use the difference from `peakRssBaselineMiB` to estimate the import's incremental contribution. RSS remains higher after release due to process/runtime allocator retention. No hard peak-RSS ceiling is set until repeated supported-runner measurements are reviewed. The 16 MiB image bufferView is a deterministic payload with an image/png MIME label but is not a valid PNG; this case measures payload retention/copying, not image decoding or GPU upload.
 
 ## Limitations
 
 - This fixture measures geometry decode/build only: no embedded textures, image decode, GPU allocation, editor entity lifecycle, or WebGL context loss.
-- Memory is sampled at specific points, not continuously; a transient peak between samples may be missed.
+- `process.memoryUsage()` is sampled at specific points, so a transient heap/ArrayBuffer peak between snapshots may be missed. `process.resourceUsage().maxRSS` is the OS high-water mark and does capture the maximum process RSS, but includes runtime startup and fixture allocations.
 - Node `process.memoryUsage()` is not equivalent to browser tab memory. Repeat the benchmark on the supported Node version and add browser-specific acceptance instrumentation before making cross-runtime performance claims.
 - Do not place user-provided/private model files in this benchmark or commit generated fixture binaries.
