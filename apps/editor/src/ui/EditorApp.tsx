@@ -704,7 +704,8 @@ export function EditorApp() {
             throw new Error(`Entity ${entity.name} has invalid transform values`);
           return value;
         };
-        const storedMaterialValue = mesh.material ?? createDefaultMaterial();
+        const storedMaterialValue =
+          mesh.material === undefined ? createDefaultMaterial() : mesh.material;
         const pbrMaterialState = readPbrMaterialState(
           storedMaterialValue,
           `$.world.entities[${index}].components.MeshRenderer.material`,
