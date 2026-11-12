@@ -324,8 +324,12 @@ test('renderer restores its WebGL context after a browser context-loss event', a
     if (!element || !context || !extension)
       throw new Error('WebGL context-loss extension disappeared');
 
-    const state = window as Window & { __webglContextEvents: string[] };
+    const state = window as Window & {
+      __webglContextEvents: string[];
+      __webglLoseContextExtension: WEBGL_lose_context;
+    };
     state.__webglContextEvents = [];
+    state.__webglLoseContextExtension = extension;
     element.addEventListener(
       'webglcontextlost',
       (event) => {
@@ -355,8 +359,10 @@ test('renderer restores its WebGL context after a browser context-loss event', a
     .toBe(true);
 
   await page.evaluate(() => {
-    const context = document.querySelector('canvas')?.getContext('webgl2');
-    context?.getExtension('WEBGL_lose_context')?.restoreContext();
+    const state = window as Window & {
+      __webglLoseContextExtension: WEBGL_lose_context;
+    };
+    state.__webglLoseContextExtension.restoreContext();
   });
 
   await expect
