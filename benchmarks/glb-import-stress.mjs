@@ -3,22 +3,35 @@ import { GlbImporter } from '../packages/engine-gltf-importer/dist/index.js';
 
 const vertexCount = Number(process.env.GLB_STRESS_VERTICES ?? 1_000_002);
 const runs = Number(process.env.GLB_STRESS_RUNS ?? 3);
+const textureBytes = Number(process.env.GLB_STRESS_TEXTURE_BYTES ?? 0);
 if (!Number.isSafeInteger(vertexCount) || vertexCount < 3 || vertexCount % 3 !== 0) {
   throw new Error('GLB_STRESS_VERTICES must be a positive safe integer divisible by 3');
+}
+if (!Number.isSafeInteger(textureBytes) || textureBytes < 0 || textureBytes > 128 * 1024 * 1024) {
+  throw new Error('GLB_STRESS_TEXTURE_BYTES must be an integer from 0 to 134217728');
 }
 if (!Number.isSafeInteger(runs) || runs < 1 || runs > 20) {
   throw new Error('GLB_STRESS_RUNS must be an integer from 1 to 20');
 }
 
-function createSyntheticGlb(vertices) {
-  const binaryBytes = vertices * 3 * Float32Array.BYTES_PER_ELEMENT;
+function createSyntheticGlb(vertices, embeddedTextureBytes) {
+  const positionBytes = vertices * 3 * Float32Array.BYTES_PER_ELEMENT;
+  const binaryBytes = positionBytes + embeddedTextureBytes;
   const document = {
     asset: { version: '2.0', generator: 'Choreon synthetic GLB stress benchmark' },
     buffers: [{ byteLength: binaryBytes }],
-    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: binaryBytes }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: positionBytes },
+      ...(embeddedTextureBytes > 0
+        ? [{ buffer: 0, byteOffset: positionBytes, byteLength: embeddedTextureBytes }]
+        : []),
+    ],
     accessors: [{ bufferView: 0, componentType: 5126, count: vertices, type: 'VEC3' }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0 } }] }],
     nodes: [{ mesh: 0 }],
+    ...(embeddedTextureBytes > 0
+      ? { images: [{ name: 'Synthetic embedded image', bufferView: 1, mimeType: 'image/png' }] }
+      : {}),
   };
   const json = new TextEncoder().encode(JSON.stringify(document));
   const jsonChunkBytes = (json.byteLength + 3) & ~3;
@@ -43,6 +56,9 @@ function createSyntheticGlb(vertices) {
     positions[offset + 1] = Math.floor(vertex / 997) % 997;
     positions[offset + 2] = (vertex % 31) / 31;
   }
+  if (embeddedTextureBytes > 0) {
+    new Uint8Array(source, binHeader + 8 + positionBytes, embeddedTextureBytes).fill(0x7f);
+  }
   return source;
 }
 
@@ -64,7 +80,7 @@ function memorySnapshot() {
 async function importOnce(importer, source, run) {
   const startedAt = performance.now();
   const imported = await importer.import(source, {
-    uri: `benchmarks/generated-${vertexCount}-vertices.glb`,
+    uri: `benchmarks/generated-${vertexCount}-vertices-${textureBytes}-texture-bytes.glb`,
     settings: {},
     signal: new AbortController().signal,
   });
@@ -80,7 +96,7 @@ async function importOnce(importer, source, run) {
 async function executeRuns() {
   await collectGarbage();
   const baseline = memorySnapshot();
-  const source = createSyntheticGlb(vertexCount);
+  const source = createSyntheticGlb(vertexCount, textureBytes);
   const sourceBytes = source.byteLength;
   const afterFixture = memorySnapshot();
   const results = [];
@@ -106,6 +122,8 @@ const output = {
     vertexCount,
     triangleCount: Math.floor(vertexCount / 3),
     indexed: false,
+    embeddedImages: textureBytes > 0 ? 1 : 0,
+    embeddedTextureBytes: textureBytes,
     embeddedTextures: 0,
   },
   environment: {
