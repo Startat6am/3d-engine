@@ -200,6 +200,11 @@ type MutableGlbJson = {
   bufferViews?: { byteOffset?: number; byteLength?: number; byteStride?: number }[];
   buffers?: { byteLength: number }[];
   materials?: {
+    alphaMode?: string;
+    alphaCutoff?: number;
+    doubleSided?: boolean;
+    normalTexture?: { index?: number; scale?: number };
+    occlusionTexture?: { index?: number; strength?: number };
     pbrMetallicRoughness?: {
       baseColorTexture?: {
         extensions?: {
@@ -413,6 +418,48 @@ describe('GlbImporter', () => {
       normalTexture: 0,
       occlusionTexture: 0,
       emissiveTexture: 0,
+    });
+  });
+
+  it('imports glTF alpha and normal/occlusion material controls', async () => {
+    const glb = rewriteGlbJson(
+      makeGlb({
+        imageBytes: [1, 2, 3, 4],
+        uvs: [0, 0, 1, 0, 0, 1],
+        allTextureChannels: true,
+      }),
+      (root) => {
+        root.materials![0]!.alphaMode = 'MASK';
+        root.materials![0]!.alphaCutoff = 0.37;
+        root.materials![0]!.doubleSided = true;
+        root.materials![0]!.normalTexture!.scale = 0.45;
+        root.materials![0]!.occlusionTexture!.strength = 0.62;
+      },
+    );
+    const result = await new GlbImporter().import(glb, context);
+    expect(result.data.materials[0]).toMatchObject({
+      alphaMode: 'MASK',
+      alphaCutoff: 0.37,
+      doubleSided: true,
+      normalScale: 0.45,
+      occlusionStrength: 0.62,
+    });
+  });
+
+  it('rejects out-of-range glTF occlusion strength', async () => {
+    const glb = rewriteGlbJson(
+      makeGlb({
+        imageBytes: [1, 2, 3, 4],
+        uvs: [0, 0, 1, 0, 0, 1],
+        allTextureChannels: true,
+      }),
+      (root) => {
+        root.materials![0]!.occlusionTexture!.strength = 1.01;
+      },
+    );
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      code: 'INVALID_GLB',
+      message: expect.stringContaining('invalid PBR factors'),
     });
   });
 
