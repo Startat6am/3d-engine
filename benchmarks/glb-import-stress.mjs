@@ -61,68 +61,69 @@ function memorySnapshot() {
   );
 }
 
-await collectGarbage();
-const baseline = memorySnapshot();
-let source = createSyntheticGlb(vertexCount);
-const sourceBytes = source.byteLength;
-const afterFixture = memorySnapshot();
-const results = [];
-const importer = new GlbImporter();
-
-for (let run = 1; run <= runs; run += 1) {
+async function importOnce(importer, source, run) {
   const startedAt = performance.now();
-  let imported = await importer.import(source, {
+  const imported = await importer.import(source, {
     uri: `benchmarks/generated-${vertexCount}-vertices.glb`,
     settings: {},
     signal: new AbortController().signal,
   });
   const wallMs = Number((performance.now() - startedAt).toFixed(2));
-  const whileRetained = memorySnapshot();
-  results.push({
+  return {
     run,
     wallMs,
     metadata: imported.metadata,
-    memoryWhileResultRetainedMiB: whileRetained,
-  });
-  imported = null;
-  await collectGarbage();
-  results[results.length - 1].memoryAfterReleaseMiB = memorySnapshot();
+    memoryWhileResultRetainedMiB: memorySnapshot(),
+  };
 }
 
-source = null;
-await collectGarbage();
+async function executeRuns() {
+  await collectGarbage();
+  const baseline = memorySnapshot();
+  const source = createSyntheticGlb(vertexCount);
+  const sourceBytes = source.byteLength;
+  const afterFixture = memorySnapshot();
+  const results = [];
+  const importer = new GlbImporter();
 
-console.log(
-  JSON.stringify(
-    {
-      benchmark: 'choreon-glb-import-stress-v1',
-      generatedFixture: true,
-      fixture: {
-        sourceBytes,
-        vertexCount,
-        triangleCount: Math.floor(vertexCount / 3),
-        indexed: false,
-        embeddedTextures: 0,
-      },
-      environment: {
-        node: process.versions.node,
-        platform: process.platform,
-        arch: process.arch,
-        cpuCount: os.cpus().length,
-        totalMemoryMiB: Math.round(os.totalmem() / 1024 / 1024),
-        gcExposed: typeof globalThis.gc === 'function',
-      },
-      memoryBaselineMiB: baseline,
-      memoryAfterFixtureMiB: afterFixture,
-      memoryAfterSourceReleaseMiB: memorySnapshot(),
-      runs: results,
-      notes: [
-        'Memory figures are process snapshots, not a sampled peak-memory profile.',
-        'Run with --expose-gc for comparable post-release snapshots.',
-        'This synthetic geometry-only fixture does not measure texture decode or GPU allocations.',
-      ],
-    },
-    null,
-    2,
-  ),
-);
+  for (let run = 1; run <= runs; run += 1) {
+    const result = await importOnce(importer, source, run);
+    await collectGarbage();
+    result.memoryAfterReleaseMiB = memorySnapshot();
+    results.push(result);
+  }
+
+  return { baseline, sourceBytes, afterFixture, results };
+}
+
+const report = await executeRuns();
+await collectGarbage();
+const output = {
+  benchmark: 'choreon-glb-import-stress-v1',
+  generatedFixture: true,
+  fixture: {
+    sourceBytes: report.sourceBytes,
+    vertexCount,
+    triangleCount: Math.floor(vertexCount / 3),
+    indexed: false,
+    embeddedTextures: 0,
+  },
+  environment: {
+    node: process.versions.node,
+    platform: process.platform,
+    arch: process.arch,
+    cpuCount: os.cpus().length,
+    totalMemoryMiB: Math.round(os.totalmem() / 1024 / 1024),
+    gcExposed: typeof globalThis.gc === 'function',
+  },
+  memoryBaselineMiB: report.baseline,
+  memoryAfterFixtureMiB: report.afterFixture,
+  memoryAfterSourceReleaseMiB: memorySnapshot(),
+  runs: report.results,
+  notes: [
+    'Memory figures are process snapshots, not a sampled peak-memory profile.',
+    'Run with --expose-gc for comparable post-release snapshots.',
+    'This synthetic geometry-only fixture does not measure texture decode or GPU allocations.',
+  ],
+};
+process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
