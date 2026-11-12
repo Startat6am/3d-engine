@@ -41,6 +41,7 @@ describe('persisted PBR material validation', () => {
   });
 
   it.each([
+    [null, 'object'],
     [{ alphaMode: 'CUTOUT' }, 'alphaMode'],
     [{ alphaMode: null }, 'alphaMode'],
     [{ alphaCutoff: -0.1 }, 'alphaCutoff'],
