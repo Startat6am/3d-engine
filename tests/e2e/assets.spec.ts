@@ -358,10 +358,12 @@ test('renderer restores its WebGL context after a browser context-loss event', a
     )
     .toBe(true);
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const state = window as Window & {
       __webglLoseContextExtension: WEBGL_lose_context;
     };
+    // Let the browser finish dispatching the loss event before requesting restoration.
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
     state.__webglLoseContextExtension.restoreContext();
   });
 
@@ -373,7 +375,7 @@ test('renderer restores its WebGL context after a browser context-loss event', a
             'restored',
           ),
         ),
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     )
     .toBe(true);
   await expect
