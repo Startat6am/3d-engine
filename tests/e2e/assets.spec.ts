@@ -317,31 +317,59 @@ test('renderer restores its WebGL context after a browser context-loss event', a
   });
   test.skip(!supported, 'WEBGL_lose_context is unavailable in this browser');
 
-  await page.evaluate(async () => {
+  await page.evaluate(() => {
     const element = document.querySelector('canvas');
     const context = element?.getContext('webgl2');
     const extension = context?.getExtension('WEBGL_lose_context');
     if (!element || !context || !extension)
       throw new Error('WebGL context-loss extension disappeared');
 
-    await new Promise<void>((resolve) => {
-      element.addEventListener(
-        'webglcontextlost',
-        (event) => {
-          event.preventDefault();
-          resolve();
-        },
-        { once: true },
-      );
-      extension.loseContext();
-    });
-
-    await new Promise<void>((resolve) => {
-      element.addEventListener('webglcontextrestored', () => resolve(), { once: true });
-      extension.restoreContext();
-    });
+    const state = window as Window & { __webglContextEvents: string[] };
+    state.__webglContextEvents = [];
+    element.addEventListener(
+      'webglcontextlost',
+      (event) => {
+        event.preventDefault();
+        state.__webglContextEvents.push('lost');
+      },
+      { once: true },
+    );
+    element.addEventListener(
+      'webglcontextrestored',
+      () => state.__webglContextEvents.push('restored'),
+      { once: true },
+    );
+    extension.loseContext();
   });
 
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as Window & { __webglContextEvents: string[] }).__webglContextEvents.includes(
+            'lost',
+          ),
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
+
+  await page.evaluate(() => {
+    const context = document.querySelector('canvas')?.getContext('webgl2');
+    context?.getExtension('WEBGL_lose_context')?.restoreContext();
+  });
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as Window & { __webglContextEvents: string[] }).__webglContextEvents.includes(
+            'restored',
+          ),
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
   await expect
     .poll(() =>
       page.evaluate(() => {
