@@ -303,7 +303,6 @@ test('renderer releases uploaded texture resources when an imported object is re
   expect(pageErrors).toEqual([]);
 });
 
-
 test('renderer restores its WebGL context after a browser context-loss event', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -322,7 +321,8 @@ test('renderer restores its WebGL context after a browser context-loss event', a
     const element = document.querySelector('canvas');
     const context = element?.getContext('webgl2');
     const extension = context?.getExtension('WEBGL_lose_context');
-    if (!element || !context || !extension) throw new Error('WebGL context-loss extension disappeared');
+    if (!element || !context || !extension)
+      throw new Error('WebGL context-loss extension disappeared');
 
     await new Promise<void>((resolve) => {
       element.addEventListener(
