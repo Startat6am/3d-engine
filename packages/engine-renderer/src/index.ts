@@ -424,11 +424,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       .catch((error: unknown) => {
         // A removed/replaced object no longer owns this asynchronous decode. Avoid
         // reporting expected late failures after its texture lease was abandoned.
-        if (
-          this.#disposed ||
-          !entry.active ||
-          entry.textureSources.get(channel) !== source
-        ) {
+        if (this.#disposed || !entry.active || entry.textureSources.get(channel) !== source) {
           return;
         }
         entry.textureSources.delete(channel);
