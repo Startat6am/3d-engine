@@ -50,10 +50,13 @@ function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
           },
           metallicRoughnessTexture: { index: 0 },
         },
-        normalTexture: { index: 0 },
-        occlusionTexture: { index: 0 },
+        normalTexture: { index: 0, scale: 0.45 },
+        occlusionTexture: { index: 0, strength: 0.62 },
         emissiveTexture: { index: 0 },
         emissiveFactor: [0.1, 0.2, 0.3],
+        alphaMode: 'MASK',
+        alphaCutoff: 0.37,
+        doubleSided: true,
       },
     ],
     meshes: [
@@ -178,6 +181,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
               normalTextureAssetId?: string;
               occlusionTextureAssetId?: string;
               emissiveTextureAssetId?: string;
+              alphaMode?: string;
+              alphaCutoff?: number;
+              doubleSided?: boolean;
+              normalScale?: number[];
+              occlusionStrength?: number;
               baseColorTextureSettings?: {
                 sampler?: {
                   magFilter: number | null;
@@ -218,6 +226,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
     normalTextureAssetId: texture.id,
     occlusionTextureAssetId: texture.id,
     emissiveTextureAssetId: texture.id,
+    alphaMode: 'MASK',
+    alphaCutoff: 0.37,
+    doubleSided: true,
+    normalScale: [0.45, 0.45],
+    occlusionStrength: 0.62,
   });
   expect(importedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
   expect(firstDocument.assetPayloads).toHaveLength(2);
@@ -263,6 +276,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
     normalTextureAssetId: texture.id,
     occlusionTextureAssetId: texture.id,
     emissiveTextureAssetId: texture.id,
+    alphaMode: 'MASK',
+    alphaCutoff: 0.37,
+    doubleSided: true,
+    normalScale: [0.45, 0.45],
+    occlusionStrength: 0.62,
   });
   expect(reopenedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
   // A tampered embedded texture payload must fail hash verification before
@@ -291,6 +309,66 @@ test('GLB imports register stable project assets and survive world save/reopen',
   await page.waitForTimeout(250);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test('failed GLB asset staging rolls back project state and a later import succeeds', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  const source = makeTriangleGlb();
+
+  // The embedded texture URI inherits the file name. A query character makes
+  // that project URI invalid after the importer lease has already been acquired.
+  await glbInput.setInputFiles({
+    name: 'invalid?name.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: source,
+  });
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Importer engine.gltf.glb failed', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Asset URI must be a project-relative path/)).toBeVisible();
+
+  const saveWorld = async () => {
+    const menu = page.locator('.file-menu');
+    if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await page.locator('.file-menu summary').click();
+    }
+    const downloadPromise = page.waitForEvent('download');
+    const saveButton = menu.locator('.file-menu-content button').nth(2);
+    await expect(saveButton).toBeVisible();
+    await saveButton.click();
+    const download = await downloadPromise;
+    const path = await download.path();
+    if (!path) throw new Error('World export did not produce a file');
+    return JSON.parse(await readFile(path, 'utf8')) as {
+      assets: Array<{ kind: string }>;
+      assetPayloads: Array<{ assetId: string }>;
+      world: { entities: Array<{ components?: { MeshRenderer?: { primitive?: string } } }> };
+    };
+  };
+
+  const afterFailure = await saveWorld();
+  expect(afterFailure.assets).toEqual([]);
+  expect(afterFailure.assetPayloads).toEqual([]);
+  expect(
+    afterFailure.world.entities.some(
+      (entity) => entity.components?.MeshRenderer?.primitive === 'GLB',
+    ),
+  ).toBe(false);
+
+  // Reuse the exact same bytes with a valid project-relative name. This proves
+  // the failed staging path did not poison the project registry or payload map.
+  await glbInput.setInputFiles({
+    name: 'recovered.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: source,
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const afterRecovery = await saveWorld();
+  expect(afterRecovery.assets).toHaveLength(2);
+  expect(afterRecovery.assetPayloads).toHaveLength(2);
+  expect(afterRecovery.assets.map((asset) => asset.kind).sort()).toEqual(['model', 'texture']);
 });
 
 test('renderer releases uploaded texture resources when an imported object is removed', async ({
