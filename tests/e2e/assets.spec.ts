@@ -90,6 +90,35 @@ function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
   return Buffer.concat([header, jsonHeader, jsonChunk, binaryHeader, binaryChunk]);
 }
 
+function makeGlbWithUnresolvedTextureSource(): Buffer {
+  const source = makeTriangleGlb();
+  const jsonLength = source.readUInt32LE(12);
+  const document = JSON.parse(source.toString('utf8', 20, 20 + jsonLength)) as {
+    textures: Array<{ source?: number; sampler?: number }>;
+  };
+  delete document.textures[0]!.source;
+  const jsonBytes = Buffer.from(JSON.stringify(document));
+  const jsonPadding = (4 - (jsonBytes.length % 4)) % 4;
+  const jsonChunk = Buffer.concat([jsonBytes, Buffer.alloc(jsonPadding, 0x20)]);
+  const binaryHeaderOffset = 20 + jsonLength;
+  const binaryLength = source.readUInt32LE(binaryHeaderOffset);
+  const binary = source.subarray(binaryHeaderOffset + 8, binaryHeaderOffset + 8 + binaryLength);
+  const binaryPadding = (4 - (binary.length % 4)) % 4;
+  const binaryChunk = Buffer.concat([binary, Buffer.alloc(binaryPadding)]);
+  const totalLength = 12 + 8 + jsonChunk.length + 8 + binaryChunk.length;
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67, 0);
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(totalLength, 8);
+  const jsonHeader = Buffer.alloc(8);
+  jsonHeader.writeUInt32LE(jsonChunk.length, 0);
+  jsonHeader.writeUInt32LE(0x4e4f534a, 4);
+  const nextBinaryHeader = Buffer.alloc(8);
+  nextBinaryHeader.writeUInt32LE(binaryChunk.length, 0);
+  nextBinaryHeader.writeUInt32LE(0x004e4942, 4);
+  return Buffer.concat([header, jsonHeader, jsonChunk, nextBinaryHeader, binaryChunk]);
+}
+
 function pngChunk(type: string, data: Buffer): Buffer {
   const name = Buffer.from(type, 'ascii');
   const payload = Buffer.concat([name, data]);
@@ -311,23 +340,24 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(pageErrors).toEqual([]);
 });
 
-test('failed GLB asset staging rolls back project state and a later import succeeds', async ({
+test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
   page,
 }) => {
   await page.goto('/');
   const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
   const source = makeTriangleGlb();
 
-  // The embedded texture URI inherits the file name. A query character makes
-  // that project URI invalid after the importer lease has already been acquired.
+  // The importer accepts an existing texture record without an embedded image
+  // source. Editor resolution then fails after it has staged image/model records
+  // and payloads, but before committing the staged project copies.
   await glbInput.setInputFiles({
-    name: 'invalid?name.glb',
+    name: 'unresolved-texture.glb',
     mimeType: 'model/gltf-binary',
-    buffer: source,
+    buffer: makeGlbWithUnresolvedTextureSource(),
   });
   await page.getByRole('button', { name: /Console/ }).click();
   await expect(page.getByText('Importer engine.gltf.glb failed', { exact: true })).toBeVisible();
-  await expect(page.getByText(/Asset URI must be a project-relative path/)).toBeVisible();
+  await expect(page.getByText(/GLB material references an unavailable texture: 0/)).toBeVisible();
 
   const saveWorld = async () => {
     const menu = page.locator('.file-menu');
@@ -357,8 +387,7 @@ test('failed GLB asset staging rolls back project state and a later import succe
     ),
   ).toBe(false);
 
-  // Reuse the exact same bytes with a valid project-relative name. This proves
-  // the failed staging path did not poison the project registry or payload map.
+  // A valid import after the failed staging path must still commit normally.
   await glbInput.setInputFiles({
     name: 'recovered.glb',
     mimeType: 'model/gltf-binary',
