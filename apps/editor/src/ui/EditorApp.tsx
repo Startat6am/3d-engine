@@ -772,7 +772,6 @@ export function EditorApp() {
           roughness: storedMaterial.roughness,
           metalness: storedMaterial.metalness,
           opacity: storedMaterial.opacity,
-          transparent: pbrMaterialState.transparent,
           wireframe: storedMaterial.wireframe,
           emissiveColor: storedMaterial.emissiveColor ?? 0,
           ...pbrMaterialState,
