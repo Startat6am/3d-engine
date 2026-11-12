@@ -12,6 +12,7 @@ import {
 import type { Matrix4 as Matrix4Type } from 'three';
 import type { GlbAsset } from '@engine/gltf-importer';
 import type { WorldAssetPayload } from '@engine/serialization';
+import { ImportTaskScope } from '../ImportTaskScope.js';
 import { EditorHistory } from './EditorHistory.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
@@ -313,12 +314,10 @@ export function EditorApp() {
   const assetPayloadsRef = useRef(new Map<AssetId, WorldAssetPayload>());
   const assetResourceCacheRef = useRef(new AssetResourceCache<ImportedAsset<GlbAsset>>());
   const assetResourceLeasesRef = useRef<AssetResourceLease<ImportedAsset<GlbAsset>>[]>([]);
-  const activeGlbImportControllersRef = useRef(new Set<AbortController>());
+  const activeGlbImportControllersRef = useRef(new ImportTaskScope());
   useEffect(
     () => () => {
-      for (const controller of activeGlbImportControllersRef.current)
-        controller.abort('Editor unmounted');
-      activeGlbImportControllersRef.current.clear();
+      activeGlbImportControllersRef.current.abortAll('Editor unmounted');
       for (const lease of assetResourceLeasesRef.current) lease.release();
       assetResourceLeasesRef.current = [];
     },
@@ -1098,7 +1097,7 @@ export function EditorApp() {
         });
       }
     } finally {
-      activeGlbImportControllersRef.current.delete(controller);
+      activeGlbImportControllersRef.current.release(controller);
     }
   };
 
