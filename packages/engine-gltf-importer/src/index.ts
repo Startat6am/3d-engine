@@ -227,12 +227,55 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
     offset += length;
   }
   if (!json) fail('GLB JSON chunk is missing');
-  let root: GltfRoot;
+  let parsed: unknown;
   try {
-    root = JSON.parse(json) as GltfRoot;
+    parsed = JSON.parse(json) as unknown;
   } catch {
     return fail('GLB JSON chunk is malformed');
   }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+    fail('GLB JSON root must be an object');
+  const root = parsed as GltfRoot;
+  const arrayFields: readonly (keyof GltfRoot)[] = [
+    'buffers',
+    'bufferViews',
+    'accessors',
+    'meshes',
+    'materials',
+    'nodes',
+    'textures',
+    'samplers',
+    'images',
+    'extensionsUsed',
+    'extensionsRequired',
+  ];
+  for (const field of arrayFields) {
+    if (root[field] !== undefined && !Array.isArray(root[field]))
+      fail(`GLB ${field} must be an array`);
+  }
+  const objectArrayFields = [
+    'buffers',
+    'bufferViews',
+    'accessors',
+    'meshes',
+    'materials',
+    'nodes',
+    'textures',
+    'samplers',
+    'images',
+  ] as const;
+  for (const field of objectArrayFields) {
+    const entries = root[field] as unknown[] | undefined;
+    const invalidIndex = entries?.findIndex(
+      (entry) => !entry || typeof entry !== 'object' || Array.isArray(entry),
+    );
+    if (invalidIndex !== undefined && invalidIndex >= 0)
+      fail(`GLB ${field}[${invalidIndex}] must be an object`);
+  }
+  if (root.extensionsUsed?.some((extension) => typeof extension !== 'string'))
+    fail('GLB extensionsUsed entries must be strings');
+  if (root.extensionsRequired?.some((extension) => typeof extension !== 'string'))
+    fail('GLB extensionsRequired entries must be strings');
   if (root.asset?.version !== '2.0') fail('glTF asset.version must be 2.0', 'UNSUPPORTED_FEATURE');
   return { root, binary };
 }
@@ -260,7 +303,9 @@ async function prepareGlbBuffers(
     fail('External/data URI buffers are not supported in GLB import', 'UNSUPPORTED_FEATURE');
   if (
     buffers[0] &&
-    (!Number.isInteger(buffers[0].byteLength) || buffers[0].byteLength! > sourceBinary.byteLength)
+    (!Number.isSafeInteger(buffers[0].byteLength) ||
+      buffers[0].byteLength! < 0 ||
+      buffers[0].byteLength! > sourceBinary.byteLength)
   )
     fail('GLB BIN chunk is shorter than buffer.byteLength');
   const views = root.bufferViews ?? [];
@@ -393,7 +438,11 @@ function readAccessor(
   const accessor = root.accessors?.[index];
   if (!accessor) fail(`Accessor ${index} does not exist`, 'INVALID_ACCESSOR');
   if (accessor.sparse) fail('Sparse accessors are not supported', 'UNSUPPORTED_FEATURE');
-  if (accessor.type !== expectedType || !Number.isInteger(accessor.count) || accessor.count! < 1) {
+  if (
+    accessor.type !== expectedType ||
+    !Number.isSafeInteger(accessor.count) ||
+    accessor.count! < 1
+  ) {
     fail(`Accessor ${index} has an invalid type or count`, 'INVALID_ACCESSOR');
   }
   const componentType = accessor.componentType;
@@ -413,6 +462,13 @@ function readAccessor(
   ) {
     fail(`Accessor ${index} uses an unsupported component type`, 'UNSUPPORTED_FEATURE');
   }
+  if (accessor.normalized !== undefined && typeof accessor.normalized !== 'boolean')
+    fail(`Accessor ${index} normalized flag must be boolean`, 'INVALID_ACCESSOR');
+  if (accessor.normalized && (expectedType === 'SCALAR' || componentType === 5126))
+    fail(
+      `Accessor ${index} uses normalized values for an invalid component type`,
+      'INVALID_ACCESSOR',
+    );
   const viewIndex = accessor.bufferView;
   const bufferView = root.bufferViews?.[viewIndex ?? -1];
   if (!bufferView || bufferView.buffer !== 0)
@@ -424,17 +480,27 @@ function readAccessor(
   const viewOffset = bufferView.byteOffset ?? 0;
   const viewLength = bufferView.byteLength ?? 0;
   if (
+    !Number.isSafeInteger(stride) ||
     stride < elementBytes ||
     stride % bytes !== 0 ||
+    !Number.isSafeInteger(accessorOffset) ||
     accessorOffset < 0 ||
+    accessorOffset % bytes !== 0 ||
+    !Number.isSafeInteger(viewOffset) ||
     viewOffset < 0 ||
+    viewOffset % bytes !== 0 ||
+    !Number.isSafeInteger(viewLength) ||
     viewLength < 0
   ) {
-    fail(`Accessor ${index} has invalid byte layout`, 'INVALID_ACCESSOR');
+    fail(`Accessor ${index} has invalid or misaligned byte layout`, 'INVALID_ACCESSOR');
   }
-  const required =
-    accessor.count! === 0 ? 0 : accessorOffset + (accessor.count! - 1) * stride + elementBytes;
-  if (required > viewLength || viewOffset + required > binary.byteLength) {
+  const required = accessorOffset + (accessor.count! - 1) * stride + elementBytes;
+  if (
+    !Number.isSafeInteger(required) ||
+    !Number.isSafeInteger(viewOffset + required) ||
+    required > viewLength ||
+    viewOffset + required > binary.byteLength
+  ) {
     fail(`Accessor ${index} reads beyond its bufferView`, 'INVALID_ACCESSOR');
   }
   const data = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
