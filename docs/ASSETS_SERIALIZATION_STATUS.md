@@ -25,6 +25,15 @@
 - Editor-specific entity/component conversion remains local to the editor. Asset references are not yet integrated into player packaging or AI authoring plans.
 - No standalone binary project asset store or archive container exists; source GLB payloads are embedded in the `.world` JSON for the current workflow.
 
+## Reliability work in progress (2026-11-12)
+
+- GLB import budgets are enforced for source bytes, decoded BIN bytes, decoded geometry bytes, embedded texture bytes, vertices, and triangles. The importer emits typed `RESOURCE_LIMIT` failures before the corresponding large geometry/decode allocation where the metadata permits preflight checks.
+- Focused importer tests now cover triangle and embedded-texture budget rejection, hostile declared vertex counts rejected before geometry allocation, and 24 concurrent repeated imports with isolated output typed arrays and source-GLB immutability. The focused importer suite passes 24/24 tests; the full workspace suite passes 78/78 tests across 7 files, TypeScript project build and ESLint pass, and Editor/Player production builds succeed.
+- The user tested a Momo GLB against the PR #46 Preview and reported a noticeable responsiveness improvement. This is qualitative feedback only; no reproducible peak-memory or timing benchmark has yet been captured.
+- Still unverified: repeated Editor imports/replacements and eventual CPU/GPU resource release; abort/failure cleanup across the editor/renderer lifecycle; actual memory ceilings on large synthetic models; browser memory telemetry availability; and WebGL context-loss recovery.
+- User-supplied test model is stored in `dl-models-test/` on `main`; do not copy it into synthetic fixtures or publish it in benchmark artifacts without explicit approval.
+- See [Execution Plan](EXECUTION_PLAN.md) for the ordered remaining M5 work and handoff state.
+
 ## Next gates
 
 1. Expand GLB conformance fixtures beyond the current baseline, including extension-specific capability handling, alignment/bounds edge cases, and additional malformed inputs.
