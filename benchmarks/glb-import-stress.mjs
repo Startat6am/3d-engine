@@ -79,8 +79,8 @@ function memorySnapshot() {
 
 function peakRssSnapshotMiB() {
   const { maxRSS } = process.resourceUsage();
-  // Node reports maxRSS in KiB on Unix and bytes on Windows.
-  const bytes = process.platform === 'win32' ? maxRSS : maxRSS * 1024;
+  // Node reports maxRSS in KiB (ru_maxrss units).
+  const bytes = maxRSS * 1024;
   return Number((bytes / 1024 / 1024).toFixed(2));
 }
 
