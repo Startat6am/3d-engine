@@ -422,7 +422,16 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         if (scene && !this.#disposed) this.render(scene);
       })
       .catch((error: unknown) => {
-        if (entry.textureSources.get(channel) === source) entry.textureSources.delete(channel);
+        // A removed/replaced object no longer owns this asynchronous decode. Avoid
+        // reporting expected late failures after its texture lease was abandoned.
+        if (
+          this.#disposed ||
+          !entry.active ||
+          entry.textureSources.get(channel) !== source
+        ) {
+          return;
+        }
+        entry.textureSources.delete(channel);
         console.error(`Failed to decode ${channel} texture asset ${source.assetId}`, error);
       });
   }
