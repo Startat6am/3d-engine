@@ -77,6 +77,13 @@ function memorySnapshot() {
   );
 }
 
+function peakRssSnapshotMiB() {
+  const { maxRSS } = process.resourceUsage();
+  // Node reports maxRSS in KiB on Unix and bytes on Windows.
+  const bytes = process.platform === 'win32' ? maxRSS : maxRSS * 1024;
+  return Number((bytes / 1024 / 1024).toFixed(2));
+}
+
 async function importOnce(importer, source, run) {
   const startedAt = performance.now();
   const imported = await importer.import(source, {
@@ -90,15 +97,18 @@ async function importOnce(importer, source, run) {
     wallMs,
     metadata: imported.metadata,
     memoryWhileResultRetainedMiB: memorySnapshot(),
+    peakRssWhileResultRetainedMiB: peakRssSnapshotMiB(),
   };
 }
 
 async function executeRuns() {
   await collectGarbage();
   const baseline = memorySnapshot();
+  const peakRssBaselineMiB = peakRssSnapshotMiB();
   const source = createSyntheticGlb(vertexCount, textureBytes);
   const sourceBytes = source.byteLength;
   const afterFixture = memorySnapshot();
+  const peakRssAfterFixtureMiB = peakRssSnapshotMiB();
   const results = [];
   const importer = new GlbImporter();
 
@@ -106,10 +116,18 @@ async function executeRuns() {
     const result = await importOnce(importer, source, run);
     await collectGarbage();
     result.memoryAfterReleaseMiB = memorySnapshot();
+    result.peakRssAfterReleaseMiB = peakRssSnapshotMiB();
     results.push(result);
   }
 
-  return { baseline, sourceBytes, afterFixture, results };
+  return {
+    baseline,
+    peakRssBaselineMiB,
+    sourceBytes,
+    afterFixture,
+    peakRssAfterFixtureMiB,
+    results,
+  };
 }
 
 const report = await executeRuns();
@@ -134,11 +152,15 @@ const output = {
     gcExposed: typeof globalThis.gc === 'function',
   },
   memoryBaselineMiB: report.baseline,
+  peakRssBaselineMiB: report.peakRssBaselineMiB,
   memoryAfterFixtureMiB: report.afterFixture,
+  peakRssAfterFixtureMiB: report.peakRssAfterFixtureMiB,
   memoryAfterSourceReleaseMiB: memorySnapshot(),
+  peakRssAfterSourceReleaseMiB: peakRssSnapshotMiB(),
   runs: report.results,
   notes: [
-    'Memory figures are process snapshots, not a sampled peak-memory profile.',
+    'process.memoryUsage values are point-in-time snapshots; peakRss fields use the OS process high-water mark and include runtime startup plus the synthetic fixture.',
+    'Peak RSS is reported as evidence but no hard ceiling is enforced until supported-runner baselines are reviewed.',
     'Run with --expose-gc for comparable post-release snapshots.',
     'Synthetic image payload bytes are copied as embedded image data; no image decode or GPU allocation is measured.',
   ],
