@@ -124,7 +124,6 @@ const output = {
     indexed: false,
     embeddedImages: textureBytes > 0 ? 1 : 0,
     embeddedTextureBytes: textureBytes,
-    embeddedTextures: 0,
   },
   environment: {
     node: process.versions.node,
@@ -141,7 +140,7 @@ const output = {
   notes: [
     'Memory figures are process snapshots, not a sampled peak-memory profile.',
     'Run with --expose-gc for comparable post-release snapshots.',
-    'This synthetic geometry-only fixture does not measure texture decode or GPU allocations.',
+    'Synthetic image payload bytes are copied as embedded image data; no image decode or GPU allocation is measured.',
   ],
 };
 process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
