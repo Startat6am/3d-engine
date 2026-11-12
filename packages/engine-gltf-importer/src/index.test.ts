@@ -202,7 +202,7 @@ type MutableGlbJson = {
   materials?: {
     alphaMode?: string;
     alphaCutoff?: number;
-    doubleSided?: boolean;
+    doubleSided?: unknown;
     normalTexture?: { index?: number; scale?: number };
     occlusionTexture?: { index?: number; strength?: number };
     pbrMetallicRoughness?: {
@@ -443,6 +443,16 @@ describe('GlbImporter', () => {
       doubleSided: true,
       normalScale: 0.45,
       occlusionStrength: 0.62,
+    });
+  });
+
+  it('rejects non-boolean glTF doubleSided values', async () => {
+    const glb = rewriteGlbJson(makeGlb(), (root) => {
+      root.materials![0]!.doubleSided = 'false';
+    });
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      code: 'INVALID_GLB',
+      message: expect.stringContaining('doubleSided must be a boolean'),
     });
   });
 
