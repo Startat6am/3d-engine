@@ -839,6 +839,8 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     const alphaMode = material.alphaMode ?? 'OPAQUE';
     if (!['OPAQUE', 'MASK', 'BLEND'].includes(alphaMode))
       fail(`Material ${index} has an invalid alphaMode`);
+    if (material.doubleSided !== undefined && typeof material.doubleSided !== 'boolean')
+      fail(`Material ${index} doubleSided must be a boolean`);
     validateTextureRef(pbr.baseColorTexture?.index, index);
     validateTextureRef(pbr.metallicRoughnessTexture?.index, index);
     validateTextureRef(material.normalTexture?.index, index);
