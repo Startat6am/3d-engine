@@ -347,6 +347,8 @@ test('renderer keeps a shared texture alive until the final object lease is rele
     )
     .toBe(0);
 
+  // Explicitly select the remaining object before the second removal.
+  await page.getByRole('button', { name: 'SharedTextureA' }).click();
   await page.getByRole('button', { name: 'Delete selected object' }).click();
   await expect(page.getByText('SharedTextureA')).toHaveCount(0);
   await expect
