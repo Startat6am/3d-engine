@@ -411,12 +411,16 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
     const state = window as Window & {
       __imageBitmapCalls: number;
       __imageBitmapSuccesses: number;
+      __replacementStarted: boolean;
+      __replacementSuccesses: number;
       __firstImageBitmapStarted: Promise<void>;
       __resolveFirstImageBitmapStarted: () => void;
       __rejectFirstImageBitmap: () => void;
     };
     state.__imageBitmapCalls = 0;
     state.__imageBitmapSuccesses = 0;
+    state.__replacementStarted = false;
+    state.__replacementSuccesses = 0;
     state.__firstImageBitmapStarted = new Promise((resolve) => {
       state.__resolveFirstImageBitmapStarted = resolve;
     });
@@ -431,6 +435,7 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
       }
       return original(...args).then((bitmap) => {
         state.__imageBitmapSuccesses += 1;
+        if (state.__replacementStarted) state.__replacementSuccesses += 1;
         return bitmap;
       });
     }) as typeof createImageBitmap;
@@ -447,6 +452,13 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
     const state = window as Window & { __firstImageBitmapStarted: Promise<void> };
     await state.__firstImageBitmapStarted;
   });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
 
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
@@ -508,11 +520,11 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
   };
   replaceTextureReferences(document.world);
   document.world.name = 'Replacement World';
+  await page.evaluate(() => {
+    (window as Window & { __replacementStarted: boolean }).__replacementStarted = true;
+  });
   const callsBeforeReplacement = await page.evaluate(
     () => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls,
-  );
-  const successesBeforeReplacement = await page.evaluate(
-    () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
   );
 
   await page.locator('input[accept=".world,application/json"]').setInputFiles({
@@ -529,10 +541,10 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
   await expect
     .poll(() =>
       page.evaluate(
-        () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
+        () => (window as Window & { __replacementSuccesses: number }).__replacementSuccesses,
       ),
     )
-    .toBeGreaterThan(successesBeforeReplacement);
+    .toBeGreaterThan(0);
 
   // Complete the original decode only after the replacement has decoded successfully.
   await page.evaluate(() => {
