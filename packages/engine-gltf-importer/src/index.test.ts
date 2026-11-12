@@ -334,6 +334,44 @@ describe('GlbImporter', () => {
     );
     expect(result.data.meshes[0]?.primitives[0]?.mesh.indices).toEqual(new Uint32Array([0, 1, 2]));
   });
+  it('rejects meshopt expansion before allocating an oversized decoded BIN buffer', async () => {
+    await expect(
+      new GlbImporter().import(await makeMeshoptGlb(), {
+        ...context,
+        settings: { maxDecodedBufferBytes: 8 },
+      }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+  });
+
+  it('reports deterministic import size and phase diagnostics', async () => {
+    const result = await new GlbImporter().import(makeGlb({ indices: [0, 1, 2] }), context);
+    expect(result.metadata).toMatchObject({
+      format: 'glb',
+      sourceBytes: expect.any(Number),
+      geometryBytes: expect.any(Number),
+      textureBytes: 0,
+      vertexCount: 3,
+      triangleCount: 1,
+      parseMs: expect.any(Number),
+      decodeMs: expect.any(Number),
+      buildMs: expect.any(Number),
+      totalMs: expect.any(Number),
+    });
+  });
+
+  it('rejects files and geometry that exceed configurable import budgets', async () => {
+    const source = makeGlb({ indices: [0, 1, 2] });
+    await expect(
+      new GlbImporter().import(source, { ...context, settings: { maxSourceBytes: 16 } }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+    await expect(
+      new GlbImporter().import(source, { ...context, settings: { maxVertices: 2 } }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+    await expect(
+      new GlbImporter().import(source, { ...context, settings: { maxGeometryBytes: 8 } }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+  });
+
   it('imports GLB positions, normals, indices, nodes and PBR material factors', async () => {
     const result = await new GlbImporter().import(makeGlb({ indices: [0, 1, 2] }), context);
     expect(result.kind).toBe('model');
