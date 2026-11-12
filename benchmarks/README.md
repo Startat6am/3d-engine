@@ -13,7 +13,7 @@ Controls:
 - `GLB_STRESS_RUNS`: sequential import count from 1 to 20; defaults to 3.
 - `GLB_STRESS_TEXTURE_BYTES`: embedded image payload bytes, from 0 to 128 MiB; defaults to 0.
 
-The script generates a deterministic GLB in memory, imports it repeatedly, records importer phase timings and Node process memory snapshots, drops each imported result, and forces several GC passes when `--expose-gc` is available. Set `GLB_STRESS_TEXTURE_BYTES` to add one embedded image bufferView. The synthetic image bytes use a PNG MIME label but are not a valid encoded PNG; the importer copies their payload but this benchmark does not decode them. It outputs one JSON report to stdout and does not write a generated model file.
+The script generates a deterministic GLB in memory, imports it repeatedly, records importer phase timings and Node process memory snapshots, drops each imported result, and forces several GC passes when `--expose-gc` is available. Set `GLB_STRESS_TEXTURE_BYTES` to add one embedded image bufferView. The synthetic image bytes use a PNG MIME label but are not a valid encoded PNG; the importer copies their payload but this benchmark does not decode them. It outputs one JSON report to stdout and does not write a generated model file. The repository CI runs both the geometry-only and 16 MiB embedded-image cases on the supported Node 22 runtime after the workspace build; use those logs as the supported-runtime baseline.
 
 ## Recorded baseline (2026-11-12)
 
