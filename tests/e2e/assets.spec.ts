@@ -523,9 +523,7 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
   await expect(page.getByLabel('World name')).toHaveValue('Replacement World');
   await expect
     .poll(() =>
-      page.evaluate(
-        () => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls,
-      ),
+      page.evaluate(() => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls),
     )
     .toBeGreaterThan(callsBeforeReplacement);
   await expect
