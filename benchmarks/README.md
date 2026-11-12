@@ -40,17 +40,17 @@ Same environment as the geometry-only run (Node 25.9.0, Linux arm64, explicit GC
 GLB_STRESS_TEXTURE_BYTES=16777216 node --expose-gc benchmarks/glb-import-stress.mjs
 ```
 
-| Measurement | Result |
-|---|---:|
-| Vertices / triangles | 1,000,002 / 333,334 |
-| Embedded image payload | 16,777,216 bytes (16 MiB) |
-| Total GLB source | 28,777,756 bytes |
-| Geometry output | 28,000,056 bytes |
-| Import wall time, run 1 | 187.52 ms |
-| Import wall time, runs 2–3 | 145.43 ms / 144.49 ms |
-| ArrayBuffers while result retained | 70.18 MiB |
+| Measurement                            |                          Result |
+| -------------------------------------- | ------------------------------: |
+| Vertices / triangles                   |             1,000,002 / 333,334 |
+| Embedded image payload                 |       16,777,216 bytes (16 MiB) |
+| Total GLB source                       |                28,777,756 bytes |
+| Geometry output                        |                28,000,056 bytes |
+| Import wall time, run 1                |                       187.52 ms |
+| Import wall time, runs 2–3             |           145.43 ms / 144.49 ms |
+| ArrayBuffers while result retained     |                       70.18 MiB |
 | ArrayBuffers after result release + GC | 27.48 MiB (source fixture only) |
-| ArrayBuffers after source release + GC | 0.03 MiB |
+| ArrayBuffers after source release + GC |                        0.03 MiB |
 
 This confirms that the importer returns to the source-fixture ArrayBuffer baseline after each result is released in this Node diagnostic run. It is not an image-decoding or GPU upload test, nor a sampled peak-memory profile.
 
