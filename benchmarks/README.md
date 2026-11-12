@@ -18,16 +18,16 @@ The script generates a deterministic, geometry-only GLB in memory, imports it re
 
 Environment: Node 25.9.0, Linux arm64, 48 reported CPUs, 189,774 MiB reported host memory, explicit GC enabled. This sandbox runtime is outside the repository's supported Node range (22.12.x), so these numbers are diagnostic only and must not be treated as the supported-runtime baseline.
 
-| Measurement | Result |
-|---|---:|
-| Synthetic GLB source | 12,000,396 bytes |
-| Vertices / triangles | 1,000,002 / 333,334 |
-| Importer-reported geometry output | 28,000,056 bytes |
-| Import wall time, run 1 | 180.31 ms |
-| Import wall time, runs 2–3 | 140.93 ms / 140.83 ms |
-| ArrayBuffers while result retained | 38.18 MiB |
+| Measurement                            |                          Result |
+| -------------------------------------- | ------------------------------: |
+| Synthetic GLB source                   |                12,000,396 bytes |
+| Vertices / triangles                   |             1,000,002 / 333,334 |
+| Importer-reported geometry output      |                28,000,056 bytes |
+| Import wall time, run 1                |                       180.31 ms |
+| Import wall time, runs 2–3             |           140.93 ms / 140.83 ms |
+| ArrayBuffers while result retained     |                       38.18 MiB |
 | ArrayBuffers after result release + GC | 11.48 MiB (source fixture only) |
-| ArrayBuffers after source release + GC | 0.03 MiB |
+| ArrayBuffers after source release + GC |                        0.03 MiB |
 
 The post-release ArrayBuffers snapshots returned to the source-fixture baseline after each run; the remaining RSS did not fall proportionally because process RSS includes allocator/runtime retention. This is not proof of a peak-memory ceiling or a browser/GPU lifecycle result.
 
