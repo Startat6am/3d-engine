@@ -46,8 +46,8 @@ GLB_STRESS_TEXTURE_BYTES=16777216 node --expose-gc benchmarks/glb-import-stress.
 | Embedded image payload | 16,777,216 bytes (16 MiB) |
 | Total GLB source | 28,777,756 bytes |
 | Geometry output | 28,000,056 bytes |
-| Import wall time, run 1 | 188.70 ms |
-| Import wall time, runs 2–3 | 147.59 ms / 146.67 ms |
+| Import wall time, run 1 | 187.52 ms |
+| Import wall time, runs 2–3 | 145.43 ms / 144.49 ms |
 | ArrayBuffers while result retained | 70.18 MiB |
 | ArrayBuffers after result release + GC | 27.48 MiB (source fixture only) |
 | ArrayBuffers after source release + GC | 0.03 MiB |
