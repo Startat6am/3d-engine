@@ -313,8 +313,12 @@ export function EditorApp() {
   const assetPayloadsRef = useRef(new Map<AssetId, WorldAssetPayload>());
   const assetResourceCacheRef = useRef(new AssetResourceCache<ImportedAsset<GlbAsset>>());
   const assetResourceLeasesRef = useRef<AssetResourceLease<ImportedAsset<GlbAsset>>[]>([]);
+  const activeGlbImportControllersRef = useRef(new Set<AbortController>());
   useEffect(
     () => () => {
+      for (const controller of activeGlbImportControllersRef.current)
+        controller.abort('Editor unmounted');
+      activeGlbImportControllersRef.current.clear();
       for (const lease of assetResourceLeasesRef.current) lease.release();
       assetResourceLeasesRef.current = [];
     },
@@ -800,9 +804,15 @@ export function EditorApp() {
 
   const importGlb = async (file?: File) => {
     if (!file) return;
+    const controller = new AbortController();
+    activeGlbImportControllersRef.current.add(controller);
+    const ensureImportActive = () => {
+      if (controller.signal.aborted) throw new Error('GLB import was cancelled');
+    };
     let pendingLease: AssetResourceLease<ImportedAsset<GlbAsset>> | null = null;
     try {
       const [three, gltf] = await Promise.all([import('three'), import('@engine/gltf-importer')]);
+      ensureImportActive();
       const { Matrix4, Quaternion, Vector3 } = three;
       const importer = new gltf.GlbImporter();
       if (!glbImporterRegisteredRef.current) {
@@ -810,19 +820,22 @@ export function EditorApp() {
         glbImporterRegisteredRef.current = true;
       }
       const sourceBytes = await file.arrayBuffer();
+      ensureImportActive();
       const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'import.glb';
       const uri = `imports/${safeFileName}`;
       const contentHash = await sha256(sourceBytes);
+      ensureImportActive();
       pendingLease = await assetResourceCacheRef.current.acquire(
         contentHash,
         () =>
           assetImportServiceRef.current.import<GlbAsset>(uri, sourceBytes, {
-            signal: new AbortController().signal,
+            signal: controller.signal,
           }),
         () => {
           // CPU mesh buffers are garbage-collected after the final editor lease is released.
         },
       );
+      ensureImportActive();
       const imported = pendingLease.resource;
       const asset = imported.data;
       const parentOf = new Map<number, number>();
@@ -955,6 +968,7 @@ export function EditorApp() {
         // The importer already owns a tightly-sized image byte buffer.
         const imageBuffer = image.data.buffer as ArrayBuffer;
         const imageHash = await sha256(imageBuffer);
+        ensureImportActive();
         const extension =
           image.mimeType === 'image/png' ? 'png' : image.mimeType === 'image/webp' ? 'webp' : 'jpg';
         const textureRecord = stagedRegistry.register({
@@ -1059,6 +1073,7 @@ export function EditorApp() {
         encoding: 'base64',
         data: encodeBase64(sourceBytes),
       });
+      ensureImportActive();
       assetRegistryRef.current = stagedRegistry;
       assetPayloadsRef.current = stagedPayloads;
       assetResourceLeasesRef.current.push(pendingLease);
@@ -1073,13 +1088,17 @@ export function EditorApp() {
       });
     } catch (error) {
       pendingLease?.release();
-      const message = error instanceof Error ? error.message : String(error);
-      pushDiagnostic({
-        level: 'error',
-        source: 'GLB Importer',
-        message: 'Importer engine.gltf.glb failed',
-        details: `${file.name}\n${message}`,
-      });
+      if (!controller.signal.aborted) {
+        const message = error instanceof Error ? error.message : String(error);
+        pushDiagnostic({
+          level: 'error',
+          source: 'GLB Importer',
+          message: 'Importer engine.gltf.glb failed',
+          details: `${file.name}\n${message}`,
+        });
+      }
+    } finally {
+      activeGlbImportControllersRef.current.delete(controller);
     }
   };
 
