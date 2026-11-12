@@ -146,7 +146,9 @@ test('GLB imports register stable project assets and survive world save/reopen',
       await page.locator('.file-menu summary').click();
     }
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Save Worldâ¦' }).click();
+    const saveButton = menu.locator('.file-menu-content button').nth(2);
+  await expect(saveButton).toBeVisible();
+  await saveButton.click();
     const download = await downloadPromise;
     const path = await download.path();
     if (!path) throw new Error('World export did not produce a file');
@@ -451,7 +453,9 @@ test('renderer ignores a stale texture decode failure after the scene replaces i
     await page.locator('.file-menu summary').click();
   }
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Save Worldâ¦' }).click();
+  const saveButton = menu.locator('.file-menu-content button').nth(2);
+  await expect(saveButton).toBeVisible();
+  await saveButton.click();
   const download = await downloadPromise;
   const path = await download.path();
   if (!path) throw new Error('World export did not produce a file');
