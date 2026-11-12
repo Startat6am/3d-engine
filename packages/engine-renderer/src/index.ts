@@ -268,7 +268,13 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         material.roughness = item.material.roughness;
         material.metalness = item.material.metalness;
         material.opacity = item.material.opacity;
-        material.transparent = item.material.transparent;
+        const alphaMode =
+          item.material.alphaMode ?? (item.material.transparent ? 'BLEND' : 'OPAQUE');
+        material.transparent = alphaMode === 'BLEND';
+        material.alphaTest = alphaMode === 'MASK' ? (item.material.alphaCutoff ?? 0.5) : 0;
+        material.side = item.material.doubleSided ? THREE.DoubleSide : THREE.FrontSide;
+        material.normalScale.set(...(item.material.normalScale ?? [1, 1]));
+        material.aoMapIntensity = item.material.occlusionStrength ?? 1;
         material.wireframe = item.material.wireframe;
         material.emissive.setHex(item.material.emissiveColor ?? 0x000000);
         this.#syncTexture(entry, 'baseColor', item.material.baseColorTexture);
