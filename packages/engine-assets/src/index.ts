@@ -194,6 +194,28 @@ function throwIfImportAborted(signal: AbortSignal): void {
   }
 }
 
+/** Owns in-flight import controllers and aborts them with the lifetime of their caller. */
+export class AssetImportScope {
+  readonly #controllers = new Set<AbortController>();
+
+  add(controller: AbortController): void {
+    this.#controllers.add(controller);
+  }
+
+  release(controller: AbortController): void {
+    this.#controllers.delete(controller);
+  }
+
+  abortAll(reason: unknown = 'Import scope disposed'): void {
+    for (const controller of this.#controllers) controller.abort(reason);
+    this.#controllers.clear();
+  }
+
+  get activeCount(): number {
+    return this.#controllers.size;
+  }
+}
+
 /**
  * Format-neutral importer dispatcher. Cancellation is cooperative: each importer
  * receives the AbortSignal and must observe it during its own decode operations.
