@@ -5,7 +5,7 @@ type FakeWorkerRequest = { readonly requestId: number };
 
 class FakeWorker extends EventTarget {
   static instances: FakeWorker[] = [];
-  static onPostMessage?: (worker: FakeWorker, message: FakeWorkerRequest) => void;
+  static onPostMessage: ((worker: FakeWorker, message: FakeWorkerRequest) => void) | undefined;
   posted?: { readonly message: FakeWorkerRequest; readonly transfer: Transferable[] };
   terminated = false;
 
