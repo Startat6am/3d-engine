@@ -196,8 +196,8 @@ function makeInterleavedGlb(): ArrayBuffer {
 type MutableGlbJson = {
   extensionsRequired?: string[];
   extensionsUsed?: string[];
-  accessors?: { count: number }[];
-  bufferViews?: { byteOffset?: number }[];
+  accessors?: { count: number; byteOffset?: number; normalized?: boolean }[];
+  bufferViews?: { byteOffset?: number; byteLength?: number; byteStride?: number }[];
   buffers?: { byteLength: number }[];
   materials?: {
     pbrMetallicRoughness?: {
@@ -215,6 +215,17 @@ type MutableGlbJson = {
   }[];
   samplers?: { magFilter?: number; minFilter?: number; wrapS?: number; wrapT?: number }[];
 };
+
+function replaceGlbJson(source: ArrayBuffer, json: string): ArrayBuffer {
+  const output = source.slice(0);
+  const jsonLength = new DataView(output).getUint32(12, true);
+  const chunk = new Uint8Array(output, 20, jsonLength);
+  const encoded = new TextEncoder().encode(json);
+  if (encoded.length > chunk.length) throw new Error('Replacement JSON exceeds GLB JSON chunk');
+  chunk.fill(0x20);
+  chunk.set(encoded);
+  return output;
+}
 
 function rewriteGlbJson(source: ArrayBuffer, update: (root: MutableGlbJson) => void): ArrayBuffer {
   const input = new DataView(source);
@@ -540,6 +551,99 @@ describe('GlbImporter', () => {
     expect(Array.from(result.data.meshes[0]!.primitives[0]!.mesh.normals)).toEqual([
       0, 0, 1, 0, 0, 1, 0, 0, 1,
     ]);
+  });
+
+  it('rejects non-object JSON roots and non-array metadata with stable GLB errors', async () => {
+    const nullRoot = replaceGlbJson(makeGlb(), 'null');
+    await expect(new GlbImporter().import(nullRoot, context)).rejects.toMatchObject({
+      name: 'GlbImportError',
+      code: 'INVALID_GLB',
+      message: expect.stringContaining('JSON root must be an object'),
+    });
+
+    const invalidBuffers = rewriteGlbJson(makeGlb(), (root) => {
+      Object.assign(root, { buffers: {} });
+    });
+    await expect(new GlbImporter().import(invalidBuffers, context)).rejects.toMatchObject({
+      name: 'GlbImportError',
+      code: 'INVALID_GLB',
+      message: expect.stringContaining('buffers must be an array'),
+    });
+  });
+
+  it('rejects negative embedded buffer lengths before import', async () => {
+    const glb = rewriteGlbJson(makeGlb(), (root) => {
+      root.buffers![0]!.byteLength = -1;
+    });
+    await expect(new GlbImporter().import(glb, context)).rejects.toMatchObject({
+      name: 'GlbImportError',
+      code: 'INVALID_GLB',
+    });
+  });
+
+  it('rejects fractional and misaligned accessor byte offsets', async () => {
+    const fractionalAccessorOffset = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.byteOffset = 0.5;
+      root.bufferViews![0]!.byteLength = 40;
+    });
+    await expect(new GlbImporter().import(fractionalAccessorOffset, context)).rejects.toMatchObject(
+      { code: 'INVALID_ACCESSOR' },
+    );
+
+    const misalignedAccessorOffset = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.byteOffset = 1;
+      root.bufferViews![0]!.byteLength = 40;
+    });
+    await expect(new GlbImporter().import(misalignedAccessorOffset, context)).rejects.toMatchObject(
+      { code: 'INVALID_ACCESSOR' },
+    );
+
+    const misalignedBufferViewOffset = rewriteGlbJson(makeGlb(), (root) => {
+      root.bufferViews![0]!.byteOffset = 1;
+      root.bufferViews![0]!.byteLength = 40;
+    });
+    await expect(
+      new GlbImporter().import(misalignedBufferViewOffset, context),
+    ).rejects.toMatchObject({ code: 'INVALID_ACCESSOR' });
+  });
+
+  it('rejects invalid accessor counts, strides and bufferView lengths', async () => {
+    const fractionalCount = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.count = 1.5;
+    });
+    await expect(new GlbImporter().import(fractionalCount, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+
+    const fractionalStride = rewriteGlbJson(makeGlb(), (root) => {
+      root.bufferViews![0]!.byteStride = 12.5;
+    });
+    await expect(new GlbImporter().import(fractionalStride, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+
+    const negativeViewLength = rewriteGlbJson(makeGlb(), (root) => {
+      root.bufferViews![0]!.byteLength = -1;
+    });
+    await expect(new GlbImporter().import(negativeViewLength, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+  });
+
+  it('rejects normalized index and floating-point accessors', async () => {
+    const normalizedIndices = rewriteGlbJson(makeGlb({ indices: [0, 1, 2] }), (root) => {
+      root.accessors![2]!.normalized = true;
+    });
+    await expect(new GlbImporter().import(normalizedIndices, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+
+    const normalizedFloats = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.normalized = true;
+    });
+    await expect(new GlbImporter().import(normalizedFloats, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
   });
 
   it('rejects malformed headers and unsupported primitive modes', async () => {
