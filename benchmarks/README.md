@@ -79,3 +79,16 @@ These are supported-runtime diagnostic baselines. ArrayBuffers return to the sou
 - `process.memoryUsage()` is sampled at specific points, so a transient heap/ArrayBuffer peak between snapshots may be missed. `process.resourceUsage().maxRSS` is the OS high-water mark and does capture the maximum process RSS, but includes runtime startup and fixture allocations. Windows does not expose Node's `maxRSS` field, so the benchmark reports `null` there.
 - Node `process.memoryUsage()` is not equivalent to browser tab memory. Repeat the benchmark on the supported Node version and add browser-specific acceptance instrumentation before making cross-runtime performance claims.
 - Do not place user-provided/private model files in this benchmark or commit generated fixture binaries.
+
+## Peak RSS high-water baseline (2026-11-12, Node 22 CI)
+
+The benchmark now records the OS process high-water mark through `process.resourceUsage().maxRSS`. Two independent supported-runner runs were collected (GitHub Actions #191 and #195; Node 22.23.4, Linux x64):
+
+| Fixture                           | CI run | Baseline RSS | After fixture |   Peak RSS | Peak increase | CI budget |
+| --------------------------------- | -----: | -----------: | ------------: | ---------: | ------------: | --------: |
+| 1,000,002 vertices, no image      |   #191 |    52.55 MiB |     65.68 MiB |  98.03 MiB |     45.48 MiB |   128 MiB |
+| 1,000,002 vertices, no image      |   #195 |    49.47 MiB |     65.74 MiB |  97.80 MiB |     48.33 MiB |   128 MiB |
+| 1,000,002 vertices + 16 MiB image |   #191 |    51.04 MiB |     81.93 MiB | 130.07 MiB |     79.03 MiB |   128 MiB |
+| 1,000,002 vertices + 16 MiB image |   #195 |    49.72 MiB |     81.74 MiB | 130.21 MiB |     80.49 MiB |   128 MiB |
+
+CI enforces `GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB=128` for both fixtures. The largest observed increase is 80.49 MiB, leaving 47.51 MiB of headroom. This is a process-RSS ceiling for these Node importer stress fixtures, measured relative to the process high-water baseline before fixture allocation. It is not a browser-tab, image-decoder, WebGL, or GPU memory ceiling. The fixture's image payload is copied but not decoded. Continue to keep browser/GPU memory lifecycle as a separate M5 acceptance item.
