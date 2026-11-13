@@ -18,7 +18,7 @@ function pngChunk(type: string, data: Buffer): Buffer {
   return Buffer.concat([length, payload, checksum]);
 }
 
-function makeSolidPng(width: number, height: number): Buffer {
+function makeSolidPng(width: number, height: number, blue = 210): Buffer {
   const header = Buffer.alloc(13);
   header.writeUInt32BE(width, 0);
   header.writeUInt32BE(height, 4);
@@ -32,7 +32,7 @@ function makeSolidPng(width: number, height: number): Buffer {
       const pixel = row + 1 + x * 4;
       pixels[pixel] = 45;
       pixels[pixel + 1] = 125;
-      pixels[pixel + 2] = 210;
+      pixels[pixel + 2] = blue;
       pixels[pixel + 3] = 255;
     }
   }
@@ -44,7 +44,7 @@ function makeSolidPng(width: number, height: number): Buffer {
   ]);
 }
 
-function makeMemoryGlb(vertexCount: number, textureSize: number): Buffer {
+function makeMemoryGlb(vertexCount: number, textureSize: number, textureBlue = 210): Buffer {
   const positions = Buffer.from(new Float32Array(vertexCount * 3).buffer);
   const normals = Buffer.from(new Float32Array(vertexCount * 3).buffer);
   const uvs = Buffer.from(new Float32Array(vertexCount * 2).buffer);
@@ -73,7 +73,7 @@ function makeMemoryGlb(vertexCount: number, textureSize: number): Buffer {
     uvValues[uvOffset] = corner === 1 ? 1 : 0;
     uvValues[uvOffset + 1] = corner === 2 ? 1 : 0;
   }
-  const image = makeSolidPng(textureSize, textureSize);
+  const image = makeSolidPng(textureSize, textureSize, textureBlue);
   const binary = Buffer.concat([positions, normals, uvs, image]);
   const document = {
     asset: { version: '2.0', generator: 'Choreon browser memory benchmark' },
@@ -392,7 +392,7 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'browser-memory-repeat.glb',
     mimeType: 'model/gltf-binary',
-    buffer: makeMemoryGlb(vertexCount, textureSize),
+    buffer: makeMemoryGlb(vertexCount, textureSize, 211),
   });
   await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
   await expect
