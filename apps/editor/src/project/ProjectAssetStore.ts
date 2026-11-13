@@ -193,6 +193,18 @@ function mimeTypeForAsset(record: AssetRecord, path: string): string {
   return EXTENSION_MIME[extension] ?? 'application/octet-stream';
 }
 
+function validateAssetMime(kind: AssetRecord['kind'], mimeType: string): void {
+  if (
+    (kind === 'texture' && !mimeType.startsWith('image/')) ||
+    (kind === 'model' && mimeType !== 'model/gltf-binary')
+  ) {
+    throw new ProjectAssetStoreError(
+      `Asset kind ${kind} has invalid MIME type: ${mimeType}`,
+      'UNSUPPORTED_MIME',
+    );
+  }
+}
+
 async function sha256(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', bytes.slice().buffer as ArrayBuffer);
   const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
@@ -257,15 +269,7 @@ export async function saveDirectoryProject(
         'HASH_MISMATCH',
       );
     }
-    if (
-      (record.kind === 'texture' && !payload.mimeType.startsWith('image/')) ||
-      (record.kind === 'model' && payload.mimeType !== 'model/gltf-binary')
-    ) {
-      throw new ProjectAssetStoreError(
-        `Asset kind ${record.kind} has invalid MIME type: ${payload.mimeType}`,
-        'UNSUPPORTED_MIME',
-      );
-    }
+    validateAssetMime(record.kind, payload.mimeType);
     const uri = assetUri(record.contentHash, payload.mimeType);
     if (!writtenBlobs.has(uri)) {
       await store.writeFile(uri, bytes, { immutable: true });
@@ -310,7 +314,18 @@ export async function loadDirectoryProject(store: ProjectFileStore): Promise<Wor
         'INVALID_PATH',
       );
     }
-    if (payloads.has(record.id)) continue;
+    const embedded = payloads.get(record.id);
+    if (embedded) {
+      const embeddedBytes = decodeBase64(embedded.data);
+      if ((await sha256(embeddedBytes)) !== `sha256:${digest}`) {
+        throw new ProjectAssetStoreError(
+          `Embedded asset hash mismatch: ${record.id}`,
+          'HASH_MISMATCH',
+        );
+      }
+      validateAssetMime(record.kind, embedded.mimeType);
+      continue;
+    }
     const bytes = await store.readFile(uri);
     if ((await sha256(bytes)) !== `sha256:${parseSha256(record.contentHash)}`) {
       throw new ProjectAssetStoreError(
@@ -318,15 +333,7 @@ export async function loadDirectoryProject(store: ProjectFileStore): Promise<Wor
         'HASH_MISMATCH',
       );
     }
-    if (
-      (record.kind === 'texture' && !mimeType.startsWith('image/')) ||
-      (record.kind === 'model' && mimeType !== 'model/gltf-binary')
-    ) {
-      throw new ProjectAssetStoreError(
-        `Asset kind ${record.kind} has invalid MIME type: ${mimeType}`,
-        'UNSUPPORTED_MIME',
-      );
-    }
+    validateAssetMime(record.kind, mimeType);
     payloads.set(record.id, {
       assetId: record.id,
       mimeType,
