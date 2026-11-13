@@ -16,7 +16,7 @@
 - Serialization tests include a versioned golden world fixture with an embedded model asset.
 - GLB importer fixtures cover meshopt-compressed buffers and interleaved POSITION/NORMAL accessors (`byteStride` and accessor offsets), rejection of unsupported required extensions, preservation of optional extension declarations, and malformed accessor/bufferView ranges.
 
-- PR #66 fixes cancellation ownership for deduplicated imports: each consumer can abort its own wait without cancelling a shared load that still has other consumers. The cache aborts the underlying worker only when the last consumer leaves and disposes any resource that resolves after all consumers have aborted. Local Node 25.9.0 validation passes 99/99 workspace tests, TypeScript project build, ESLint, Editor/Player production builds, changed-file Prettier, and git diff --check; supported Node 22 CI and Chromium E2E remain pending.
+- PR #66 fixes cancellation ownership for deduplicated imports: each consumer can abort its own wait without cancelling a shared load that still has other consumers. The cache aborts the underlying worker only when the last consumer leaves and disposes any resource that resolves after all consumers have aborted. GitHub Actions CI #211 passed on the code-bearing commit 42734ce5391a56f169340237f48b958b81060782 with Node 22: 99/99 workspace unit tests, typecheck, lint, Editor/Player builds, both 128 MiB peak-RSS stress budgets, and 16/16 Chromium E2E tests. The exact final PR head 466b2714e43a79fee674ec275ae24801a5aeea4f has a READY Vercel Preview: https://3d-engine-4fvp01j0j-callback5.vercel.app. Local Node 25.9.0 checks also pass; Node 25 is outside the supported range.
 
 ## Not yet delivered
 
