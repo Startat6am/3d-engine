@@ -1,6 +1,8 @@
 import { expect, test } from '@playwright/test';
 import { deflateSync } from 'node:zlib';
 
+test.use({ launchOptions: { args: ['--enable-experimental-web-platform-features'] } });
+
 function pngChunk(type: string, data: Buffer): Buffer {
   const name = Buffer.from(type, 'ascii');
   const payload = Buffer.concat([name, data]);
