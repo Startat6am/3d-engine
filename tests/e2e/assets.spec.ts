@@ -50,10 +50,13 @@ function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
           },
           metallicRoughnessTexture: { index: 0 },
         },
-        normalTexture: { index: 0 },
-        occlusionTexture: { index: 0 },
+        normalTexture: { index: 0, scale: 0.45 },
+        occlusionTexture: { index: 0, strength: 0.62 },
         emissiveTexture: { index: 0 },
         emissiveFactor: [0.1, 0.2, 0.3],
+        alphaMode: 'MASK',
+        alphaCutoff: 0.37,
+        doubleSided: true,
       },
     ],
     meshes: [
@@ -85,6 +88,35 @@ function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
   binaryHeader.writeUInt32LE(binaryChunk.length, 0);
   binaryHeader.writeUInt32LE(0x004e4942, 4);
   return Buffer.concat([header, jsonHeader, jsonChunk, binaryHeader, binaryChunk]);
+}
+
+function makeGlbWithUnresolvedTextureSource(): Buffer {
+  const source = makeTriangleGlb();
+  const jsonLength = source.readUInt32LE(12);
+  const document = JSON.parse(source.toString('utf8', 20, 20 + jsonLength)) as {
+    textures: Array<{ source?: number; sampler?: number }>;
+  };
+  delete document.textures[0]!.source;
+  const jsonBytes = Buffer.from(JSON.stringify(document));
+  const jsonPadding = (4 - (jsonBytes.length % 4)) % 4;
+  const jsonChunk = Buffer.concat([jsonBytes, Buffer.alloc(jsonPadding, 0x20)]);
+  const binaryHeaderOffset = 20 + jsonLength;
+  const binaryLength = source.readUInt32LE(binaryHeaderOffset);
+  const binary = source.subarray(binaryHeaderOffset + 8, binaryHeaderOffset + 8 + binaryLength);
+  const binaryPadding = (4 - (binary.length % 4)) % 4;
+  const binaryChunk = Buffer.concat([binary, Buffer.alloc(binaryPadding)]);
+  const totalLength = 12 + 8 + jsonChunk.length + 8 + binaryChunk.length;
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67, 0);
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(totalLength, 8);
+  const jsonHeader = Buffer.alloc(8);
+  jsonHeader.writeUInt32LE(jsonChunk.length, 0);
+  jsonHeader.writeUInt32LE(0x4e4f534a, 4);
+  const nextBinaryHeader = Buffer.alloc(8);
+  nextBinaryHeader.writeUInt32LE(binaryChunk.length, 0);
+  nextBinaryHeader.writeUInt32LE(0x004e4942, 4);
+  return Buffer.concat([header, jsonHeader, jsonChunk, nextBinaryHeader, binaryChunk]);
 }
 
 function pngChunk(type: string, data: Buffer): Buffer {
@@ -178,6 +210,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
               normalTextureAssetId?: string;
               occlusionTextureAssetId?: string;
               emissiveTextureAssetId?: string;
+              alphaMode?: string;
+              alphaCutoff?: number;
+              doubleSided?: boolean;
+              normalScale?: number[];
+              occlusionStrength?: number;
               baseColorTextureSettings?: {
                 sampler?: {
                   magFilter: number | null;
@@ -218,6 +255,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
     normalTextureAssetId: texture.id,
     occlusionTextureAssetId: texture.id,
     emissiveTextureAssetId: texture.id,
+    alphaMode: 'MASK',
+    alphaCutoff: 0.37,
+    doubleSided: true,
+    normalScale: [0.45, 0.45],
+    occlusionStrength: 0.62,
   });
   expect(importedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
   expect(firstDocument.assetPayloads).toHaveLength(2);
@@ -263,6 +305,11 @@ test('GLB imports register stable project assets and survive world save/reopen',
     normalTextureAssetId: texture.id,
     occlusionTextureAssetId: texture.id,
     emissiveTextureAssetId: texture.id,
+    alphaMode: 'MASK',
+    alphaCutoff: 0.37,
+    doubleSided: true,
+    normalScale: [0.45, 0.45],
+    occlusionStrength: 0.62,
   });
   expect(reopenedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
   // A tampered embedded texture payload must fail hash verification before
@@ -291,6 +338,66 @@ test('GLB imports register stable project assets and survive world save/reopen',
   await page.waitForTimeout(250);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  const source = makeTriangleGlb();
+
+  // The importer accepts an existing texture record without an embedded image
+  // source. Editor resolution then fails after it has staged image/model records
+  // and payloads, but before committing the staged project copies.
+  await glbInput.setInputFiles({
+    name: 'unresolved-texture.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeGlbWithUnresolvedTextureSource(),
+  });
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Importer engine.gltf.glb failed', { exact: true })).toBeVisible();
+  await expect(page.getByText(/GLB material references an unavailable texture: 0/)).toBeVisible();
+
+  const saveWorld = async () => {
+    const menu = page.locator('.file-menu');
+    if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await page.locator('.file-menu summary').click();
+    }
+    const downloadPromise = page.waitForEvent('download');
+    const saveButton = menu.locator('.file-menu-content button').nth(2);
+    await expect(saveButton).toBeVisible();
+    await saveButton.click();
+    const download = await downloadPromise;
+    const path = await download.path();
+    if (!path) throw new Error('World export did not produce a file');
+    return JSON.parse(await readFile(path, 'utf8')) as {
+      assets: Array<{ kind: string }>;
+      assetPayloads: Array<{ assetId: string }>;
+      world: { entities: Array<{ components?: { MeshRenderer?: { primitive?: string } } }> };
+    };
+  };
+
+  const afterFailure = await saveWorld();
+  expect(afterFailure.assets).toEqual([]);
+  expect(afterFailure.assetPayloads).toEqual([]);
+  expect(
+    afterFailure.world.entities.some(
+      (entity) => entity.components?.MeshRenderer?.primitive === 'GLB',
+    ),
+  ).toBe(false);
+
+  // A valid import after the failed staging path must still commit normally.
+  await glbInput.setInputFiles({
+    name: 'recovered.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: source,
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const afterRecovery = await saveWorld();
+  expect(afterRecovery.assets).toHaveLength(2);
+  expect(afterRecovery.assetPayloads).toHaveLength(2);
+  expect(afterRecovery.assets.map((asset) => asset.kind).sort()).toEqual(['model', 'texture']);
 });
 
 test('renderer releases uploaded texture resources when an imported object is removed', async ({
