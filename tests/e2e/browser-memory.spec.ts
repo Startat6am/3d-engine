@@ -194,6 +194,31 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
       }
       return Reflect.apply(originalTexImage2D, this, args);
     };
+    const originalTexSubImage2D = prototype.texSubImage2D;
+    prototype.texSubImage2D = function (...args) {
+      const texture = this.getParameter(this.TEXTURE_BINDING_2D) as WebGLTexture | null;
+      if (texture) {
+        const source =
+          args.length === 9
+            ? null
+            : (args[6] as {
+                width?: number;
+                height?: number;
+                videoWidth?: number;
+                videoHeight?: number;
+              });
+        const width =
+          args.length === 9 ? Number(args[4]) : Number(source?.width ?? source?.videoWidth ?? 0);
+        const height =
+          args.length === 9 ? Number(args[5]) : Number(source?.height ?? source?.videoHeight ?? 0);
+        const size = width * height * 4;
+        const previous = textureSizes.get(texture) ?? 0;
+        state.liveTextureBytes += size - previous;
+        state.peakTextureBytes = Math.max(state.peakTextureBytes, state.liveTextureBytes);
+        textureSizes.set(texture, size);
+      }
+      return Reflect.apply(originalTexSubImage2D, this, args);
+    };
     const originalDeleteTexture = prototype.deleteTexture;
     prototype.deleteTexture = function (texture) {
       if (texture) {
