@@ -302,3 +302,90 @@ test('renderer releases uploaded texture resources when an imported object is re
   await page.waitForTimeout(300);
   expect(pageErrors).toEqual([]);
 });
+
+test('renderer restores its WebGL context after a browser context-loss event', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('/');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+
+  const supported = await page.evaluate(() => {
+    const element = document.querySelector('canvas');
+    const context = element?.getContext('webgl2');
+    return Boolean(context?.getExtension('WEBGL_lose_context'));
+  });
+  test.skip(!supported, 'WEBGL_lose_context is unavailable in this browser');
+
+  await page.evaluate(() => {
+    const element = document.querySelector('canvas');
+    const context = element?.getContext('webgl2');
+    const extension = context?.getExtension('WEBGL_lose_context');
+    if (!element || !context || !extension)
+      throw new Error('WebGL context-loss extension disappeared');
+
+    const state = window as Window & {
+      __webglContextEvents: string[];
+      __webglLoseContextExtension: WEBGL_lose_context;
+    };
+    state.__webglContextEvents = [];
+    state.__webglLoseContextExtension = extension;
+    element.addEventListener(
+      'webglcontextlost',
+      (event) => {
+        event.preventDefault();
+        state.__webglContextEvents.push('lost');
+      },
+      { once: true },
+    );
+    element.addEventListener(
+      'webglcontextrestored',
+      () => state.__webglContextEvents.push('restored'),
+      { once: true },
+    );
+    extension.loseContext();
+  });
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as Window & { __webglContextEvents: string[] }).__webglContextEvents.includes(
+            'lost',
+          ),
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
+
+  await page.evaluate(async () => {
+    const state = window as Window & {
+      __webglLoseContextExtension: WEBGL_lose_context;
+    };
+    // Let the browser finish dispatching the loss event before requesting restoration.
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    state.__webglLoseContextExtension.restoreContext();
+  });
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as Window & { __webglContextEvents: string[] }).__webglContextEvents.includes(
+            'restored',
+          ),
+        ),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const context = document.querySelector('canvas')?.getContext('webgl2');
+        return context ? context.isContextLost() : true;
+      }),
+    )
+    .toBe(false);
+  await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+  expect(pageErrors).toEqual([]);
+});
