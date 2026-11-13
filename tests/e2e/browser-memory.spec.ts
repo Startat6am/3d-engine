@@ -392,7 +392,7 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'browser-memory-repeat.glb',
     mimeType: 'model/gltf-binary',
-    buffer: makeMemoryGlb(vertexCount, textureSize, 211),
+    buffer: makeMemoryGlb(vertexCount, textureSize + 1, 211),
   });
   await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
   await expect
