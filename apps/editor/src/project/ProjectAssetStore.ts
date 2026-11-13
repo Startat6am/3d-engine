@@ -195,7 +195,7 @@ function mimeTypeForAsset(record: AssetRecord, path: string): string {
 
 function validateAssetMime(kind: AssetRecord['kind'], mimeType: string): void {
   if (
-    (kind === 'texture' && !mimeType.startsWith('image/')) ||
+    (kind === 'texture' && !['image/png', 'image/jpeg', 'image/webp'].includes(mimeType)) ||
     (kind === 'model' && mimeType !== 'model/gltf-binary')
   ) {
     throw new ProjectAssetStoreError(
