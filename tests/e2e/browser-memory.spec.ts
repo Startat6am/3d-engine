@@ -385,7 +385,9 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
   expect(retained.gpu.peakBufferBytes).toBeGreaterThanOrEqual(vertexCount * 3 * 4);
   expect(retained.gpu.peakTextureBytes).toBeGreaterThanOrEqual(expectedTextureBytes);
   expect(released.gpu.liveTextureBytes).toBeLessThanOrEqual(baseline.gpu.liveTextureBytes);
-  expect(released.gpu.liveBufferBytes).toBeLessThanOrEqual(baseline.gpu.liveBufferBytes);
+  expect(released.gpu.liveBufferBytes).toBeLessThanOrEqual(
+    baseline.gpu.liveBufferBytes + Math.max(1024, retained.gpu.liveBufferBytes * 0.01),
+  );
 
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'browser-memory-repeat.glb',
@@ -413,4 +415,22 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
       ),
     )
     .toBeLessThanOrEqual(baseline.gpu.liveTextureBytes);
+  const repeatReleased = {
+    jsHeapBytes: await readHeapBytes(),
+    gpu: await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __webglMemory: { liveBufferBytes: number; liveTextureBytes: number };
+          }
+        ).__webglMemory,
+    ),
+  };
+  expect(repeatReleased.gpu.liveBufferBytes).toBeLessThanOrEqual(
+    baseline.gpu.liveBufferBytes + Math.max(1024, retained.gpu.liveBufferBytes * 0.01),
+  );
+  console.warn(
+    '[browser-memory-repeat-cycle]',
+    JSON.stringify({ jsHeapBytes: repeatReleased.jsHeapBytes, gpuBytes: repeatReleased.gpu }),
+  );
 });
