@@ -4,7 +4,7 @@ The Playwright browser-memory diagnostic runs against the production Editor buil
 
 ## Fixture and sampling
 
-- Synthetic GLB: 300,000 vertices with POSITION, NORMAL, and TEXCOORD_0 attributes.
+- Synthetic GLB: 60,000 vertices with POSITION, NORMAL, and TEXCOORD_0 attributes.
 - Embedded texture: 2048 × 2048 RGBA PNG (16 MiB decoded pixel allocation).
 - Renderer heap: Chrome DevTools Protocol `Performance.getMetrics` / `JSHeapUsedSize`, sampled after `HeapProfiler.collectGarbage`.
 - WebGL allocations: instrument `bufferData` and `texImage2D`; subtract tracked sizes on `deleteBuffer` and `deleteTexture`.
