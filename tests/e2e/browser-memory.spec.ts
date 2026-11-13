@@ -133,6 +133,13 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
       liveTextureBytes: 0,
       peakTextureBytes: 0,
       textureUploads: [] as Array<Record<string, number | string | null>>,
+      imageBitmapSizes: [] as Array<{ width: number; height: number }>,
+    };
+    const originalCreateImageBitmap = window.createImageBitmap.bind(window);
+    window.createImageBitmap = async (...args) => {
+      const bitmap = await originalCreateImageBitmap(...args);
+      state.imageBitmapSizes.push({ width: bitmap.width, height: bitmap.height });
+      return bitmap;
     };
     const bufferSizes = new WeakMap<WebGLBuffer, number>();
     const textureSizes = new WeakMap<WebGLTexture, number>();
@@ -288,7 +295,23 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
         }
       ).__webglMemory.textureUploads,
   );
-  console.warn('[browser-memory-texture-uploads]', JSON.stringify(textureUploads));
+  const imageBitmapSizes = await page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __webglMemory: { imageBitmapSizes: Array<{ width: number; height: number }> };
+        }
+      ).__webglMemory.imageBitmapSizes,
+  );
+  const maxTextureSize = await page.evaluate(() => {
+    const canvas = document.querySelector('canvas');
+    const context = canvas?.getContext('webgl2');
+    return context ? context.getParameter(context.MAX_TEXTURE_SIZE) : null;
+  });
+  console.warn(
+    '[browser-memory-texture-uploads]',
+    JSON.stringify({ textureUploads, imageBitmapSizes, maxTextureSize }),
+  );
   await expect
     .poll(() =>
       page.evaluate(
