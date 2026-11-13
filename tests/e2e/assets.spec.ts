@@ -335,6 +335,30 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(afterRejectedLoad.assets.map((item) => item.id)).toContain(texture.id);
   expect(afterRejectedLoad.assetPayloads).toEqual(firstDocument.assetPayloads);
 
+  // Component payloads are extensible at the envelope level, but known PBR
+  // material fields must pass semantic validation before a world is committed.
+  const invalidMaterialDocument = JSON.parse(firstSave) as typeof firstDocument;
+  const invalidMaterialEntity = invalidMaterialDocument.world.entities.find(
+    (entity) => entity.components?.MeshRenderer?.assetId,
+  )!;
+  invalidMaterialEntity.components!.MeshRenderer!.material!.alphaMode = 'INVALID';
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'invalid-material.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(invalidMaterialDocument)),
+  });
+  await expect(
+    page.getByText('Could not open invalid-material.world', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/Material alphaMode is invalid/)).toBeVisible();
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const afterRejectedMaterialLoad = JSON.parse(await saveWorld()) as typeof firstDocument;
+  const preservedMaterial = afterRejectedMaterialLoad.world.entities.find(
+    (entity) => entity.components?.MeshRenderer?.assetId,
+  )?.components?.MeshRenderer?.material;
+  expect(preservedMaterial?.alphaMode).toBe('MASK');
+  expect(afterRejectedMaterialLoad.assetPayloads).toEqual(firstDocument.assetPayloads);
+
   await page.waitForTimeout(250);
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);

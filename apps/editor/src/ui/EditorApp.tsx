@@ -14,6 +14,7 @@ import type { Matrix4 as Matrix4Type } from 'three';
 import type { GlbAsset } from '@engine/gltf-importer';
 import type { WorldAssetPayload } from '@engine/serialization';
 import { EditorHistory } from './EditorHistory.js';
+import { readPbrMaterialState } from './materialValidation.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
   createBoxGeometry,
@@ -703,8 +704,13 @@ export function EditorApp() {
             throw new Error(`Entity ${entity.name} has invalid transform values`);
           return value;
         };
-        const storedMaterial = (mesh.material ??
-          createDefaultMaterial()) as SceneEntity['material'] & {
+        const storedMaterialValue =
+          mesh.material === undefined ? createDefaultMaterial() : mesh.material;
+        const pbrMaterialState = readPbrMaterialState(
+          storedMaterialValue,
+          `$.world.entities[${index}].components.MeshRenderer.material`,
+        );
+        const storedMaterial = storedMaterialValue as SceneEntity['material'] & {
           readonly baseColorTextureAssetId?: string;
           readonly metallicRoughnessTextureAssetId?: string;
           readonly normalTextureAssetId?: string;
@@ -767,14 +773,9 @@ export function EditorApp() {
           roughness: storedMaterial.roughness,
           metalness: storedMaterial.metalness,
           opacity: storedMaterial.opacity,
-          transparent: storedMaterial.transparent,
           wireframe: storedMaterial.wireframe,
           emissiveColor: storedMaterial.emissiveColor ?? 0,
-          alphaMode: storedMaterial.alphaMode ?? (storedMaterial.transparent ? 'BLEND' : 'OPAQUE'),
-          alphaCutoff: storedMaterial.alphaCutoff ?? 0.5,
-          doubleSided: storedMaterial.doubleSided ?? false,
-          normalScale: storedMaterial.normalScale ?? [1, 1],
-          occlusionStrength: storedMaterial.occlusionStrength ?? 1,
+          ...pbrMaterialState,
           ...(baseColorTexture ? { baseColorTexture } : {}),
           ...(metallicRoughnessTexture ? { metallicRoughnessTexture } : {}),
           ...(normalTexture ? { normalTexture } : {}),
