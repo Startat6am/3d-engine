@@ -38,3 +38,76 @@ test('player renders the primitive acceptance scene through WebGL2', async ({ pa
   expect(renderOutput.litPixels).toBeGreaterThan(500);
   expect(pageErrors).toEqual([]);
 });
+
+test('player shutdown releases renderer GPU resources and stops its frame loop', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const state = window as unknown as {
+      __deletedBuffers: number;
+      __deletedPrograms: number;
+      __drawCalls: number;
+    };
+    state.__deletedBuffers = 0;
+    state.__deletedPrograms = 0;
+    state.__drawCalls = 0;
+
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__deletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
+    const deleteProgram = WebGL2RenderingContext.prototype.deleteProgram;
+    WebGL2RenderingContext.prototype.deleteProgram = function (program) {
+      state.__deletedPrograms += 1;
+      return deleteProgram.call(this, program);
+    };
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (mode, count, type, offset) {
+      state.__drawCalls += 1;
+      return drawElements.call(this, mode, count, type, offset);
+    };
+  });
+
+  await page.goto('http://127.0.0.1:5174');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __drawCalls: number }).__drawCalls))
+    .toBeGreaterThanOrEqual(4);
+
+  const beforeDispose = await page.evaluate(() => {
+    const state = window as unknown as {
+      __deletedBuffers: number;
+      __deletedPrograms: number;
+    };
+    return { ...state };
+  });
+
+  // Exercise the same pagehide handler used by a real browser navigation while
+  // keeping the page alive long enough to observe WebGL resource deletion.
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __deletedBuffers: number }).__deletedBuffers),
+    )
+    .toBeGreaterThan(beforeDispose.__deletedBuffers);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __deletedPrograms: number }).__deletedPrograms),
+    )
+    .toBeGreaterThan(beforeDispose.__deletedPrograms);
+
+  // Let any frame already in flight when pagehide was dispatched finish, then
+  // prove that the cancelled loop does not schedule another frame.
+  await page.waitForTimeout(100);
+  const settledDrawCalls = await page.evaluate(
+    () => (window as unknown as { __drawCalls: number }).__drawCalls,
+  );
+  await page.waitForTimeout(100);
+  const afterDisposeDrawCalls = await page.evaluate(
+    () => (window as unknown as { __drawCalls: number }).__drawCalls,
+  );
+  expect(afterDisposeDrawCalls).toBe(settledDrawCalls);
+  expect(pageErrors).toEqual([]);
+});
