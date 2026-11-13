@@ -1,7 +1,7 @@
 name: CI
 on:
   push:
-    branches: [main]
+    branches: [main, feat/glb-import-texture-stress]
   pull_request:
     branches: [main]
 permissions:
@@ -24,5 +24,11 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: GLB import stress benchmark (geometry)
+        run: node --expose-gc benchmarks/glb-import-stress.mjs
+      - name: GLB import stress benchmark (embedded image)
+        env:
+          GLB_STRESS_TEXTURE_BYTES: 16777216
+        run: node --expose-gc benchmarks/glb-import-stress.mjs
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
