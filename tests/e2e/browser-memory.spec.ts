@@ -94,7 +94,8 @@ function makeMemoryGlb(vertexCount: number, textureSize: number): Buffer {
       { bufferView: 2, componentType: 5126, count: vertexCount, type: 'VEC2' },
     ],
     images: [{ name: 'Memory benchmark texture', mimeType: 'image/png', bufferView: 3 }],
-    textures: [{ source: 0 }],
+    samplers: [{ magFilter: 9728, minFilter: 9985, wrapS: 10497, wrapT: 10497 }],
+    textures: [{ source: 0, sampler: 0 }],
     materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
     meshes: [
       {
@@ -131,6 +132,7 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
       peakBufferBytes: 0,
       liveTextureBytes: 0,
       peakTextureBytes: 0,
+      textureUploads: [] as Array<Record<string, number | string | null>>,
     };
     const bufferSizes = new WeakMap<WebGLBuffer, number>();
     const textureSizes = new WeakMap<WebGLTexture, number>();
@@ -191,6 +193,13 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
         state.liveTextureBytes += size - previous;
         state.peakTextureBytes = Math.max(state.peakTextureBytes, state.liveTextureBytes);
         textureSizes.set(texture, size);
+        state.textureUploads.push({
+          method: 'texImage2D',
+          argsLength: args.length,
+          width,
+          height,
+          sourceType: source?.constructor?.name ?? null,
+        });
       }
       return Reflect.apply(originalTexImage2D, this, args);
     };
@@ -216,6 +225,13 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
         state.liveTextureBytes += size - previous;
         state.peakTextureBytes = Math.max(state.peakTextureBytes, state.liveTextureBytes);
         textureSizes.set(texture, size);
+        state.textureUploads.push({
+          method: 'texSubImage2D',
+          argsLength: args.length,
+          width,
+          height,
+          sourceType: source?.constructor?.name ?? null,
+        });
       }
       return Reflect.apply(originalTexSubImage2D, this, args);
     };
@@ -264,6 +280,15 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     buffer: makeMemoryGlb(vertexCount, textureSize),
   });
   await expect(page.getByText('BrowserMemoryFixture')).toBeVisible({ timeout: 20_000 });
+  const textureUploads = await page.evaluate(
+    () =>
+      (
+        window as Window & {
+          __webglMemory: { textureUploads: Array<Record<string, number | string | null>> };
+        }
+      ).__webglMemory.textureUploads,
+  );
+  console.warn('[browser-memory-texture-uploads]', JSON.stringify(textureUploads));
   await expect
     .poll(() =>
       page.evaluate(
