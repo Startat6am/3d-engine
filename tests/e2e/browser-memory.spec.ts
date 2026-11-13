@@ -417,12 +417,14 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
   await expect
     .poll(
       () =>
-        page.evaluate(() =>
-          (
-            window as Window & {
-              __webglMemory: { imageBitmapSizes: Array<{ width: number; height: number }> };
-            }
-          ).__webglMemory.imageBitmapSizes.some((size) => size.width === textureSize + 1),
+        page.evaluate(
+          (expectedWidth) =>
+            (
+              window as Window & {
+                __webglMemory: { imageBitmapSizes: Array<{ width: number; height: number }> };
+              }
+            ).__webglMemory.imageBitmapSizes.some((size) => size.width === expectedWidth),
+          textureSize + 1,
         ),
       { timeout: 20_000 },
     )
