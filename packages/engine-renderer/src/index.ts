@@ -44,6 +44,10 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #orthographicCamera = new THREE.OrthographicCamera(-5, 5, 5, -5, 0.1, 1000);
   #activeCamera: THREE.Camera | null = null;
   #disposed = false;
+  readonly #handleContextRestored = (): void => {
+    const scene = this.#lastScene;
+    if (scene && !this.#disposed) this.render(scene);
+  };
   #lastScene: RenderScene | null = null;
   #lastObjects: readonly RenderObject[] | null = null;
   #width = 0;
@@ -66,6 +70,12 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         antialias: options.antialias ?? true,
         alpha: false,
       });
+      // Three.js restores its GL state first; render the last scene afterwards so
+      // textures and geometry are uploaded again without waiting for a UI change.
+      this.#renderer.domElement.addEventListener(
+        'webglcontextrestored',
+        this.#handleContextRestored,
+      );
     } catch (error) {
       if (error instanceof RendererError) throw error;
       throw new RendererError('WEBGL2_UNAVAILABLE', 'Failed to initialize WebGL2 renderer', {
@@ -134,6 +144,10 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     this.#lastScene = null;
     this.#lastObjects = null;
     this.#scene.clear();
+    this.#renderer.domElement.removeEventListener(
+      'webglcontextrestored',
+      this.#handleContextRestored,
+    );
     this.#renderer.dispose();
     this.#disposed = true;
   }
