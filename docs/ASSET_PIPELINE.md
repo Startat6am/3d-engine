@@ -42,7 +42,7 @@ Discover -> identify/hash -> validate -> import/decode -> normalize metadata -> 
 
 ## Asset identity and registry
 
-Stable AssetId independent of path; path/URI is project-relative. Registry stores type, content hash, importer/version settings, dependencies, and metadata. Cache keys include content hash and relevant importer settings. Import results are versioned to invalidate stale derived data.
+Stable AssetId independent of path; path/URI is project-relative. Registry stores type, content hash, importer/version settings, dependencies, and metadata. Cache keys include content hash and relevant importer settings. Import results are versioned to invalidate stale derived data. Project-directory persistence is specified by [ADR-0002](ADR/0002-project-asset-store.md): immutable content-addressed blobs are verified before the `.world` manifest is committed; filesystem access remains Editor-adapter-only.
 
 ## Resource lifecycle
 
