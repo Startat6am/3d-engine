@@ -1,0 +1,12 @@
+{
+  "format": "universal-3d-world",
+  "schemaVersion": "0.8.0",
+  "engineVersion": "0.1.0",
+  "world": {
+    "id": "world:migration-chain-fixture",
+    "name": "Legacy migration fixture",
+    "settings": {},
+    "entities": []
+  },
+  "assets": []
+}

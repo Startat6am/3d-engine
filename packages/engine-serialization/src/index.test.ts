@@ -1,4 +1,5 @@
 import goldenFixture from '../fixtures/world-v1-assets.world.json' with { type: 'json' };
+import legacyMigrationFixture from '../fixtures/world-v0.8.0.legacy.json' with { type: 'json' };
 import { describe, expect, it } from 'vitest';
 import {
   CURRENT_WORLD_SCHEMA_VERSION,
@@ -197,5 +198,38 @@ describe('world serialization', () => {
     expect(() =>
       parseWorld(JSON.stringify({ ...world(), schemaVersion: '0.9.0' }), migrations),
     ).toThrow('did not advance');
+  });
+
+  it('migrates a legacy fixture through multiple schema versions in order', () => {
+    const migrations = new WorldMigrationRegistry();
+    migrations.register('0.8.0', (document) => ({
+      ...document,
+      schemaVersion: '0.9.0',
+      extensions: {},
+    }));
+    migrations.register('0.9.0', (document) => ({
+      ...document,
+      schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
+      assetPayloads: [],
+    }));
+
+    const parsed = parseWorld(JSON.stringify(legacyMigrationFixture), migrations);
+    expect(parsed.schemaVersion).toBe(CURRENT_WORLD_SCHEMA_VERSION);
+    expect(parsed.world.name).toBe('Legacy migration fixture');
+    expect(parsed.extensions).toEqual({});
+    expect(parsed.assetPayloads).toEqual([]);
+    expect(legacyMigrationFixture.schemaVersion).toBe('0.8.0');
+  });
+
+  it('rejects cyclic migration chains and duplicate migration registrations', () => {
+    const migrations = new WorldMigrationRegistry();
+    migrations.register('0.8.0', (document) => ({ ...document, schemaVersion: '0.9.0' }));
+    migrations.register('0.9.0', (document) => ({ ...document, schemaVersion: '0.8.0' }));
+    expect(() => parseWorld(JSON.stringify(legacyMigrationFixture), migrations)).toThrow(
+      'Invalid or cyclic migration chain',
+    );
+    expect(() => migrations.register('0.8.0', (document) => document)).toThrow(
+      'Migration already registered',
+    );
   });
 });
