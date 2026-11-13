@@ -12,8 +12,7 @@
   "dependencies": {
     "@engine/core": "workspace:*",
     "@engine/geometry": "workspace:*",
-    "@engine/renderer": "workspace:*",
-    "three": "0.187.0"
+    "@engine/renderer": "workspace:*"
   },
   "devDependencies": {
     "vite": "7.3.8"

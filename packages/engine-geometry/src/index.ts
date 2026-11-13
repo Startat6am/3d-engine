@@ -6,7 +6,10 @@ export interface MeshData {
   readonly uvs?: Float32Array;
 }
 
-/** A renderer-independent CPU mesh primitive. */
+/**
+ * A renderer-independent CPU mesh primitive. Buffer contents are immutable after
+ * ingestion; edits must produce a new MeshData snapshot so renderer caches stay valid.
+ */
 export function createBoxGeometry(width = 1, height = 1, depth = 1): MeshData {
   if (![width, height, depth].every((value) => Number.isFinite(value) && value > 0)) {
     throw new RangeError('Box dimensions must be finite positive numbers');

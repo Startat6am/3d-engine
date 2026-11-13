@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@engine/assets": "workspace:*",
-    "@engine/geometry": "workspace:*"
+    "@engine/geometry": "workspace:*",
+    "meshoptimizer": "1.1.1"
   }
 }

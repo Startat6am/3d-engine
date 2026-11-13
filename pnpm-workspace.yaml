@@ -1,3 +1,7 @@
+catalog:
+  three: 0.187.0
+  '@types/three': 0.187.0
+
 packages:
   - 'apps/*'
   - 'packages/*'

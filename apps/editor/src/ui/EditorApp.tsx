@@ -27,7 +27,7 @@ import {
   createDefaultMaterial,
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
-import type { RenderObject, Vec3 } from '@engine/renderer/contracts';
+import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 
 type TransformNumberInputProps = {
@@ -75,7 +75,15 @@ function TransformNumberInput({ value, label, onCommit }: TransformNumberInputPr
 
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
 type TransformMode = 'position' | 'rotation' | 'scale';
-type SceneEntity = RenderObject & {
+type DiagnosticEntry = {
+  id: number;
+  time: string;
+  level: 'info' | 'warning' | 'error';
+  source: string;
+  message: string;
+  details?: string;
+};
+type SceneEntity = Extract<RenderObject, { readonly position: Vec3 }> & {
   readonly name: string;
   readonly primitive: Primitive | 'GLB';
   readonly assetId?: AssetId;
@@ -283,8 +291,17 @@ export function EditorApp() {
   }, [redo, undo]);
   const [selectedId, setSelectedId] = useState('entity-1');
   const [rendererError, setRendererError] = useState('');
+  const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
+  const pushDiagnostic = useCallback((entry: Omit<DiagnosticEntry, 'id' | 'time'>) => {
+    setDiagnostics((current) =>
+      [
+        { ...entry, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString() },
+        ...current,
+      ].slice(0, 200),
+    );
+  }, []);
   const [worldName, setWorldName] = useState('Untitled World');
-  const [worldError, setWorldError] = useState('');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
@@ -317,20 +334,24 @@ export function EditorApp() {
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
 
-  const renderScene = useMemo(
-    () => ({
-      camera,
-      background: 0x151a23,
-      objects: entities.map((entity) => ({
+  const renderObjects = useMemo(
+    () =>
+      entities.map((entity) => ({
         ...entity,
         material:
           entity.id === selectedId
             ? { ...entity.material, color: entity.material.color }
             : entity.material,
       })),
-    }),
-    [camera, entities, selectedId],
+    [entities, selectedId],
   );
+  const renderScene = useMemo(
+    () => ({ camera, background: 0x151a23, objects: renderObjects }),
+    [camera, renderObjects],
+  );
+
+  const renderSceneRef = useRef(renderScene);
+  renderSceneRef.current = renderScene;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -348,7 +369,7 @@ export function EditorApp() {
           if (!renderer) return;
           const bounds = canvas.getBoundingClientRect();
           renderer.resize(bounds.width, bounds.height);
-          renderer.render(renderScene);
+          renderer.render(renderSceneRef.current);
         };
         observer = new ResizeObserver(resize);
         observer.observe(canvas);
@@ -359,6 +380,12 @@ export function EditorApp() {
         const message = error instanceof Error ? error.message : String(error);
         canvas.dataset.rendererError = message;
         setRendererError(message);
+        pushDiagnostic({
+          level: 'error',
+          source: 'Renderer',
+          message: 'WebGL2 renderer initialization failed',
+          details: message,
+        });
         console.error('WebGL2 renderer initialization failed', error);
       });
     return () => {
@@ -368,7 +395,7 @@ export function EditorApp() {
       rendererRef.current = null;
     };
     // Renderer lifetime is tied to the canvas; scene updates are handled below.
-  }, []);
+  }, [pushDiagnostic]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -485,19 +512,69 @@ export function EditorApp() {
                   wireframe: material.wireframe,
                   emissiveColor: material.emissiveColor ?? 0,
                   ...(material.baseColorTexture
-                    ? { baseColorTextureAssetId: material.baseColorTexture.assetId }
+                    ? {
+                        baseColorTextureAssetId: material.baseColorTexture.assetId,
+                        baseColorTextureSettings: {
+                          ...(material.baseColorTexture.sampler
+                            ? { sampler: material.baseColorTexture.sampler }
+                            : {}),
+                          ...(material.baseColorTexture.transform
+                            ? { transform: material.baseColorTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.metallicRoughnessTexture
-                    ? { metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId }
+                    ? {
+                        metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId,
+                        metallicRoughnessTextureSettings: {
+                          ...(material.metallicRoughnessTexture.sampler
+                            ? { sampler: material.metallicRoughnessTexture.sampler }
+                            : {}),
+                          ...(material.metallicRoughnessTexture.transform
+                            ? { transform: material.metallicRoughnessTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.normalTexture
-                    ? { normalTextureAssetId: material.normalTexture.assetId }
+                    ? {
+                        normalTextureAssetId: material.normalTexture.assetId,
+                        normalTextureSettings: {
+                          ...(material.normalTexture.sampler
+                            ? { sampler: material.normalTexture.sampler }
+                            : {}),
+                          ...(material.normalTexture.transform
+                            ? { transform: material.normalTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.occlusionTexture
-                    ? { occlusionTextureAssetId: material.occlusionTexture.assetId }
+                    ? {
+                        occlusionTextureAssetId: material.occlusionTexture.assetId,
+                        occlusionTextureSettings: {
+                          ...(material.occlusionTexture.sampler
+                            ? { sampler: material.occlusionTexture.sampler }
+                            : {}),
+                          ...(material.occlusionTexture.transform
+                            ? { transform: material.occlusionTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                   ...(material.emissiveTexture
-                    ? { emissiveTextureAssetId: material.emissiveTexture.assetId }
+                    ? {
+                        emissiveTextureAssetId: material.emissiveTexture.assetId,
+                        emissiveTextureSettings: {
+                          ...(material.emissiveTexture.sampler
+                            ? { sampler: material.emissiveTexture.sampler }
+                            : {}),
+                          ...(material.emissiveTexture.transform
+                            ? { transform: material.emissiveTexture.transform }
+                            : {}),
+                        },
+                      }
                     : {}),
                 },
                 ...(assetId ? { assetId } : {}),
@@ -527,7 +604,6 @@ export function EditorApp() {
     anchor.download = `${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'world'}.world`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setWorldError('');
   };
 
   const loadWorld = async (file?: File) => {
@@ -564,7 +640,10 @@ export function EditorApp() {
             MeshRenderer?: {
               primitive?: Primitive | 'GLB';
               assetId?: string;
-              material?: SceneEntity['material'] & { readonly baseColorTextureAssetId?: string };
+              material?: SceneEntity['material'] &
+                Record<string, unknown> & {
+                  readonly baseColorTextureAssetId?: string;
+                };
               geometry?: {
                 positions?: number[];
                 normals?: number[];
@@ -621,8 +700,16 @@ export function EditorApp() {
           readonly normalTextureAssetId?: string;
           readonly occlusionTextureAssetId?: string;
           readonly emissiveTextureAssetId?: string;
+          readonly baseColorTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly metallicRoughnessTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly normalTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly occlusionTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly emissiveTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
         };
-        const restoreTexture = (assetId: string | undefined) => {
+        const restoreTexture = (
+          assetId: string | undefined,
+          settings?: Pick<TextureSource, 'sampler' | 'transform'>,
+        ) => {
           if (!assetId) return undefined;
           const textureRecord = restoredAssetRegistry.require(assetId as AssetId);
           if (textureRecord.kind !== 'texture')
@@ -630,22 +717,41 @@ export function EditorApp() {
           const payload = restoredAssetPayloads.get(assetId as AssetId);
           if (!payload)
             throw new Error(`Material references a missing embedded texture payload: ${assetId}`);
-          if (payload.mimeType !== 'image/png' && payload.mimeType !== 'image/jpeg')
+          if (
+            payload.mimeType !== 'image/png' &&
+            payload.mimeType !== 'image/jpeg' &&
+            payload.mimeType !== 'image/webp'
+          )
             throw new Error(`Material references an unsupported texture payload: ${assetId}`);
           return {
             assetId,
             cacheKey: textureRecord.contentHash,
             mimeType: payload.mimeType,
             data: new Uint8Array(decodeBase64(payload.data)),
+            ...(settings?.sampler ? { sampler: settings.sampler } : {}),
+            ...(settings?.transform ? { transform: settings.transform } : {}),
           } as const;
         };
-        const baseColorTexture = restoreTexture(storedMaterial.baseColorTextureAssetId);
+        const baseColorTexture = restoreTexture(
+          storedMaterial.baseColorTextureAssetId,
+          storedMaterial.baseColorTextureSettings,
+        );
         const metallicRoughnessTexture = restoreTexture(
           storedMaterial.metallicRoughnessTextureAssetId,
+          storedMaterial.metallicRoughnessTextureSettings,
         );
-        const normalTexture = restoreTexture(storedMaterial.normalTextureAssetId);
-        const occlusionTexture = restoreTexture(storedMaterial.occlusionTextureAssetId);
-        const emissiveTexture = restoreTexture(storedMaterial.emissiveTextureAssetId);
+        const normalTexture = restoreTexture(
+          storedMaterial.normalTextureAssetId,
+          storedMaterial.normalTextureSettings,
+        );
+        const occlusionTexture = restoreTexture(
+          storedMaterial.occlusionTextureAssetId,
+          storedMaterial.occlusionTextureSettings,
+        );
+        const emissiveTexture = restoreTexture(
+          storedMaterial.emissiveTextureAssetId,
+          storedMaterial.emissiveTextureSettings,
+        );
         const material = {
           color: storedMaterial.color,
           roughness: storedMaterial.roughness,
@@ -679,9 +785,14 @@ export function EditorApp() {
       commitEntities(parsed);
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
-      setWorldError('');
     } catch (error) {
-      setWorldError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      pushDiagnostic({
+        level: 'error',
+        source: 'World',
+        message: `Could not open ${file.name}`,
+        details: message,
+      });
     }
   };
 
@@ -845,7 +956,8 @@ export function EditorApp() {
           imageBytes.byteOffset + imageBytes.byteLength,
         ) as ArrayBuffer;
         const imageHash = await sha256(imageBuffer);
-        const extension = image.mimeType === 'image/png' ? 'png' : 'jpg';
+        const extension =
+          image.mimeType === 'image/png' ? 'png' : image.mimeType === 'image/webp' ? 'webp' : 'jpg';
         const textureRecord = stagedRegistry.register({
           name: image.name,
           kind: 'texture',
@@ -872,7 +984,15 @@ export function EditorApp() {
         dependencies: [...(imported.dependencies as AssetId[]), ...textureRecords],
         metadata: { ...imported.metadata, fileSize: file.size },
       });
-      const resolveTextureSource = (textureIndex: number | undefined) => {
+      const resolveTextureSource = (
+        textureIndex: number | undefined,
+        channel: 'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive',
+        transform?: {
+          offset: readonly [number, number];
+          rotation: number;
+          scale: readonly [number, number];
+        },
+      ) => {
         if (textureIndex === undefined) return undefined;
         const texture = asset.textures[textureIndex];
         if (!texture || texture.source === null)
@@ -886,6 +1006,8 @@ export function EditorApp() {
           cacheKey: stagedRegistry.require(textureAssetId).contentHash,
           mimeType: image.mimeType,
           data: image.data.slice(),
+          ...(texture.sampler === null ? {} : { sampler: asset.samplers[texture.sampler]! }),
+          ...(transform ? { transform } : {}),
         } as const;
       };
       const importedEntities = importedEntitiesWithoutAsset.map((entity, entityIndex) => {
@@ -894,11 +1016,31 @@ export function EditorApp() {
           source.primitive.material === null
             ? undefined
             : asset.materials[source.primitive.material];
-        const baseColorTexture = resolveTextureSource(pbr?.baseColorTexture);
-        const metallicRoughnessTexture = resolveTextureSource(pbr?.metallicRoughnessTexture);
-        const normalTexture = resolveTextureSource(pbr?.normalTexture);
-        const occlusionTexture = resolveTextureSource(pbr?.occlusionTexture);
-        const emissiveTexture = resolveTextureSource(pbr?.emissiveTexture);
+        const baseColorTexture = resolveTextureSource(
+          pbr?.baseColorTexture,
+          'baseColor',
+          pbr?.textureTransforms?.baseColor,
+        );
+        const metallicRoughnessTexture = resolveTextureSource(
+          pbr?.metallicRoughnessTexture,
+          'metallicRoughness',
+          pbr?.textureTransforms?.metallicRoughness,
+        );
+        const normalTexture = resolveTextureSource(
+          pbr?.normalTexture,
+          'normal',
+          pbr?.textureTransforms?.normal,
+        );
+        const occlusionTexture = resolveTextureSource(
+          pbr?.occlusionTexture,
+          'occlusion',
+          pbr?.textureTransforms?.occlusion,
+        );
+        const emissiveTexture = resolveTextureSource(
+          pbr?.emissiveTexture,
+          'emissive',
+          pbr?.textureTransforms?.emissive,
+        );
         return {
           ...entity,
           assetId: assetRecord.id,
@@ -924,10 +1066,21 @@ export function EditorApp() {
       pendingLease = null;
       commitEntities([...entitiesRef.current, ...importedEntities]);
       setSelectedId(importedEntities[0]!.id);
-      setWorldError('');
+      pushDiagnostic({
+        level: 'info',
+        source: 'GLB Importer',
+        message: `Imported ${file.name}`,
+        details: `${importedEntities.length} scene object(s) created`,
+      });
     } catch (error) {
       pendingLease?.release();
-      setWorldError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      pushDiagnostic({
+        level: 'error',
+        source: 'GLB Importer',
+        message: 'Importer engine.gltf.glb failed',
+        details: `${file.name}\n${message}`,
+      });
     }
   };
 
@@ -1105,6 +1258,16 @@ export function EditorApp() {
             event.currentTarget.value = '';
           }}
         />
+        <button
+          className="toolbar-button diagnostics-trigger"
+          onClick={() => setIsDiagnosticsOpen((open) => !open)}
+          aria-expanded={isDiagnosticsOpen}
+        >
+          Console{' '}
+          {diagnostics.filter((entry) => entry.level === 'error').length
+            ? `· ${diagnostics.filter((entry) => entry.level === 'error').length}`
+            : ''}
+        </button>
         <span className="spacer" />
         <span className="status">
           <i /> EDITOR · INTERACTIVE PREVIEW
@@ -1151,11 +1314,6 @@ export function EditorApp() {
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          {worldError ? (
-            <div className="world-error" role="alert">
-              {worldError}
-            </div>
-          ) : null}
           <div className="panel-foot">{entities.length} OBJECTS · SCENE 01</div>
         </aside>
         <section className="viewport">
@@ -1343,6 +1501,37 @@ export function EditorApp() {
           <div className="panel-foot">FOUNDATION BUILD · 0.1.0</div>
         </aside>
       </div>
+      {isDiagnosticsOpen ? (
+        <section className="diagnostics-panel" aria-label="Technical console" aria-live="polite">
+          <div className="diagnostics-heading">
+            <strong>CONSOLE / DIAGNOSTICS</strong>
+            <span>{diagnostics.length} EVENTS</span>
+            <button onClick={() => setDiagnostics([])}>Clear</button>
+            <button aria-label="Close console" onClick={() => setIsDiagnosticsOpen(false)}>
+              ×
+            </button>
+          </div>
+          <div className="diagnostics-list">
+            {diagnostics.length ? (
+              diagnostics.map((entry) => (
+                <article className={`diagnostic-entry level-${entry.level}`} key={entry.id}>
+                  <time>{entry.time}</time>
+                  <b>{entry.level.toUpperCase()}</b>
+                  <span className="diagnostic-source">{entry.source}</span>
+                  <div>
+                    <strong>{entry.message}</strong>
+                    {entry.details ? <pre>{entry.details}</pre> : null}
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="diagnostics-empty">
+                No events yet. Import, load or edit a scene to see diagnostics.
+              </div>
+            )}
+          </div>
+        </section>
+      ) : null}
       <footer className="bottombar">
         <span>● READY</span>
         <span>WebGL2 · Three.js adapter</span>

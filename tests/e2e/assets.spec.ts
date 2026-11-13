@@ -29,11 +29,23 @@ function makeTriangleGlb(): Buffer {
       { bufferView: 2, componentType: 5126, count: 3, type: 'VEC2' },
     ],
     images: [{ name: 'One pixel', mimeType: 'image/png', bufferView: 3 }],
-    textures: [{ source: 0 }],
+    extensionsUsed: ['KHR_texture_transform'],
+    extensionsRequired: ['KHR_texture_transform'],
+    samplers: [{ magFilter: 9728, minFilter: 9985, wrapS: 33648, wrapT: 33071 }],
+    textures: [{ source: 0, sampler: 0 }],
     materials: [
       {
         pbrMetallicRoughness: {
-          baseColorTexture: { index: 0 },
+          baseColorTexture: {
+            index: 0,
+            extensions: {
+              KHR_texture_transform: {
+                offset: [0.25, 0.5],
+                rotation: Math.PI / 2,
+                scale: [2, 3],
+              },
+            },
+          },
           metallicRoughnessTexture: { index: 0 },
         },
         normalTexture: { index: 0 },
@@ -125,6 +137,15 @@ test('GLB imports register stable project assets and survive world save/reopen',
               normalTextureAssetId?: string;
               occlusionTextureAssetId?: string;
               emissiveTextureAssetId?: string;
+              baseColorTextureSettings?: {
+                sampler?: {
+                  magFilter: number | null;
+                  minFilter: number | null;
+                  wrapS: number;
+                  wrapT: number;
+                };
+                transform?: { offset: number[]; rotation: number; scale: number[] };
+              };
             };
           };
         };
@@ -147,6 +168,10 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(importedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
     texture.id,
   );
+  expect(importedEntity?.components?.MeshRenderer?.material?.baseColorTextureSettings).toEqual({
+    sampler: { magFilter: 9728, minFilter: 9985, wrapS: 33648, wrapT: 33071 },
+    transform: { offset: [0.25, 0.5], rotation: Math.PI / 2, scale: [2, 3] },
+  });
   expect(importedEntity?.components?.MeshRenderer?.material).toMatchObject({
     metallicRoughnessTextureAssetId: texture.id,
     normalTextureAssetId: texture.id,
@@ -188,6 +213,9 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(reopenedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
   expect(reopenedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
     texture.id,
+  );
+  expect(reopenedEntity?.components?.MeshRenderer?.material?.baseColorTextureSettings).toEqual(
+    importedEntity?.components?.MeshRenderer?.material?.baseColorTextureSettings,
   );
   expect(reopenedEntity?.components?.MeshRenderer?.material).toMatchObject({
     metallicRoughnessTextureAssetId: texture.id,

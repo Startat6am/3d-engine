@@ -1,3 +1,9 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig({ plugins: [react()], server: { port: 5173 } });
+import { engineBuildConfig, engineBundleBudgetPlugin } from '../../vite.shared';
+
+export default defineConfig({
+  plugins: [react(), engineBundleBudgetPlugin()],
+  server: { port: 5173 },
+  build: engineBuildConfig,
+});

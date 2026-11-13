@@ -1,9 +1,16 @@
+import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import type { AssetImportContext, AssetImporter, ImportedAsset } from '@engine/assets';
 import { validateMeshData, type MeshData } from '@engine/geometry';
 
 const GLB_MAGIC = 0x46546c67;
 const JSON_CHUNK = 0x4e4f534a;
 const BIN_CHUNK = 0x004e4942;
+
+export interface GltfTextureTransform {
+  readonly offset: readonly [number, number];
+  readonly rotation: number;
+  readonly scale: readonly [number, number];
+}
 
 export interface GltfPbrMaterial {
   readonly name: string;
@@ -15,6 +22,12 @@ export interface GltfPbrMaterial {
   readonly normalTexture?: number;
   readonly occlusionTexture?: number;
   readonly emissiveTexture?: number;
+  readonly textureTransforms?: Partial<
+    Record<
+      'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive',
+      GltfTextureTransform
+    >
+  >;
   readonly emissiveFactor: readonly [number, number, number];
   readonly alphaMode: 'OPAQUE' | 'MASK' | 'BLEND';
   readonly alphaCutoff: number;
@@ -44,7 +57,7 @@ export interface GltfNode {
 
 export interface GltfImageAsset {
   readonly name: string;
-  readonly mimeType: 'image/png' | 'image/jpeg';
+  readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
   /** Encoded image bytes copied from the GLB BIN chunk; decoding is a renderer concern. */
   readonly data: Uint8Array;
 }
@@ -86,6 +99,19 @@ export class GlbImportError extends Error {
   }
 }
 
+interface GltfTextureInfoInput {
+  index?: number;
+  texCoord?: number;
+  extensions?: {
+    KHR_texture_transform?: {
+      offset?: number[];
+      rotation?: number;
+      scale?: number[];
+      texCoord?: number;
+    };
+  };
+}
+
 interface GltfRoot {
   asset?: { version?: string; generator?: string };
   buffers?: { uri?: string; byteLength?: number }[];
@@ -94,6 +120,17 @@ interface GltfRoot {
     byteOffset?: number;
     byteLength?: number;
     byteStride?: number;
+    extensions?: {
+      EXT_meshopt_compression?: {
+        buffer?: number;
+        byteOffset?: number;
+        byteLength?: number;
+        byteStride?: number;
+        count?: number;
+        mode?: string;
+        filter?: string;
+      };
+    };
   }[];
   accessors?: {
     bufferView?: number;
@@ -119,12 +156,12 @@ interface GltfRoot {
       baseColorFactor?: number[];
       metallicFactor?: number;
       roughnessFactor?: number;
-      baseColorTexture?: { index?: number; texCoord?: number };
-      metallicRoughnessTexture?: { index?: number; texCoord?: number };
+      baseColorTexture?: GltfTextureInfoInput;
+      metallicRoughnessTexture?: GltfTextureInfoInput;
     };
-    normalTexture?: { index?: number; texCoord?: number };
-    occlusionTexture?: { index?: number; texCoord?: number };
-    emissiveTexture?: { index?: number; texCoord?: number };
+    normalTexture?: GltfTextureInfoInput;
+    occlusionTexture?: GltfTextureInfoInput;
+    emissiveTexture?: GltfTextureInfoInput;
     emissiveFactor?: number[];
     alphaMode?: string;
     alphaCutoff?: number;
@@ -196,47 +233,121 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
     return fail('GLB JSON chunk is malformed');
   }
   if (root.asset?.version !== '2.0') fail('glTF asset.version must be 2.0', 'UNSUPPORTED_FEATURE');
-  const buffers = root.buffers ?? [];
-  if (root.extensionsRequired?.length)
+  return { root, binary };
+}
+
+async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Promise<Uint8Array> {
+  const supportedRequired = new Set([
+    'EXT_meshopt_compression',
+    'KHR_mesh_quantization',
+    'KHR_texture_transform',
+  ]);
+  const unsupported = (root.extensionsRequired ?? []).filter(
+    (extension) => !supportedRequired.has(extension),
+  );
+  if (unsupported.length)
     fail(
-      `Required glTF extensions are not supported: ${root.extensionsRequired.join(', ')}`,
+      `Required glTF extensions are not supported: ${unsupported.join(', ')}`,
       'UNSUPPORTED_FEATURE',
     );
-  if (buffers.length > 1) fail('Only one embedded GLB buffer is supported', 'UNSUPPORTED_FEATURE');
-  if (buffers[0]?.uri)
+  const buffers = root.buffers ?? [];
+  if (buffers.some((buffer) => buffer.uri))
     fail('External/data URI buffers are not supported in GLB import', 'UNSUPPORTED_FEATURE');
   if (
     buffers[0] &&
-    (!Number.isInteger(buffers[0].byteLength) || buffers[0].byteLength! > binary.byteLength)
-  ) {
+    (!Number.isInteger(buffers[0].byteLength) || buffers[0].byteLength! > sourceBinary.byteLength)
+  )
     fail('GLB BIN chunk is shorter than buffer.byteLength');
-  }
-  if ((root.accessors?.length ?? 0) > 0 && !buffers[0])
-    fail('Accessors require an embedded GLB buffer');
-  for (const [index, bufferView] of (root.bufferViews ?? []).entries()) {
-    const start = bufferView.byteOffset ?? 0;
-    const length = bufferView.byteLength;
+  const views = root.bufferViews ?? [];
+  const decodedParts: Uint8Array[] = [];
+  let totalLength = sourceBinary.byteLength;
+  if (views.some((view) => view.buffer !== 0 && !view.extensions?.EXT_meshopt_compression))
+    fail('GLB bufferView references an unavailable buffer', 'UNSUPPORTED_FEATURE');
+  for (const [index, view] of views.entries()) {
+    const compression = view.extensions?.EXT_meshopt_compression;
+    if (!compression) continue;
+    const { buffer = 0, byteOffset = 0, byteLength, byteStride, count, mode, filter } = compression;
     if (
-      bufferView.buffer !== 0 ||
+      buffer !== 0 ||
+      !Number.isInteger(byteOffset) ||
+      byteOffset < 0 ||
+      !Number.isInteger(byteLength) ||
+      byteLength! <= 0 ||
+      byteOffset + byteLength! > sourceBinary.byteLength ||
+      !Number.isInteger(byteStride) ||
+      byteStride! <= 0 ||
+      !Number.isInteger(count) ||
+      count! < 0 ||
+      !['ATTRIBUTES', 'TRIANGLES', 'INDICES'].includes(mode ?? '')
+    )
+      fail(`bufferView ${index} has invalid EXT_meshopt_compression metadata`, 'INVALID_ACCESSOR');
+    if (filter && !['NONE', 'OCTAHEDRAL', 'QUATERNION', 'EXPONENTIAL', 'COLOR'].includes(filter))
+      fail(`bufferView ${index} uses unsupported meshopt filter ${filter}`, 'UNSUPPORTED_FEATURE');
+    let decoded: Uint8Array;
+    try {
+      await MeshoptDecoder.ready;
+      decoded = await MeshoptDecoder.decodeGltfBufferAsync(
+        count!,
+        byteStride!,
+        sourceBinary.subarray(byteOffset, byteOffset + byteLength!),
+        mode!,
+        filter,
+      );
+    } catch (error) {
+      fail(
+        `bufferView ${index} meshopt decompression failed: ${error instanceof Error ? error.message : String(error)}`,
+        'INVALID_ACCESSOR',
+      );
+    }
+    if (decoded.byteLength !== count! * byteStride!)
+      fail(`bufferView ${index} decoded size is invalid`, 'INVALID_ACCESSOR');
+    totalLength = (totalLength + 3) & ~3;
+    view.buffer = 0;
+    view.byteOffset = totalLength;
+    view.byteLength = decoded.byteLength;
+    if (mode === 'ATTRIBUTES') view.byteStride = byteStride!;
+    else delete view.byteStride;
+    delete view.extensions;
+    decodedParts.push(decoded);
+    totalLength += decoded.byteLength;
+  }
+  if (!buffers[0] && (root.accessors?.length ?? 0) > 0)
+    fail('Accessors require an embedded GLB buffer');
+  root.buffers = [{ byteLength: totalLength }];
+  const binary = new Uint8Array(totalLength);
+  binary.set(sourceBinary);
+  let cursor = sourceBinary.byteLength;
+  for (const part of decodedParts) {
+    cursor = (cursor + 3) & ~3;
+    binary.set(part, cursor);
+    cursor += part.byteLength;
+  }
+  return binary;
+}
+
+function validateGlbBufferViews(root: GltfRoot, binary: Uint8Array): void {
+  for (const [index, view] of (root.bufferViews ?? []).entries()) {
+    const start = view.byteOffset ?? 0;
+    const length = view.byteLength;
+    if (
+      view.buffer !== 0 ||
       !Number.isInteger(start) ||
       start < 0 ||
       !Number.isInteger(length) ||
       length! < 0 ||
-      start + length! > (buffers[0]?.byteLength ?? 0)
-    ) {
-      fail(`bufferView ${index} is outside the declared embedded buffer`, 'INVALID_ACCESSOR');
-    }
+      start + length! > (root.buffers?.[0]?.byteLength ?? 0) ||
+      start + length! > binary.byteLength
+    )
+      fail(`bufferView ${index} is outside the embedded buffer`, 'INVALID_ACCESSOR');
     if (
-      bufferView.byteStride !== undefined &&
-      (!Number.isInteger(bufferView.byteStride) ||
-        bufferView.byteStride < 4 ||
-        bufferView.byteStride > 252 ||
-        bufferView.byteStride % 4 !== 0)
-    ) {
+      view.byteStride !== undefined &&
+      (!Number.isInteger(view.byteStride) ||
+        view.byteStride < 4 ||
+        view.byteStride > 252 ||
+        view.byteStride % 4 !== 0)
+    )
       fail(`bufferView ${index} has an invalid byteStride`, 'INVALID_ACCESSOR');
-    }
   }
-  return { root, binary };
 }
 
 function readAccessor(
@@ -251,23 +362,20 @@ function readAccessor(
   if (accessor.type !== expectedType || !Number.isInteger(accessor.count) || accessor.count! < 1) {
     fail(`Accessor ${index} has an invalid type or count`, 'INVALID_ACCESSOR');
   }
-  if (accessor.normalized)
-    fail('Normalized vertex/index accessors are not supported', 'UNSUPPORTED_FEATURE');
   const componentType = accessor.componentType;
-  const bytes =
-    componentType === 5126
-      ? 4
-      : componentType === 5123
-        ? 2
-        : componentType === 5121
-          ? 1
-          : componentType === 5125
-            ? 4
-            : 0;
+  const bytes = [5120, 5121].includes(componentType!)
+    ? 1
+    : [5122, 5123].includes(componentType!)
+      ? 2
+      : [5125, 5126].includes(componentType!)
+        ? 4
+        : 0;
   if (
     !bytes ||
-    (expectedType !== 'SCALAR' && componentType !== 5126) ||
-    (expectedType === 'SCALAR' && ![5121, 5123, 5125].includes(componentType!))
+    (expectedType === 'SCALAR' && ![5121, 5123, 5125].includes(componentType!)) ||
+    (expectedType !== 'SCALAR' &&
+      componentType !== 5126 &&
+      !([5120, 5121, 5122, 5123].includes(componentType!) && accessor.normalized))
   ) {
     fail(`Accessor ${index} uses an unsupported component type`, 'UNSUPPORTED_FEATURE');
   }
@@ -300,14 +408,27 @@ function readAccessor(
   for (let item = 0; item < accessor.count!; item++) {
     for (let component = 0; component < components; component++) {
       const at = viewOffset + accessorOffset + item * stride + component * bytes;
-      const value =
+      const raw =
         componentType === 5126
           ? data.getFloat32(at, true)
-          : componentType === 5123
-            ? data.getUint16(at, true)
-            : componentType === 5121
-              ? data.getUint8(at)
-              : data.getUint32(at, true);
+          : componentType === 5125
+            ? data.getUint32(at, true)
+            : componentType === 5123
+              ? data.getUint16(at, true)
+              : componentType === 5122
+                ? data.getInt16(at, true)
+                : componentType === 5121
+                  ? data.getUint8(at)
+                  : data.getInt8(at);
+      const value = accessor.normalized
+        ? componentType === 5120
+          ? Math.max(raw / 127, -1)
+          : componentType === 5121
+            ? raw / 255
+            : componentType === 5122
+              ? Math.max(raw / 32767, -1)
+              : raw / 65535
+        : raw;
       if (!Number.isFinite(value))
         fail(`Accessor ${index} contains a non-finite value`, 'INVALID_ACCESSOR');
       result.push(value);
@@ -465,19 +586,30 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
   };
   const materials: GltfPbrMaterial[] = (root.materials ?? []).map((material, index) => {
     const pbr = material.pbrMetallicRoughness ?? {};
-    const textureInfos = [
-      pbr.baseColorTexture,
-      pbr.metallicRoughnessTexture,
-      material.normalTexture,
-      material.occlusionTexture,
-      material.emissiveTexture,
-    ];
-    for (const [textureInfoIndex, textureInfo] of textureInfos.entries()) {
-      if (textureInfo?.texCoord !== undefined && textureInfo.texCoord !== 0) {
+    const textureInfos = {
+      baseColor: pbr.baseColorTexture,
+      metallicRoughness: pbr.metallicRoughnessTexture,
+      normal: material.normalTexture,
+      occlusion: material.occlusionTexture,
+      emissive: material.emissiveTexture,
+    };
+    const textureTransforms: NonNullable<GltfPbrMaterial['textureTransforms']> = {};
+    for (const [channel, textureInfo] of Object.entries(textureInfos)) {
+      const extension = textureInfo?.extensions?.KHR_texture_transform;
+      const texCoord = extension?.texCoord ?? textureInfo?.texCoord ?? 0;
+      if (texCoord !== 0) {
         fail(
-          `Material ${index} texture info ${textureInfoIndex} requires unsupported TEXCOORD_${textureInfo.texCoord}`,
+          `Material ${index} ${channel} texture requires unsupported TEXCOORD_${texCoord}`,
           'UNSUPPORTED_FEATURE',
         );
+      }
+      if (extension) {
+        const offset = tuple(extension.offset, [0, 0] as const, 2, `${channel} texture offset`);
+        const scale = tuple(extension.scale, [1, 1] as const, 2, `${channel} texture scale`);
+        const rotation = extension.rotation ?? 0;
+        if (!Number.isFinite(rotation))
+          fail(`Material ${index} ${channel} texture rotation is invalid`);
+        textureTransforms[channel as keyof typeof textureTransforms] = { offset, rotation, scale };
       }
     }
     const alphaMode = material.alphaMode ?? 'OPAQUE';
@@ -522,6 +654,7 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       ...(material.emissiveTexture?.index !== undefined
         ? { emissiveTexture: material.emissiveTexture.index }
         : {}),
+      ...(Object.keys(textureTransforms).length ? { textureTransforms } : {}),
       emissiveFactor: emissive,
       alphaMode: alphaMode as GltfPbrMaterial['alphaMode'],
       alphaCutoff: cutoff,
@@ -637,7 +770,11 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     const bufferView = root.bufferViews?.[image.bufferView];
     if (!bufferView || bufferView.buffer !== 0)
       fail(`Image ${index} references an invalid bufferView`);
-    if (image.mimeType !== 'image/png' && image.mimeType !== 'image/jpeg') {
+    if (
+      image.mimeType !== 'image/png' &&
+      image.mimeType !== 'image/jpeg' &&
+      image.mimeType !== 'image/webp'
+    ) {
       fail(`Image ${index} has an unsupported or missing MIME type`, 'UNSUPPORTED_FEATURE');
     }
     const start = bufferView.byteOffset ?? 0;
@@ -722,7 +859,10 @@ export class GlbImporter implements AssetImporter<GlbAsset> {
 
   async import(source: ArrayBuffer, context: AssetImportContext): Promise<ImportedAsset<GlbAsset>> {
     abortIfNeeded(context.signal);
-    const { root, binary } = parseGlb(source);
+    const { root, binary: sourceBinary } = parseGlb(source);
+    abortIfNeeded(context.signal);
+    const binary = await prepareGlbBuffers(root, sourceBinary);
+    validateGlbBufferViews(root, binary);
     abortIfNeeded(context.signal);
     const data = importDocument(root, binary, context.signal);
     abortIfNeeded(context.signal);

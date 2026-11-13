@@ -11,12 +11,25 @@ export interface CameraDescriptor {
   readonly fovY?: number;
   readonly orthographicHeight?: number;
 }
+export interface TextureSamplerDescriptor {
+  readonly magFilter: number | null;
+  readonly minFilter: number | null;
+  readonly wrapS: number;
+  readonly wrapT: number;
+}
+export interface TextureTransformDescriptor {
+  readonly offset: readonly [number, number];
+  readonly rotation: number;
+  readonly scale: readonly [number, number];
+}
 export interface TextureSource {
   readonly assetId: string;
   /** Content hash used for decoded/GPU resource deduplication across project assets. */
   readonly cacheKey: string;
-  readonly mimeType: 'image/png' | 'image/jpeg';
+  readonly mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
   readonly data: Uint8Array;
+  readonly sampler?: TextureSamplerDescriptor;
+  readonly transform?: TextureTransformDescriptor;
 }
 export interface MaterialDescriptor {
   readonly color: number;
@@ -32,14 +45,28 @@ export interface MaterialDescriptor {
   readonly occlusionTexture?: TextureSource;
   readonly emissiveTexture?: TextureSource;
 }
-export interface RenderObject {
+interface RenderObjectBase {
   readonly id: string;
   readonly geometry: MeshData;
   readonly material: MaterialDescriptor;
-  readonly position: Vec3;
-  readonly rotation: Quaternion;
-  readonly scale: Vec3;
 }
+
+/** Backend-neutral render input: local TRS or a propagated column-major world matrix. */
+export type RenderObject = RenderObjectBase &
+  (
+    | {
+        readonly worldMatrix: ArrayLike<number>;
+        readonly position?: never;
+        readonly rotation?: never;
+        readonly scale?: never;
+      }
+    | {
+        readonly worldMatrix?: never;
+        readonly position: Vec3;
+        readonly rotation: Quaternion;
+        readonly scale: Vec3;
+      }
+  );
 export interface RenderScene {
   readonly camera: CameraDescriptor;
   readonly objects: readonly RenderObject[];

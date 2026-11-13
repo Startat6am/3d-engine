@@ -16,7 +16,7 @@
     "@vitejs/plugin-react": "5.1.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "three": "0.187.0",
+    "three": "catalog:",
     "@engine/serialization": "workspace:*",
     "@engine/gltf-importer": "workspace:*",
     "@engine/assets": "workspace:*"
