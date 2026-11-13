@@ -10,6 +10,7 @@ import type {
   TextureSource,
 } from './contracts.js';
 import { RendererError } from './contracts.js';
+import { applyMaterialState } from './material-state.js';
 export * from './contracts.js';
 
 type TextureChannel = 'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive';
@@ -278,13 +279,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       const mesh = entry.mesh;
       if (materialChanged) {
         const material = entry.materialLease.resource;
-        material.color.setHex(item.material.color);
-        material.roughness = item.material.roughness;
-        material.metalness = item.material.metalness;
-        material.opacity = item.material.opacity;
-        material.transparent = item.material.transparent;
-        material.wireframe = item.material.wireframe;
-        material.emissive.setHex(item.material.emissiveColor ?? 0x000000);
+        applyMaterialState(material, item.material);
         this.#syncTexture(entry, 'baseColor', item.material.baseColorTexture);
         this.#syncTexture(entry, 'metallicRoughness', item.material.metallicRoughnessTexture);
         this.#syncTexture(entry, 'normal', item.material.normalTexture);
