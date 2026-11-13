@@ -1,8 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { deflateSync } from 'node:zlib';
 
-test.use({ launchOptions: { args: ['--enable-experimental-web-platform-features'] } });
-
 function pngChunk(type: string, data: Buffer): Buffer {
   const name = Buffer.from(type, 'ascii');
   const payload = Buffer.concat([name, data]);
@@ -91,24 +89,10 @@ function makeMemoryGlb(vertexCount: number, textureSize: number): Buffer {
   return Buffer.concat([header, jsonHeader, jsonChunk, binaryHeader, binaryChunk]);
 }
 
-test('browser memory benchmark records tab memory and WebGL allocation lifecycle', async ({
-  page,
-}) => {
+test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', async ({ page }) => {
   const vertexCount = 300_000;
   const textureSize = 2048;
   const expectedTextureBytes = textureSize * textureSize * 4;
-
-  await page.route('**/*', async (route) => {
-    const response = await route.fetch();
-    await route.fulfill({
-      response,
-      headers: {
-        ...response.headers(),
-        'cross-origin-opener-policy': 'same-origin',
-        'cross-origin-embedder-policy': 'require-corp',
-      },
-    });
-  });
 
   await page.addInitScript(() => {
     const state = {
@@ -190,22 +174,27 @@ test('browser memory benchmark records tab memory and WebGL allocation lifecycle
   });
 
   await page.goto('/');
-  const baseline = await page.evaluate(async () => {
-    const api = performance as Performance & {
-      measureUserAgentSpecificMemory?: () => Promise<{ bytes: number }>;
-    };
-    if (!crossOriginIsolated || !api.measureUserAgentSpecificMemory) {
-      throw new Error('Chromium user-agent memory measurement requires cross-origin isolation');
-    }
-    return {
-      userAgentBytes: (await api.measureUserAgentSpecificMemory()).bytes,
-      gpu: (
-        window as Window & {
-          __webglMemory: { liveBufferBytes: number; liveTextureBytes: number };
-        }
-      ).__webglMemory,
-    };
-  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Performance.enable');
+  await cdp.send('HeapProfiler.enable');
+  const readHeapBytes = async (): Promise<number> => {
+    await cdp.send('HeapProfiler.collectGarbage');
+    const { metrics } = await cdp.send('Performance.getMetrics');
+    const heap = metrics.find((metric) => metric.name === 'JSHeapUsedSize');
+    if (!heap) throw new Error('Chromium did not report JSHeapUsedSize');
+    return heap.value;
+  };
+  const baseline = {
+    jsHeapBytes: await readHeapBytes(),
+    gpu: await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __webglMemory: { liveBufferBytes: number; liveTextureBytes: number };
+          }
+        ).__webglMemory,
+    ),
+  };
 
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'browser-memory.glb',
@@ -223,24 +212,22 @@ test('browser memory benchmark records tab memory and WebGL allocation lifecycle
     )
     .toBeGreaterThanOrEqual(expectedTextureBytes);
 
-  const retained = await page.evaluate(async () => {
-    const api = performance as Performance & {
-      measureUserAgentSpecificMemory: () => Promise<{ bytes: number }>;
-    };
-    return {
-      userAgentBytes: (await api.measureUserAgentSpecificMemory()).bytes,
-      gpu: (
-        window as Window & {
-          __webglMemory: {
-            liveBufferBytes: number;
-            peakBufferBytes: number;
-            liveTextureBytes: number;
-            peakTextureBytes: number;
-          };
-        }
-      ).__webglMemory,
-    };
-  });
+  const retained = {
+    jsHeapBytes: await readHeapBytes(),
+    gpu: await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __webglMemory: {
+              liveBufferBytes: number;
+              peakBufferBytes: number;
+              liveTextureBytes: number;
+              peakTextureBytes: number;
+            };
+          }
+        ).__webglMemory,
+    ),
+  };
 
   await page.getByRole('button', { name: 'Delete selected object' }).click();
   await expect(page.getByText('BrowserMemoryFixture')).toHaveCount(0);
@@ -255,33 +242,31 @@ test('browser memory benchmark records tab memory and WebGL allocation lifecycle
     .toBeLessThanOrEqual(baseline.gpu.liveTextureBytes);
   await page.waitForTimeout(250);
 
-  const released = await page.evaluate(async () => {
-    const api = performance as Performance & {
-      measureUserAgentSpecificMemory: () => Promise<{ bytes: number }>;
-    };
-    return {
-      userAgentBytes: (await api.measureUserAgentSpecificMemory()).bytes,
-      gpu: (
-        window as Window & {
-          __webglMemory: {
-            liveBufferBytes: number;
-            peakBufferBytes: number;
-            liveTextureBytes: number;
-            peakTextureBytes: number;
-          };
-        }
-      ).__webglMemory,
-    };
-  });
+  const released = {
+    jsHeapBytes: await readHeapBytes(),
+    gpu: await page.evaluate(
+      () =>
+        (
+          window as Window & {
+            __webglMemory: {
+              liveBufferBytes: number;
+              peakBufferBytes: number;
+              liveTextureBytes: number;
+              peakTextureBytes: number;
+            };
+          }
+        ).__webglMemory,
+    ),
+  };
 
   console.warn(
     '[browser-memory-benchmark]',
     JSON.stringify({
       fixture: { vertexCount, textureSize, expectedTextureBytes },
-      userAgentMemoryBytes: {
-        baseline: baseline.userAgentBytes,
-        retained: retained.userAgentBytes,
-        released: released.userAgentBytes,
+      rendererJsHeapBytes: {
+        baseline: baseline.jsHeapBytes,
+        retained: retained.jsHeapBytes,
+        released: released.jsHeapBytes,
       },
       webglBytes: { retained: retained.gpu, released: released.gpu },
     }),
