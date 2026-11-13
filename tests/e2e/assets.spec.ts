@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
+import { deflateSync } from 'node:zlib';
 
 function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
   const positions = Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
@@ -85,6 +87,39 @@ function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
   return Buffer.concat([header, jsonHeader, jsonChunk, binaryHeader, binaryChunk]);
 }
 
+function pngChunk(type: string, data: Buffer): Buffer {
+  const name = Buffer.from(type, 'ascii');
+  const payload = Buffer.concat([name, data]);
+  let crc = 0xffffffff;
+  for (const byte of payload) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(data.length, 0);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0, 0);
+  return Buffer.concat([header, payload, checksum]);
+}
+
+function makeSolidPng(red: number, green: number, blue: number): Buffer {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(1, 0);
+  header.writeUInt32BE(1, 4);
+  header[8] = 8;
+  header[9] = 6;
+  const pixels = deflateSync(Buffer.from([0, red, green, blue, 255]));
+  return Buffer.concat([
+    signature,
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', pixels),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
 test('GLB imports register stable project assets and survive world save/reopen', async ({
   page,
 }) => {
@@ -111,7 +146,9 @@ test('GLB imports register stable project assets and survive world save/reopen',
       await page.locator('.file-menu summary').click();
     }
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Save World…' }).click();
+    const saveButton = menu.locator('.file-menu-content button').nth(2);
+    await expect(saveButton).toBeVisible();
+    await saveButton.click();
     const download = await downloadPromise;
     const path = await download.path();
     if (!path) throw new Error('World export did not produce a file');
@@ -358,6 +395,166 @@ test('renderer keeps a shared texture alive until the final object lease is rele
       ),
     )
     .toBeGreaterThan(0);
+});
+
+test('renderer ignores a stale texture decode failure after the scene replaces its source', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const original = window.createImageBitmap.bind(window);
+    const state = window as Window & {
+      __imageBitmapCalls: number;
+      __imageBitmapSuccesses: number;
+      __replacementStarted: boolean;
+      __replacementSuccesses: number;
+      __firstImageBitmapStarted: Promise<void>;
+      __resolveFirstImageBitmapStarted: () => void;
+      __rejectFirstImageBitmap: () => void;
+    };
+    state.__imageBitmapCalls = 0;
+    state.__imageBitmapSuccesses = 0;
+    state.__replacementStarted = false;
+    state.__replacementSuccesses = 0;
+    state.__firstImageBitmapStarted = new Promise((resolve) => {
+      state.__resolveFirstImageBitmapStarted = resolve;
+    });
+    window.createImageBitmap = ((...args: Parameters<typeof createImageBitmap>) => {
+      state.__imageBitmapCalls += 1;
+      if (state.__imageBitmapCalls === 1) {
+        state.__resolveFirstImageBitmapStarted();
+        return new Promise<ImageBitmap>((_resolve, reject) => {
+          state.__rejectFirstImageBitmap = () =>
+            reject(new Error('intentionally delayed stale texture decode failure'));
+        });
+      }
+      return original(...args).then((bitmap) => {
+        state.__imageBitmapSuccesses += 1;
+        if (state.__replacementStarted) state.__replacementSuccesses += 1;
+        return bitmap;
+      });
+    }) as typeof createImageBitmap;
+  });
+
+  await page.goto('/');
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'texture-race.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await page.evaluate(async () => {
+    const state = window as Window & { __firstImageBitmapStarted: Promise<void> };
+    await state.__firstImageBitmapStarted;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
+
+  const menu = page.locator('.file-menu');
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.locator('.file-menu summary').click();
+  }
+  const downloadPromise = page.waitForEvent('download');
+  const saveButton = menu.locator('.file-menu-content button').nth(2);
+  await expect(saveButton).toBeVisible();
+  await saveButton.click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  if (!path) throw new Error('World export did not produce a file');
+  const document = JSON.parse(await readFile(path, 'utf8')) as {
+    assets: Array<{
+      id: string;
+      contentHash: string;
+      kind: string;
+      uri?: string;
+      dependencies?: string[];
+    }>;
+    assetPayloads: Array<{ assetId: string; mimeType: string; encoding: string; data: string }>;
+    world: {
+      name: string;
+      entities: Array<{ components?: { MeshRenderer?: { material?: Record<string, unknown> } } }>;
+    };
+  };
+  const texture = document.assets.find((asset) => asset.kind === 'texture');
+  if (!texture) throw new Error('Saved world does not contain a texture asset');
+  const originalTextureId = texture.id;
+  const replacementTextureId = `replacement-${originalTextureId}`;
+  const replacementPng = makeSolidPng(220, 30, 90);
+  const payload = document.assetPayloads.find((item) => item.assetId === originalTextureId);
+  if (!payload) throw new Error('Saved world does not contain the embedded texture payload');
+  payload.assetId = replacementTextureId;
+  payload.data = replacementPng.toString('base64');
+  texture.id = replacementTextureId;
+  texture.uri = 'imports/replacement-texture.png';
+  texture.contentHash = `sha256:${createHash('sha256').update(replacementPng).digest('hex')}`;
+  for (const asset of document.assets) {
+    if (asset.dependencies) {
+      asset.dependencies = asset.dependencies.map((id) =>
+        id === originalTextureId ? replacementTextureId : id,
+      );
+    }
+  }
+  const replaceTextureReferences = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(replaceTextureReferences);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key.endsWith('TextureAssetId') && child === originalTextureId) {
+        (value as Record<string, unknown>)[key] = replacementTextureId;
+      } else {
+        replaceTextureReferences(child);
+      }
+    }
+  };
+  replaceTextureReferences(document.world);
+  document.world.name = 'Replacement World';
+  await page.evaluate(() => {
+    (window as Window & { __replacementStarted: boolean }).__replacementStarted = true;
+  });
+  const callsBeforeReplacement = await page.evaluate(
+    () => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls,
+  );
+
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'replacement.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(document)),
+  });
+  await expect(page.getByLabel('World name')).toHaveValue('Replacement World');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls),
+    )
+    .toBeGreaterThan(callsBeforeReplacement);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __replacementSuccesses: number }).__replacementSuccesses,
+      ),
+    )
+    .toBeGreaterThan(0);
+
+  // Complete the original decode only after the replacement has decoded successfully.
+  await page.evaluate(() => {
+    const state = window as Window & { __rejectFirstImageBitmap: () => void };
+    state.__rejectFirstImageBitmap();
+  });
+  await page.waitForTimeout(150);
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  await expect(page.getByText('TriangleNode')).toBeVisible();
 });
 
 test('renderer restores its WebGL context after a browser context-loss event', async ({ page }) => {
