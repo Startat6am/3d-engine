@@ -121,6 +121,28 @@ describe('directory project asset store', () => {
     );
   });
 
+  it('does not commit the manifest if a written blob fails read-back verification', async () => {
+    class CorruptingStore extends MemoryProjectFileStore {
+      override async writeFile(
+        path: string,
+        data: Uint8Array,
+        options?: { readonly immutable?: boolean },
+      ): Promise<void> {
+        await super.writeFile(path, data, options);
+        if (options?.immutable) await super.writeFile(path, new Uint8Array([7, 7, 7]));
+      }
+    }
+    const store = new CorruptingStore();
+    await store.writeFile('worlds/main.world', new TextEncoder().encode('previous manifest'));
+
+    await expect(saveDirectoryProject(store, await fixture())).rejects.toMatchObject({
+      code: 'HASH_MISMATCH',
+    });
+    expect(new TextDecoder().decode(await store.readFile('worlds/main.world'))).toBe(
+      'previous manifest',
+    );
+  });
+
   it('leaves the previous manifest intact if the final manifest write fails', async () => {
     class ManifestFailStore extends MemoryProjectFileStore {
       failManifest = false;
