@@ -637,12 +637,13 @@ export function EditorApp() {
   };
 
   const loadWorld = async (
-    file?: File,
+    source?: File | WorldDocument,
     options: { readonly replaceAssets?: boolean } = {},
   ): Promise<boolean> => {
-    if (!file) return false;
+    if (!source) return false;
+    const sourceName = source instanceof File ? source.name : 'main.world';
     try {
-      const root = parseWorld(await file.text());
+      const root = source instanceof File ? parseWorld(await source.text()) : source;
       const restoredAssetRegistry = mergeAssetRegistry(
         options.replaceAssets ? new AssetRegistry() : assetRegistryRef.current,
         root.assets,
@@ -829,7 +830,7 @@ export function EditorApp() {
         assetResourceLeasesRef.current = [];
       }
       setSelectedId(parsed[0]?.id ?? '');
-      setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
+      setWorldName(root.world.name || sourceName.replace(/\.world$/i, ''));
       projectDirectoryRef.current = null;
       return true;
     } catch (error) {
@@ -837,7 +838,7 @@ export function EditorApp() {
       pushDiagnostic({
         level: 'error',
         source: 'World',
-        message: `Could not open ${file.name}`,
+        message: `Could not open ${sourceName}`,
         details: message,
       });
       return false;
@@ -883,8 +884,7 @@ export function EditorApp() {
         );
       const directory = await picker({ mode: 'readwrite' });
       const document = await loadDirectoryProject(new BrowserProjectFileStore(directory));
-      const file = new File([serializeWorld(document)], 'main.world', { type: 'application/json' });
-      if (!(await loadWorld(file, { replaceAssets: true }))) return;
+      if (!(await loadWorld(document, { replaceAssets: true }))) return;
       projectDirectoryRef.current = directory;
       pushDiagnostic({
         level: 'info',
