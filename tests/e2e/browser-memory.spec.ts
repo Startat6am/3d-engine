@@ -46,30 +46,61 @@ function makeSolidPng(width: number, height: number): Buffer {
 
 function makeMemoryGlb(vertexCount: number, textureSize: number): Buffer {
   const positions = Buffer.from(new Float32Array(vertexCount * 3).buffer);
-  const values = new Float32Array(
+  const normals = Buffer.from(new Float32Array(vertexCount * 3).buffer);
+  const uvs = Buffer.from(new Float32Array(vertexCount * 2).buffer);
+  const positionValues = new Float32Array(
     positions.buffer,
     positions.byteOffset,
     positions.byteLength / Float32Array.BYTES_PER_ELEMENT,
   );
+  const normalValues = new Float32Array(
+    normals.buffer,
+    normals.byteOffset,
+    normals.byteLength / Float32Array.BYTES_PER_ELEMENT,
+  );
+  const uvValues = new Float32Array(
+    uvs.buffer,
+    uvs.byteOffset,
+    uvs.byteLength / Float32Array.BYTES_PER_ELEMENT,
+  );
   for (let vertex = 0; vertex < vertexCount; vertex += 1) {
-    const offset = vertex * 3;
-    values[offset] = (vertex % 3) * 0.5;
-    values[offset + 1] = Math.floor(vertex / 3) % 2;
+    const corner = vertex % 3;
+    const positionOffset = vertex * 3;
+    positionValues[positionOffset] = corner === 1 ? 1 : 0;
+    positionValues[positionOffset + 1] = corner === 2 ? 1 : 0;
+    normalValues[positionOffset + 2] = 1;
+    const uvOffset = vertex * 2;
+    uvValues[uvOffset] = corner === 1 ? 1 : 0;
+    uvValues[uvOffset + 1] = corner === 2 ? 1 : 0;
   }
   const image = makeSolidPng(textureSize, textureSize);
-  const binary = Buffer.concat([positions, image]);
+  const binary = Buffer.concat([positions, normals, uvs, image]);
   const document = {
     asset: { version: '2.0', generator: 'Choreon browser memory benchmark' },
     buffers: [{ byteLength: binary.length }],
     bufferViews: [
       { buffer: 0, byteOffset: 0, byteLength: positions.length },
-      { buffer: 0, byteOffset: positions.length, byteLength: image.length },
+      { buffer: 0, byteOffset: positions.length, byteLength: normals.length },
+      { buffer: 0, byteOffset: positions.length + normals.length, byteLength: uvs.length },
+      {
+        buffer: 0,
+        byteOffset: positions.length + normals.length + uvs.length,
+        byteLength: image.length,
+      },
     ],
-    accessors: [{ bufferView: 0, componentType: 5126, count: vertexCount, type: 'VEC3' }],
-    images: [{ name: 'Memory benchmark texture', mimeType: 'image/png', bufferView: 1 }],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: vertexCount, type: 'VEC3' },
+      { bufferView: 1, componentType: 5126, count: vertexCount, type: 'VEC3' },
+      { bufferView: 2, componentType: 5126, count: vertexCount, type: 'VEC2' },
+    ],
+    images: [{ name: 'Memory benchmark texture', mimeType: 'image/png', bufferView: 3 }],
     textures: [{ source: 0 }],
     materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
-    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    meshes: [
+      {
+        primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, material: 0 }],
+      },
+    ],
     nodes: [{ name: 'BrowserMemoryFixture', mesh: 0 }],
   };
   const json = Buffer.from(JSON.stringify(document));
@@ -173,6 +204,12 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     };
   });
 
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
   await page.goto('/');
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
@@ -201,7 +238,16 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     mimeType: 'model/gltf-binary',
     buffer: makeMemoryGlb(vertexCount, textureSize),
   });
-  await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
+  try {
+    await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
+  } catch (error) {
+    const alerts = await page.getByRole('alert').allTextContents();
+    throw new Error(
+      `Memory fixture import failed. Alerts: ${alerts.join(' | ')}. ` +
+        `Page errors: ${pageErrors.join(' | ')}. Console errors: ${consoleErrors.join(' | ')}`,
+      { cause: error },
+    );
+  }
   await expect
     .poll(() =>
       page.evaluate(
