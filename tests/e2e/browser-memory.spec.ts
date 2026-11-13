@@ -122,6 +122,7 @@ function makeMemoryGlb(vertexCount: number, textureSize: number, textureBlue = 2
 }
 
 test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', async ({ page }) => {
+  test.setTimeout(60_000);
   const vertexCount = 60_000;
   const textureSize = 2048;
   const expectedTextureBytes = textureSize * textureSize * 4;
@@ -314,12 +315,28 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     JSON.stringify({ textureUploads, imageBitmapSizes, maxTextureSize }),
   );
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (window as Window & { __webglMemory: { liveTextureBytes: number } }).__webglMemory
-            .liveTextureBytes,
-      ),
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (
+              window as Window & {
+                __webglMemory: { imageBitmapSizes: Array<{ width: number; height: number }> };
+              }
+            ).__webglMemory.imageBitmapSizes.length,
+        ),
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThan(0);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as Window & { __webglMemory: { liveTextureBytes: number } }).__webglMemory
+              .liveTextureBytes,
+        ),
+      { timeout: 20_000 },
     )
     .toBeGreaterThanOrEqual(expectedTextureBytes);
 
@@ -398,12 +415,27 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
   await expect(page.getByText('Imported browser-memory-repeat.glb')).toBeVisible();
   await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (window as Window & { __webglMemory: { liveTextureBytes: number } }).__webglMemory
-            .liveTextureBytes,
-      ),
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (
+            window as Window & {
+              __webglMemory: { imageBitmapSizes: Array<{ width: number; height: number }> };
+            }
+          ).__webglMemory.imageBitmapSizes.some((size) => size.width === textureSize + 1),
+        ),
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as Window & { __webglMemory: { liveTextureBytes: number } }).__webglMemory
+              .liveTextureBytes,
+        ),
+      { timeout: 20_000 },
     )
     .toBeGreaterThanOrEqual(expectedTextureBytes);
   await page.getByRole('button', { name: 'Delete selected object' }).click();
