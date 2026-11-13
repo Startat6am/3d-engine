@@ -251,3 +251,54 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+test('renderer releases uploaded texture resources when an imported object is removed', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const context = WebGL2RenderingContext.prototype;
+    const deleteTexture = context.deleteTexture;
+    Object.defineProperty(window, '__deletedTextureCount', { value: 0, writable: true });
+    context.deleteTexture = function (texture: WebGLTexture | null) {
+      (window as Window & { __deletedTextureCount: number }).__deletedTextureCount += 1;
+      return deleteTexture.call(this, texture);
+    };
+  });
+
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  await glbInput.setInputFiles({
+    name: 'lifecycle.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  // Wait until the renderer has decoded and uploaded the embedded texture maps.
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('canvas')?.dataset.renderer))
+    .toBe('webgl2');
+  await page.waitForTimeout(300);
+
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('TriangleNode')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __deletedTextureCount: number }).__deletedTextureCount,
+      ),
+    )
+    .toBeGreaterThan(0);
+
+  // A fresh import after final-lease disposal must decode/upload cleanly again.
+  await glbInput.setInputFiles({
+    name: 'lifecycle-again.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(pageErrors).toEqual([]);
+});
