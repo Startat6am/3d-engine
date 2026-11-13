@@ -80,7 +80,6 @@ test('player shutdown releases renderer GPU resources and stops its frame loop',
     const state = window as unknown as {
       __deletedBuffers: number;
       __deletedPrograms: number;
-      __drawCalls: number;
     };
     return { ...state };
   });
@@ -99,15 +98,16 @@ test('player shutdown releases renderer GPU resources and stops its frame loop',
     )
     .toBeGreaterThan(beforeDispose.__deletedPrograms);
 
+  // Let any frame already in flight when pagehide was dispatched finish, then
+  // prove that the cancelled loop does not schedule another frame.
   await page.waitForTimeout(100);
-  const afterDispose = await page.evaluate(() => {
-    const state = window as unknown as {
-      __deletedBuffers: number;
-      __deletedPrograms: number;
-      __drawCalls: number;
-    };
-    return { ...state };
-  });
-  expect(afterDispose.__drawCalls).toBe(beforeDispose.__drawCalls);
+  const settledDrawCalls = await page.evaluate(
+    () => (window as unknown as { __drawCalls: number }).__drawCalls,
+  );
+  await page.waitForTimeout(100);
+  const afterDisposeDrawCalls = await page.evaluate(
+    () => (window as unknown as { __drawCalls: number }).__drawCalls,
+  );
+  expect(afterDisposeDrawCalls).toBe(settledDrawCalls);
   expect(pageErrors).toEqual([]);
 });
