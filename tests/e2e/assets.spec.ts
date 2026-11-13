@@ -386,6 +386,127 @@ test('GLB imports register stable project assets and survive world save/reopen',
   expect(pageErrors).toEqual([]);
 });
 
+test('directory project saves content-addressed blobs and opens atomically', async ({ page }) => {
+  await page.addInitScript(() => {
+    type FakeFileNode = { bytes: Uint8Array };
+    const files = new Map<string, FakeFileNode>();
+    const directories = new Set<string>(['']);
+    const writes: string[] = [];
+    const makeDirectory = (prefix: string) => ({
+      async getDirectoryHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!directories.has(path)) {
+          if (!options?.create) throw new DOMException('Directory not found', 'NotFoundError');
+          directories.add(path);
+        }
+        return makeDirectory(path);
+      },
+      async getFileHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!files.has(path)) {
+          if (!options?.create) throw new DOMException('File not found', 'NotFoundError');
+          files.set(path, { bytes: new Uint8Array() });
+        }
+        return {
+          async getFile() {
+            const node = files.get(path)!;
+            return new File([node.bytes], name);
+          },
+          async createWritable() {
+            let pending = new Uint8Array();
+            return {
+              async write(data: Uint8Array) {
+                pending = new Uint8Array(data);
+              },
+              async close() {
+                files.set(path, { bytes: pending });
+                writes.push(path);
+              },
+              async abort() {},
+            };
+          },
+        };
+      },
+    });
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => makeDirectory(''),
+    });
+    Object.defineProperty(window, '__projectFiles', { value: files, configurable: true });
+    Object.defineProperty(window, '__projectWrites', { value: writes, configurable: true });
+  });
+  await page.goto('/');
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'project.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  const menu = page.locator('.file-menu');
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.locator('.file-menu summary').click();
+  }
+  await menu.getByRole('button', { name: 'Save Project Folder…' }).click();
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Project folder saved', { exact: true })).toBeVisible();
+
+  const saved = await page.evaluate(() => {
+    const scope = window as Window & {
+      __projectFiles?: Map<string, { bytes: Uint8Array }>;
+      __projectWrites?: string[];
+    };
+    const files = scope.__projectFiles!;
+    const manifestBytes = files.get('worlds/main.world')!.bytes;
+    const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
+      assets: Array<{ id: string; kind: string; uri: string }>;
+      assetPayloads?: unknown[];
+    };
+    return {
+      paths: [...files.keys()].sort(),
+      writes: [...scope.__projectWrites!],
+      manifest,
+    };
+  });
+  expect(saved.manifest.assetPayloads).toBeUndefined();
+  expect(saved.manifest.assets).toHaveLength(2);
+  expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
+  expect(saved.paths).toContain('worlds/main.world');
+  expect(saved.paths).toHaveLength(3);
+  expect(saved.writes.at(-1)).toBe('worlds/main.world');
+
+  // Change the active scene, then reopen the folder. The directory loader should
+  // resolve the external blobs and restore the previously saved world.
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'second.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['SecondTriangle']),
+  });
+  await expect(page.getByText('SecondTriangle')).toBeVisible();
+  await menu.getByRole('button', { name: 'Open Project Folder…' }).click();
+  await expect(page.getByText('Project folder opened', { exact: true })).toBeVisible();
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await expect(page.getByText('SecondTriangle')).toHaveCount(0);
+
+  // A tampered external image must fail before replacing the active scene.
+  const texturePath = saved.manifest.assets.find((asset) => asset.kind === 'texture')!.uri;
+  await page.evaluate((path) => {
+    const files = (window as Window & { __projectFiles: Map<string, { bytes: Uint8Array }> })
+      .__projectFiles;
+    files.set(path, { bytes: new Uint8Array([9, 9, 9]) });
+  }, texturePath);
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'after-failed-open.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['AfterFailedOpen']),
+  });
+  await expect(page.getByText('AfterFailedOpen')).toBeVisible();
+  await menu.getByRole('button', { name: 'Open Project Folder…' }).click();
+  await expect(page.getByText('Could not open project folder', { exact: true })).toBeVisible();
+  await expect(page.getByText(/External asset hash mismatch/)).toBeVisible();
+  await expect(page.getByText('AfterFailedOpen')).toBeVisible();
+});
+
 test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
   page,
 }) => {
