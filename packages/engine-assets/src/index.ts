@@ -48,6 +48,7 @@ export function normalizeAssetUri(uri: string): string {
   if (
     !uri ||
     uri.includes('\\') ||
+    uri.includes('\0') ||
     uri.startsWith('/') ||
     /^[a-zA-Z][a-zA-Z\d+.-]*:/.test(uri) ||
     uri.includes('?') ||
