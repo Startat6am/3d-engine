@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
-function makeTriangleGlb(): Buffer {
+function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
   const positions = Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
   const normals = Buffer.from(new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]).buffer);
   const image = Buffer.from(
@@ -60,7 +60,11 @@ function makeTriangleGlb(): Buffer {
         primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, material: 0 }],
       },
     ],
-    nodes: [{ name: 'TriangleNode', mesh: 0, translation: [1, 0, 0] }],
+    nodes: nodeNames.map((name, index) => ({
+      name,
+      mesh: 0,
+      translation: [index * 2 - 1, 0, 0],
+    })),
   };
   const json = Buffer.from(JSON.stringify(document));
   const jsonPadding = (4 - (json.length % 4)) % 4;
@@ -301,6 +305,59 @@ test('renderer releases uploaded texture resources when an imported object is re
   await expect(page.getByText('TriangleNode')).toBeVisible();
   await page.waitForTimeout(300);
   expect(pageErrors).toEqual([]);
+});
+
+test('renderer keeps a shared texture alive until the final object lease is released', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const context = WebGL2RenderingContext.prototype;
+    const deleteTexture = context.deleteTexture;
+    Object.defineProperty(window, '__deletedTextureCount', { value: 0, writable: true });
+    context.deleteTexture = function (texture: WebGLTexture | null) {
+      (window as Window & { __deletedTextureCount: number }).__deletedTextureCount += 1;
+      return deleteTexture.call(this, texture);
+    };
+  });
+
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  await glbInput.setInputFiles({
+    name: 'shared-texture.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['SharedTextureA', 'SharedTextureB']),
+  });
+  await expect(page.getByText('SharedTextureA')).toBeVisible();
+  await expect(page.getByText('SharedTextureB')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('canvas')?.dataset.renderer))
+    .toBe('webgl2');
+  // Allow all five material texture channels to finish decoding and uploading.
+  await page.waitForTimeout(350);
+
+  await page.getByRole('button', { name: 'SharedTextureB' }).click();
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('SharedTextureB')).toHaveCount(0);
+  await expect(page.getByText('SharedTextureA')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __deletedTextureCount: number }).__deletedTextureCount,
+      ),
+    )
+    .toBe(0);
+
+  // Explicitly select the remaining object before the second removal.
+  await page.getByRole('button', { name: 'SharedTextureA' }).click();
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('SharedTextureA')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __deletedTextureCount: number }).__deletedTextureCount,
+      ),
+    )
+    .toBeGreaterThan(0);
 });
 
 test('renderer restores its WebGL context after a browser context-loss event', async ({ page }) => {
