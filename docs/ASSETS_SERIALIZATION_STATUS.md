@@ -16,12 +16,14 @@
 - Serialization tests include a versioned golden world fixture with an embedded model asset.
 - GLB importer fixtures cover meshopt-compressed buffers and interleaved POSITION/NORMAL accessors (`byteStride` and accessor offsets), rejection of unsupported required extensions, preservation of optional extension declarations, and malformed accessor/bufferView ranges.
 
+- PR #66 fixes cancellation ownership for deduplicated imports: each consumer can abort its own wait without cancelling a shared load that still has other consumers. The cache aborts the underlying worker only when the last consumer leaves and disposes any resource that resolves after all consumers have aborted. GitHub Actions CI #211 passed on the code-bearing commit 42734ce5391a56f169340237f48b958b81060782 with Node 22: 99/99 workspace unit tests, typecheck, lint, Editor/Player builds, both 128 MiB peak-RSS stress budgets, and 16/16 Chromium E2E tests. The code-bearing commit 466b2714e43a79fee674ec275ae24801a5aeea4f has a READY Vercel Preview: https://3d-engine-4fvp01j0j-callback5.vercel.app. Later commits on this branch update documentation only. Local Node 25.9.0 checks also pass; Node 25 is outside the supported range.
+
 ## Not yet delivered
 
 - The v1 JSON Schema validates the stable document envelope and known record shapes while leaving extension/component payloads open. Cross-record invariants (unique IDs, reference resolution, acyclic dependencies) remain explicit semantic validation in TypeScript; the schema is not claimed to replace those checks.
 - GLB external/data URI buffers and images, sparse accessors, non-triangle primitive modes, GLB v1, glTF JSON with external buffers, skins, morph targets, and animation channels remain unsupported. Broader conformance fixtures remain open beyond the current interleaved-accessor, extension-declaration, and malformed-range coverage.
-- Core glTF sampler mag/min filters and wrap modes (repeat, mirrored repeat, clamp-to-edge) are applied. `KHR_texture_transform` offset/rotation/scale is applied independently per material channel. UV sets beyond TEXCOORD_0 are not imported; UV0 is currently reused for the core occlusion map. Per-channel normal scale and occlusion strength, alpha MASK cutoff, and double-sided material behavior remain unsupported. WebGL2 context restoration is verified end-to-end: the renderer redraws the restored scene and re-uploads textures (PR #59, CI #160).
-- Cancellation is cooperative through `AbortSignal`; there is no worker-backed import job queue or mid-accessor interruption for synchronous parsing.
+- Core glTF sampler mag/min filters and wrap modes (repeat, mirrored repeat, clamp-to-edge) are applied. `KHR_texture_transform` offset/rotation/scale is applied independently per material channel. UV sets beyond TEXCOORD_0 are not imported; UV0 is currently reused for the core occlusion map. Per-channel normal scale and occlusion strength, alpha MASK cutoff, and double-sided material behavior are carried through import, renderer, and .world save/restore by PRs #61–#64. WebGL2 context restoration is verified end-to-end: the renderer redraws the restored scene and re-uploads textures (PR #59, CI #160).
+- GLB parsing and geometry/image construction run in a dedicated module worker (PR #65); shared-load cancellation is isolated per consumer (PR #66). Cancellation is cooperative through `AbortSignal`; there is no worker-backed import job queue or mid-accessor interruption for synchronous parsing.
 - Editor-specific entity/component conversion remains local to the editor. Asset references are not yet integrated into player packaging or AI authoring plans.
 - No standalone binary project asset store or archive container exists; source GLB payloads are embedded in the `.world` JSON for the current workflow.
 
@@ -48,8 +50,8 @@
 
 1. Expand GLB conformance fixtures beyond the current baseline, including extension-specific capability handling and deeper failure-path/resource rollback checks. PR #60 adds malformed JSON-root/array/object, negative BIN length, normalized accessor, fractional/misaligned offsets, unsafe count/stride, and invalid bufferView length cases.
 2. Expand schema coverage for component-specific contracts and add compatibility/conformance fixtures for schema evolution.
-3. Add worker-backed cancellable import jobs when the job boundary is specified; preserve the current cooperative cancellation contract.
-4. Shared GPU texture leases, replacement during decode, and scene/texture recreation after WebGL context loss are now covered by PRs #57–#59 and their green Chromium CI runs. Remaining material work: per-channel normal scale and occlusion strength, alpha MASK/double-sided behavior.
+3. Worker-backed GLB import is implemented (PR #65), and shared-load cancellation is isolated per consumer (PR #66). A general-purpose import job queue and mid-accessor interruption remain out of scope until their contracts are specified.
+4. Shared GPU texture leases, replacement during decode, and scene/texture recreation after WebGL context loss are now covered by PRs #57–#59 and their green Chromium CI runs. PBR alpha modes, sidedness, normal scale, and occlusion strength are now covered by PRs #61–#64; retain browser/GPU memory and renderer shutdown teardown as open gates.
 5. Keep player packaging and future AI authoring on the same asset identity/reference contracts.
 6. Run full workspace format, lint, typecheck, unit tests, production builds, and browser acceptance before marking the milestone complete.
 

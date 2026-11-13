@@ -838,9 +838,9 @@ export function EditorApp() {
       ensureImportActive();
       pendingLease = await assetResourceCacheRef.current.acquire(
         contentHash,
-        () =>
+        (sharedSignal) =>
           assetImportServiceRef.current.import<GlbAsset>(uri, sourceBytes, {
-            signal: controller.signal,
+            signal: sharedSignal,
             onSourceRestored: (restoredSource) => {
               sourceBytes = restoredSource;
             },
@@ -848,6 +848,7 @@ export function EditorApp() {
         () => {
           // CPU mesh buffers are garbage-collected after the final editor lease is released.
         },
+        controller.signal,
       );
       ensureImportActive();
       const imported = pendingLease.resource;
