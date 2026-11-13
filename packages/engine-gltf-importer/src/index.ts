@@ -92,7 +92,8 @@ export interface GlbAsset {
 export class GlbImportError extends Error {
   constructor(
     message: string,
-    readonly code: 'INVALID_GLB' | 'UNSUPPORTED_FEATURE' | 'INVALID_ACCESSOR' | 'ABORTED',
+    readonly code:
+      'INVALID_GLB' | 'UNSUPPORTED_FEATURE' | 'INVALID_ACCESSOR' | 'RESOURCE_LIMIT' | 'ABORTED',
   ) {
     super(message);
     this.name = 'GlbImportError';
@@ -236,7 +237,11 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
   return { root, binary };
 }
 
-async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Promise<Uint8Array> {
+async function prepareGlbBuffers(
+  root: GltfRoot,
+  sourceBinary: Uint8Array,
+  maxDecodedBytes: number,
+): Promise<Uint8Array> {
   const supportedRequired = new Set([
     'EXT_meshopt_compression',
     'KHR_mesh_quantization',
@@ -285,6 +290,7 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
       byteOffset < 0 ||
       !Number.isInteger(byteLength) ||
       byteLength! <= 0 ||
+      !Number.isSafeInteger(byteOffset + byteLength!) ||
       byteOffset + byteLength! > sourceBinary.byteLength ||
       !Number.isInteger(byteStride) ||
       byteStride! <= 0 ||
@@ -298,7 +304,7 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
     const decodedByteLength = count! * byteStride!;
     if (!Number.isSafeInteger(decodedByteLength) || decodedByteLength <= 0)
       fail(`bufferView ${index} decoded size is invalid`, 'INVALID_ACCESSOR');
-    totalLength = (totalLength + 3) & ~3;
+    totalLength = Math.ceil(totalLength / 4) * 4;
     const outputOffset = totalLength;
     view.buffer = 0;
     view.byteOffset = outputOffset;
@@ -316,6 +322,11 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
       ...(filter ? { filter } : {}),
     });
     totalLength += decodedByteLength;
+    if (!Number.isSafeInteger(totalLength) || totalLength > maxDecodedBytes)
+      fail(
+        `Decoded GLB buffer bytes (${totalLength}) exceed the configured import limit (${maxDecodedBytes})`,
+        'RESOURCE_LIMIT',
+      );
   }
   if (!buffers[0] && (root.accessors?.length ?? 0) > 0)
     fail('Accessors require an embedded GLB buffer');
@@ -466,7 +477,9 @@ function readAccessor(
 }
 
 function makeNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array {
-  const normals = new Float64Array(positions.length);
+  // Float32 is sufficient for the final vertex normals and avoids a second,
+  // double-sized accumulation buffer during large imports.
+  const normals = new Float32Array(positions.length);
   for (let i = 0; i < indices.length; i += 3) {
     const a = indices[i]! * 3,
       b = indices[i + 1]! * 3,
@@ -480,19 +493,29 @@ function makeNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): 
     const nx = aby * acz - abz * acy,
       ny = abz * acx - abx * acz,
       nz = abx * acy - aby * acx;
-    for (const vertex of [a, b, c]) {
-      normals[vertex] = normals[vertex]! + nx;
-      normals[vertex + 1] = normals[vertex + 1]! + ny;
-      normals[vertex + 2] = normals[vertex + 2]! + nz;
-    }
+    normals[a] = normals[a]! + nx;
+    normals[a + 1] = normals[a + 1]! + ny;
+    normals[a + 2] = normals[a + 2]! + nz;
+    normals[b] = normals[b]! + nx;
+    normals[b + 1] = normals[b + 1]! + ny;
+    normals[b + 2] = normals[b + 2]! + nz;
+    normals[c] = normals[c]! + nx;
+    normals[c + 1] = normals[c + 1]! + ny;
+    normals[c + 2] = normals[c + 2]! + nz;
   }
   for (let i = 0; i < normals.length; i += 3) {
     const length = Math.hypot(normals[i]!, normals[i + 1]!, normals[i + 2]!);
-    if (length > 1e-12)
-      normals.set([normals[i]! / length, normals[i + 1]! / length, normals[i + 2]! / length], i);
-    else normals.set([0, 1, 0], i);
+    if (length > 1e-12) {
+      normals[i] = normals[i]! / length;
+      normals[i + 1] = normals[i + 1]! / length;
+      normals[i + 2] = normals[i + 2]! / length;
+    } else {
+      normals[i] = 0;
+      normals[i + 1] = 1;
+      normals[i + 2] = 0;
+    }
   }
-  return Float32Array.from(normals);
+  return normals;
 }
 
 function decomposeNodeMatrix(
@@ -602,6 +625,109 @@ function tuple<T extends readonly number[]>(
   return result as T;
 }
 
+interface GlbImportBudget {
+  readonly sourceBytes: number;
+  readonly geometryBytes: number;
+  readonly textureBytes: number;
+  readonly vertexCount: number;
+  readonly triangleCount: number;
+}
+
+function budgetLimit(
+  settings: AssetImportContext['settings'],
+  key: string,
+  fallback: number,
+): number {
+  const configured = settings[key];
+  if (configured === undefined) return fallback;
+  if (typeof configured !== 'number' || !Number.isSafeInteger(configured) || configured <= 0)
+    fail(`Import setting ${key} must be a positive safe integer`);
+  return configured;
+}
+
+function validateImportBudget(
+  root: GltfRoot,
+  sourceBytes: number,
+  settings: AssetImportContext['settings'],
+): GlbImportBudget {
+  const accessors = root.accessors ?? [];
+  const componentCounts: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+  let geometryBytes = 0;
+  const accessorBytes = (index: number): number => {
+    const accessor = accessors[index];
+    if (!accessor || !Number.isSafeInteger(accessor.count) || accessor.count! < 0)
+      fail(`Accessor ${index} count is invalid`, 'INVALID_ACCESSOR');
+    const components = componentCounts[accessor.type ?? ''];
+    if (!components) fail(`Accessor ${index} has an unsupported type`, 'INVALID_ACCESSOR');
+    const bytes = accessor.count! * components * 4;
+    if (!Number.isSafeInteger(bytes))
+      fail(`Accessor ${index} output size exceeds safe limits`, 'RESOURCE_LIMIT');
+    return bytes;
+  };
+  let vertexCount = 0;
+  let triangleCount = 0;
+  for (const mesh of root.meshes ?? []) {
+    for (const primitive of mesh.primitives ?? []) {
+      const attributes = primitive.attributes ?? {};
+      const position = attributes.POSITION;
+      if (position === undefined) continue;
+      const positionAccessor = accessors[position];
+      if (!positionAccessor)
+        fail(`POSITION accessor ${position} does not exist`, 'INVALID_ACCESSOR');
+      const vertices = positionAccessor.count ?? 0;
+      vertexCount += vertices;
+      const usedAccessors = new Set(Object.values(attributes));
+      if (primitive.indices !== undefined) usedAccessors.add(primitive.indices);
+      for (const accessorIndex of usedAccessors) geometryBytes += accessorBytes(accessorIndex);
+      // The importer materializes normals and sequential indices when absent.
+      if (attributes.NORMAL === undefined) geometryBytes += vertices * 3 * 4;
+      if (primitive.indices === undefined) geometryBytes += vertices * 4;
+      const indexAccessor =
+        primitive.indices === undefined ? undefined : accessors[primitive.indices];
+      const elements = indexAccessor?.count ?? vertices;
+      triangleCount += Math.floor(elements / 3);
+      if (
+        !Number.isSafeInteger(geometryBytes) ||
+        !Number.isSafeInteger(vertexCount) ||
+        !Number.isSafeInteger(triangleCount)
+      )
+        fail('GLB geometry totals exceed safe limits', 'RESOURCE_LIMIT');
+    }
+  }
+  let textureBytes = 0;
+  for (const image of root.images ?? []) {
+    const view = image.bufferView === undefined ? undefined : root.bufferViews?.[image.bufferView];
+    if (view) textureBytes += view.byteLength ?? 0;
+  }
+  const limits = [
+    ['source bytes', sourceBytes, budgetLimit(settings, 'maxSourceBytes', 256 * 1024 * 1024)],
+    [
+      'decoded geometry bytes',
+      geometryBytes,
+      budgetLimit(settings, 'maxGeometryBytes', 384 * 1024 * 1024),
+    ],
+    [
+      'embedded texture bytes',
+      textureBytes,
+      budgetLimit(settings, 'maxTextureBytes', 128 * 1024 * 1024),
+    ],
+    ['vertices', vertexCount, budgetLimit(settings, 'maxVertices', 8_000_000)],
+    ['triangles', triangleCount, budgetLimit(settings, 'maxTriangles', 16_000_000)],
+  ] as const;
+  for (const [label, actual, maximum] of limits) {
+    if (!Number.isSafeInteger(actual) || actual > maximum)
+      fail(
+        `GLB ${label} (${actual}) exceeds the configured import limit (${maximum})`,
+        'RESOURCE_LIMIT',
+      );
+  }
+  return { sourceBytes, geometryBytes, textureBytes, vertexCount, triangleCount };
+}
+
+function now(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
 function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal): GlbAsset {
   const textureCount = root.textures?.length ?? 0;
   const validateTextureRef = (textureIndex: number | undefined, materialIndex: number): void => {
@@ -704,7 +830,7 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       if (vertexCount < 3) fail('A triangle primitive requires at least three vertices');
       const indices =
         primitive.indices === undefined
-          ? Array.from({ length: vertexCount }, (_, i) => i)
+          ? Uint32Array.from({ length: vertexCount }, (_, i) => i)
           : readAccessor(root, binary, primitive.indices, 'SCALAR');
       if (
         indices.length % 3 !== 0 ||
@@ -886,13 +1012,29 @@ export class GlbImporter implements AssetImporter<GlbAsset> {
   readonly extensions = ['glb'] as const;
 
   async import(source: ArrayBuffer, context: AssetImportContext): Promise<ImportedAsset<GlbAsset>> {
+    const startedAt = now();
     abortIfNeeded(context.signal);
+    const maxSourceBytes = budgetLimit(context.settings, 'maxSourceBytes', 256 * 1024 * 1024);
+    if (source.byteLength > maxSourceBytes)
+      fail(
+        `GLB source bytes (${source.byteLength}) exceeds the configured import limit (${maxSourceBytes})`,
+        'RESOURCE_LIMIT',
+      );
     const { root, binary: sourceBinary } = parseGlb(source);
+    const parsedAt = now();
     abortIfNeeded(context.signal);
-    const binary = await prepareGlbBuffers(root, sourceBinary);
+    const budget = validateImportBudget(root, source.byteLength, context.settings);
+    const maxDecodedBufferBytes = budgetLimit(
+      context.settings,
+      'maxDecodedBufferBytes',
+      512 * 1024 * 1024,
+    );
+    const binary = await prepareGlbBuffers(root, sourceBinary, maxDecodedBufferBytes);
     validateGlbBufferViews(root, binary);
+    const decodedAt = now();
     abortIfNeeded(context.signal);
     const data = importDocument(root, binary, context.signal);
+    const builtAt = now();
     abortIfNeeded(context.signal);
     return {
       kind: 'model',
@@ -905,6 +1047,15 @@ export class GlbImporter implements AssetImporter<GlbAsset> {
         primitiveCount: data.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0),
         materialCount: data.materials.length,
         textureCount: data.textures.length,
+        sourceBytes: budget.sourceBytes,
+        geometryBytes: budget.geometryBytes,
+        textureBytes: budget.textureBytes,
+        vertexCount: budget.vertexCount,
+        triangleCount: budget.triangleCount,
+        parseMs: Math.round((parsedAt - startedAt) * 100) / 100,
+        decodeMs: Math.round((decodedAt - parsedAt) * 100) / 100,
+        buildMs: Math.round((builtAt - decodedAt) * 100) / 100,
+        totalMs: Math.round((builtAt - startedAt) * 100) / 100,
       },
     };
   }
