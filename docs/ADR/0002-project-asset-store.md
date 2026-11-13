@@ -28,6 +28,7 @@ The v1 .world document is a UTF-8 JSON manifest with stable asset IDs, project-r
                 <64-hex-sha256>.png
 
    The exact extension comes from a small allowlisted MIME-to-extension mapping; unknown binary types use .bin. The URI stored in an asset record is project-relative, for example assets/sha256/ab/<digest>.glb.
+
 3. **Use content hashes as storage identity, not asset IDs or filenames.** The asset ID remains a stable logical reference inside the world. The file path is derived from the verified SHA-256 digest, so identical bytes can be shared by multiple asset records/worlds and existing blobs are never overwritten with different content.
 4. **Keep assetPayloads as a compatibility and portability feature.** Existing v1 files with embedded Base64 payloads remain readable. A single-file .world export may include assetPayloads; a directory-project save writes external binary files and omits the embedded payload array. No schema-version bump is required because the field is already optional and asset URIs are already part of v1.
 5. **Resolve and verify before mutating editor state.** Opening a directory project reads the .world manifest, validates each relative URI, loads the referenced bytes, verifies their SHA-256 content hash and MIME/type constraints, and stages the complete world before committing it. If a payload is embedded, its hash must match the asset record as well. Missing or mismatched external assets reject the open atomically.
