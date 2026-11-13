@@ -3,7 +3,6 @@ on:
   push:
     branches: [main, feat/glb-import-texture-stress]
   pull_request:
-    branches: [main]
 permissions:
   contents: read
 jobs:
