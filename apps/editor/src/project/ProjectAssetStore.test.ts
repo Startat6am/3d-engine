@@ -102,6 +102,23 @@ describe('directory project asset store', () => {
     ]);
   });
 
+  it('rejects texture MIME types that the Editor renderer cannot decode', async () => {
+    const store = new MemoryProjectFileStore();
+    const document = await fixture();
+    const invalid: WorldDocument = {
+      ...document,
+      assetPayloads: document.assetPayloads!.map((payload) => ({
+        ...payload,
+        mimeType: 'image/gif',
+      })),
+    };
+
+    await expect(saveDirectoryProject(store, invalid)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_MIME',
+    });
+    expect(store.has('worlds/main.world')).toBe(false);
+  });
+
   it('does not replace the manifest when any source payload fails hash verification', async () => {
     const store = new MemoryProjectFileStore();
     const document = await fixture();
