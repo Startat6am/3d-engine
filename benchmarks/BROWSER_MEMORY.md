@@ -19,7 +19,6 @@ The test asserts that the fixture actually uploads the expected texture and vert
 - The Node GLB stress benchmark remains the source of process peak-RSS measurements.
 - This browser test is a repeatable lifecycle diagnostic, not a universal memory ceiling. A release ceiling requires repeated runs on representative browser/OS/GPU combinations and explicit headroom for driver and browser overhead.
 
-
 ## Observed CI sample
 
 One Chromium CI run with the fixture measured a renderer JS heap of about 2.60 MiB before import, 8.25 MiB while retained, and 8.36 MiB after deleting the scene object. WebGL instrumentation measured 2.16 MiB peak buffer allocations and a 16 MiB texture allocation; after deletion the texture returned to 0 bytes and the remaining tracked buffer allocation was 720 bytes. This is consistent with the Editor releasing renderer GPU resources while retaining the asset records/source payloads in the project registry after the scene object is deleted. Treat these as one-run diagnostic observations, not a release budget or cross-device guarantee.
