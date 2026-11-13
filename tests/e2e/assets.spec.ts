@@ -410,7 +410,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
         return {
           async getFile() {
             const node = files.get(path)!;
-            return new File([node.bytes], name);
+            return new File([node.bytes.slice().buffer as ArrayBuffer], name);
           },
           async createWritable() {
             let pending = new Uint8Array();
