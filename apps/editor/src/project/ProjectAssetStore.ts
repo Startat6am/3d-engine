@@ -273,6 +273,13 @@ export async function saveDirectoryProject(
     const uri = assetUri(record.contentHash, payload.mimeType);
     if (!writtenBlobs.has(uri)) {
       await store.writeFile(uri, bytes, { immutable: true });
+      const persistedBytes = await store.readFile(uri);
+      if ((await sha256(persistedBytes)) !== `sha256:${parseSha256(record.contentHash)}`) {
+        throw new ProjectAssetStoreError(
+          `Written asset failed hash verification: ${record.id}`,
+          'HASH_MISMATCH',
+        );
+      }
       writtenBlobs.add(uri);
     }
     savedAssets.push({ ...record, uri });
