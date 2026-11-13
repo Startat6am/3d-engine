@@ -76,5 +76,4 @@
 
 - PR #67 (`test/renderer-dispose-gpu-resources`, stacked on PR #66) verifies Player shutdown through its `pagehide` handler. Chromium instrumentation confirms renderer disposal calls WebGL2 `deleteBuffer` and `deleteProgram`, and that the render loop stops after an already-running frame settles. CI #219 passed the complete Node 22 pipeline: format, lint, typecheck, 99/99 unit tests, Editor/Player builds, both 128 MiB stress budgets, and 17/17 Chromium E2E tests. Browser/tab and GPU memory ceilings and binary project asset storage remain open M5 gates.
 
-
 - PR #69 records ADR-0002: directory projects use immutable content-addressed binary assets under `assets/sha256/<prefix>/<digest>.<ext>`, referenced by project-relative URIs in the `.world` JSON manifest. Optional Base64 `assetPayloads` remain for single-file portable snapshots and old v1 documents. Asset files are written and hash-verified before the manifest is replaced; open resolves and verifies all assets before scene commit. This resolves the storage-format decision but does not implement the project storage adapter or Editor directory-picker workflow; those remain M5 work.
