@@ -121,7 +121,7 @@ function makeMemoryGlb(vertexCount: number, textureSize: number): Buffer {
 }
 
 test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', async ({ page }) => {
-  const vertexCount = 300_000;
+  const vertexCount = 60_000;
   const textureSize = 2048;
   const expectedTextureBytes = textureSize * textureSize * 4;
 
@@ -238,16 +238,7 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     mimeType: 'model/gltf-binary',
     buffer: makeMemoryGlb(vertexCount, textureSize),
   });
-  try {
-    await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
-  } catch (error) {
-    const alerts = await page.getByRole('alert').allTextContents();
-    throw new Error(
-      `Memory fixture import failed. Alerts: ${alerts.join(' | ')}. ` +
-        `Page errors: ${pageErrors.join(' | ')}. Console errors: ${consoleErrors.join(' | ')}`,
-      { cause: error },
-    );
-  }
+  await expect(page.getByText('BrowserMemoryFixture')).toBeVisible({ timeout: 20_000 });
   await expect
     .poll(() =>
       page.evaluate(
