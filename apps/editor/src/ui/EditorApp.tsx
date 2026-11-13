@@ -215,11 +215,13 @@ async function sha256(source: ArrayBuffer): Promise<string> {
 
 function encodeBase64(source: ArrayBuffer): string {
   const bytes = new Uint8Array(source);
-  let binary = '';
-  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+  const chunks: string[] = [];
+  // Encode bounded, 3-byte-aligned slices to avoid a model-sized binary string.
+  const chunkSize = 0x6000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    chunks.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))));
   }
-  return btoa(binary);
+  return chunks.join('');
 }
 
 function decodeBase64(source: string): ArrayBuffer {
@@ -950,11 +952,8 @@ export function EditorApp() {
       const stagedPayloads = new Map(assetPayloadsRef.current);
       const textureRecords: AssetId[] = [];
       for (const [imageIndex, image] of asset.images.entries()) {
-        const imageBytes = image.data.slice();
-        const imageBuffer = imageBytes.buffer.slice(
-          imageBytes.byteOffset,
-          imageBytes.byteOffset + imageBytes.byteLength,
-        ) as ArrayBuffer;
+        // The importer already owns a tightly-sized image byte buffer.
+        const imageBuffer = image.data.buffer as ArrayBuffer;
         const imageHash = await sha256(imageBuffer);
         const extension =
           image.mimeType === 'image/png' ? 'png' : image.mimeType === 'image/webp' ? 'webp' : 'jpg';
@@ -1005,7 +1004,7 @@ export function EditorApp() {
           assetId: textureAssetId,
           cacheKey: stagedRegistry.require(textureAssetId).contentHash,
           mimeType: image.mimeType,
-          data: image.data.slice(),
+          data: image.data,
           ...(texture.sampler === null ? {} : { sampler: asset.samplers[texture.sampler]! }),
           ...(transform ? { transform } : {}),
         } as const;

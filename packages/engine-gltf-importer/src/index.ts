@@ -259,10 +259,22 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
   )
     fail('GLB BIN chunk is shorter than buffer.byteLength');
   const views = root.bufferViews ?? [];
-  const decodedParts: Uint8Array[] = [];
-  let totalLength = sourceBinary.byteLength;
   if (views.some((view) => view.buffer !== 0 && !view.extensions?.EXT_meshopt_compression))
     fail('GLB bufferView references an unavailable buffer', 'UNSUPPORTED_FEATURE');
+
+  // First reserve the final output ranges from metadata alone. Keeping every
+  // decompressed meshopt buffer in an array while also allocating the combined
+  // BIN buffer would temporarily retain two full copies of the decoded model.
+  const compressedViews: {
+    readonly index: number;
+    readonly byteOffset: number;
+    readonly byteLength: number;
+    readonly byteStride: number;
+    readonly count: number;
+    readonly mode: string;
+    readonly filter?: string;
+  }[] = [];
+  let totalLength = sourceBinary.byteLength;
   for (const [index, view] of views.entries()) {
     const compression = view.extensions?.EXT_meshopt_compression;
     if (!compression) continue;
@@ -283,48 +295,59 @@ async function prepareGlbBuffers(root: GltfRoot, sourceBinary: Uint8Array): Prom
       fail(`bufferView ${index} has invalid EXT_meshopt_compression metadata`, 'INVALID_ACCESSOR');
     if (filter && !['NONE', 'OCTAHEDRAL', 'QUATERNION', 'EXPONENTIAL', 'COLOR'].includes(filter))
       fail(`bufferView ${index} uses unsupported meshopt filter ${filter}`, 'UNSUPPORTED_FEATURE');
-    let decoded: Uint8Array;
-    try {
-      await MeshoptDecoder.ready;
-      decoded = await MeshoptDecoder.decodeGltfBufferAsync(
-        count!,
-        byteStride!,
-        sourceBinary.subarray(byteOffset, byteOffset + byteLength!),
-        mode!,
-        filter,
-      );
-    } catch (error) {
-      fail(
-        `bufferView ${index} meshopt decompression failed: ${error instanceof Error ? error.message : String(error)}`,
-        'INVALID_ACCESSOR',
-      );
-    }
-    if (decoded.byteLength !== count! * byteStride!)
+    const decodedByteLength = count! * byteStride!;
+    if (!Number.isSafeInteger(decodedByteLength) || decodedByteLength <= 0)
       fail(`bufferView ${index} decoded size is invalid`, 'INVALID_ACCESSOR');
     totalLength = (totalLength + 3) & ~3;
+    const outputOffset = totalLength;
     view.buffer = 0;
-    view.byteOffset = totalLength;
-    view.byteLength = decoded.byteLength;
+    view.byteOffset = outputOffset;
+    view.byteLength = decodedByteLength;
     if (mode === 'ATTRIBUTES') view.byteStride = byteStride!;
     else delete view.byteStride;
     delete view.extensions;
-    decodedParts.push(decoded);
-    totalLength += decoded.byteLength;
+    compressedViews.push({
+      index,
+      byteOffset,
+      byteLength: byteLength!,
+      byteStride: byteStride!,
+      count: count!,
+      mode: mode!,
+      ...(filter ? { filter } : {}),
+    });
+    totalLength += decodedByteLength;
   }
   if (!buffers[0] && (root.accessors?.length ?? 0) > 0)
     fail('Accessors require an embedded GLB buffer');
   root.buffers = [{ byteLength: totalLength }];
+  if (compressedViews.length === 0) return sourceBinary;
+
   const binary = new Uint8Array(totalLength);
   binary.set(sourceBinary);
-  let cursor = sourceBinary.byteLength;
-  for (const part of decodedParts) {
-    cursor = (cursor + 3) & ~3;
-    binary.set(part, cursor);
-    cursor += part.byteLength;
+  // Decompress one view at a time directly into its reserved final range.
+  for (const entry of compressedViews) {
+    let decoded: Uint8Array;
+    try {
+      await MeshoptDecoder.ready;
+      decoded = await MeshoptDecoder.decodeGltfBufferAsync(
+        entry.count,
+        entry.byteStride,
+        sourceBinary.subarray(entry.byteOffset, entry.byteOffset + entry.byteLength),
+        entry.mode,
+        entry.filter,
+      );
+    } catch (error) {
+      fail(
+        `bufferView ${entry.index} meshopt decompression failed: ${error instanceof Error ? error.message : String(error)}`,
+        'INVALID_ACCESSOR',
+      );
+    }
+    if (decoded.byteLength !== entry.count * entry.byteStride)
+      fail(`bufferView ${entry.index} decoded size is invalid`, 'INVALID_ACCESSOR');
+    binary.set(decoded, views[entry.index]!.byteOffset);
   }
   return binary;
 }
-
 function validateGlbBufferViews(root: GltfRoot, binary: Uint8Array): void {
   for (const [index, view] of (root.bufferViews ?? []).entries()) {
     const start = view.byteOffset ?? 0;
@@ -355,7 +378,7 @@ function readAccessor(
   binary: Uint8Array,
   index: number,
   expectedType: 'VEC2' | 'VEC3' | 'SCALAR',
-): number[] {
+): Float32Array | Uint32Array {
   const accessor = root.accessors?.[index];
   if (!accessor) fail(`Accessor ${index} does not exist`, 'INVALID_ACCESSOR');
   if (accessor.sparse) fail('Sparse accessors are not supported', 'UNSUPPORTED_FEATURE');
@@ -404,7 +427,12 @@ function readAccessor(
     fail(`Accessor ${index} reads beyond its bufferView`, 'INVALID_ACCESSOR');
   }
   const data = new DataView(binary.buffer, binary.byteOffset, binary.byteLength);
-  const result: number[] = [];
+  // Avoid boxed number[] allocations (8+ bytes per JS element plus array overhead).
+  // Geometry accessors are materialized directly into their final renderer-ready buffers.
+  const result =
+    expectedType === 'SCALAR'
+      ? new Uint32Array(accessor.count!)
+      : new Float32Array(accessor.count! * components);
   for (let item = 0; item < accessor.count!; item++) {
     for (let component = 0; component < components; component++) {
       const at = viewOffset + accessorOffset + item * stride + component * bytes;
@@ -431,13 +459,13 @@ function readAccessor(
         : raw;
       if (!Number.isFinite(value))
         fail(`Accessor ${index} contains a non-finite value`, 'INVALID_ACCESSOR');
-      result.push(value);
+      result[item * components + component] = value;
     }
   }
   return result;
 }
 
-function makeNormals(positions: readonly number[], indices: readonly number[]): Float32Array {
+function makeNormals(positions: ArrayLike<number>, indices: ArrayLike<number>): Float32Array {
   const normals = new Float64Array(positions.length);
   for (let i = 0; i < indices.length; i += 3) {
     const a = indices[i]! * 3,
@@ -671,7 +699,7 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       const positionAccessor = primitive.attributes?.POSITION;
       if (positionAccessor === undefined)
         fail(`Mesh ${meshIndex} primitive ${primitiveIndex} has no POSITION`);
-      const positions = readAccessor(root, binary, positionAccessor, 'VEC3');
+      const positions = readAccessor(root, binary, positionAccessor, 'VEC3') as Float32Array;
       const vertexCount = positions.length / 3;
       if (vertexCount < 3) fail('A triangle primitive requires at least three vertices');
       const indices =
@@ -687,17 +715,17 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       const normals =
         primitive.attributes?.NORMAL === undefined
           ? makeNormals(positions, indices)
-          : Float32Array.from(readAccessor(root, binary, primitive.attributes.NORMAL, 'VEC3'));
+          : (readAccessor(root, binary, primitive.attributes.NORMAL, 'VEC3') as Float32Array);
       const uvs =
         primitive.attributes?.TEXCOORD_0 === undefined
           ? undefined
-          : Float32Array.from(readAccessor(root, binary, primitive.attributes.TEXCOORD_0, 'VEC2'));
+          : (readAccessor(root, binary, primitive.attributes.TEXCOORD_0, 'VEC2') as Float32Array);
       if (normals.length !== positions.length)
         fail('NORMAL accessor count does not match POSITION', 'INVALID_ACCESSOR');
       const mesh: MeshData = {
-        positions: Float32Array.from(positions),
+        positions,
         normals,
-        indices: Uint32Array.from(indices),
+        indices: indices instanceof Uint32Array ? indices : Uint32Array.from(indices),
         ...(uvs ? { uvs } : {}),
       };
       try {
