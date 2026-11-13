@@ -830,6 +830,7 @@ export function EditorApp() {
       }
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
+      projectDirectoryRef.current = null;
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
