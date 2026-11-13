@@ -132,7 +132,7 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
       peakBufferBytes: 0,
       liveTextureBytes: 0,
       peakTextureBytes: 0,
-      textureUploads: [] as Array<Record<string, number | string | null>>,
+      textureUploads: [] as Array<Record<string, number | string | boolean | null>>,
       imageBitmapSizes: [] as Array<{ width: number; height: number }>,
     };
     const originalCreateImageBitmap = window.createImageBitmap.bind(window);
@@ -178,69 +178,68 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
       return originalDeleteBuffer.call(this, buffer);
     };
 
+    const recordTextureUpload = (
+      context: WebGL2RenderingContext,
+      method: string,
+      width: number,
+      height: number,
+      sourceType: string | null,
+    ) => {
+      const texture = context.getParameter(context.TEXTURE_BINDING_2D) as WebGLTexture | null;
+      state.textureUploads.push({
+        method,
+        width,
+        height,
+        sourceType,
+        textureBound: Boolean(texture),
+      });
+      if (!texture || width < 32 || height < 32) return;
+      const size = width * height * 4;
+      const previous = textureSizes.get(texture) ?? 0;
+      state.liveTextureBytes += size - previous;
+      state.peakTextureBytes = Math.max(state.peakTextureBytes, state.liveTextureBytes);
+      textureSizes.set(texture, size);
+    };
     const originalTexImage2D = prototype.texImage2D;
     prototype.texImage2D = function (...args) {
-      const texture = this.getParameter(this.TEXTURE_BINDING_2D) as WebGLTexture | null;
-      if (texture) {
-        const source =
-          args.length === 9
-            ? null
-            : (args[5] as {
-                width?: number;
-                height?: number;
-                videoWidth?: number;
-                videoHeight?: number;
-              });
-        const width =
-          args.length === 9 ? Number(args[3]) : Number(source?.width ?? source?.videoWidth ?? 0);
-        const height =
-          args.length === 9 ? Number(args[4]) : Number(source?.height ?? source?.videoHeight ?? 0);
-        const size = width * height * 4;
-        const previous = textureSizes.get(texture) ?? 0;
-        state.liveTextureBytes += size - previous;
-        state.peakTextureBytes = Math.max(state.peakTextureBytes, state.liveTextureBytes);
-        textureSizes.set(texture, size);
-        state.textureUploads.push({
-          method: 'texImage2D',
-          argsLength: args.length,
-          width,
-          height,
-          sourceType: source?.constructor?.name ?? null,
-        });
-      }
+      const source =
+        args.length === 9
+          ? null
+          : (args[5] as {
+              width?: number;
+              height?: number;
+              videoWidth?: number;
+              videoHeight?: number;
+            });
+      const width =
+        args.length === 9 ? Number(args[3]) : Number(source?.width ?? source?.videoWidth ?? 0);
+      const height =
+        args.length === 9 ? Number(args[4]) : Number(source?.height ?? source?.videoHeight ?? 0);
+      recordTextureUpload(this, 'texImage2D', width, height, source?.constructor?.name ?? null);
       return Reflect.apply(originalTexImage2D, this, args);
     };
     const originalTexSubImage2D = prototype.texSubImage2D;
     prototype.texSubImage2D = function (...args) {
-      const texture = this.getParameter(this.TEXTURE_BINDING_2D) as WebGLTexture | null;
-      if (texture) {
-        const source =
-          args.length === 9
-            ? null
-            : (args[6] as {
-                width?: number;
-                height?: number;
-                videoWidth?: number;
-                videoHeight?: number;
-              });
-        const width =
-          args.length === 9 ? Number(args[4]) : Number(source?.width ?? source?.videoWidth ?? 0);
-        const height =
-          args.length === 9 ? Number(args[5]) : Number(source?.height ?? source?.videoHeight ?? 0);
-        const size = width * height * 4;
-        const previous = textureSizes.get(texture) ?? 0;
-        state.liveTextureBytes += size - previous;
-        state.peakTextureBytes = Math.max(state.peakTextureBytes, state.liveTextureBytes);
-        textureSizes.set(texture, size);
-        state.textureUploads.push({
-          method: 'texSubImage2D',
-          argsLength: args.length,
-          width,
-          height,
-          sourceType: source?.constructor?.name ?? null,
-        });
-      }
+      const source =
+        args.length === 9
+          ? null
+          : (args[6] as {
+              width?: number;
+              height?: number;
+              videoWidth?: number;
+              videoHeight?: number;
+            });
+      const width =
+        args.length === 9 ? Number(args[4]) : Number(source?.width ?? source?.videoWidth ?? 0);
+      const height =
+        args.length === 9 ? Number(args[5]) : Number(source?.height ?? source?.videoHeight ?? 0);
+      recordTextureUpload(this, 'texSubImage2D', width, height, source?.constructor?.name ?? null);
       return Reflect.apply(originalTexSubImage2D, this, args);
+    };
+    const originalTexStorage2D = prototype.texStorage2D;
+    prototype.texStorage2D = function (target, levels, internalformat, width, height) {
+      recordTextureUpload(this, 'texStorage2D', width, height, null);
+      return originalTexStorage2D.call(this, target, levels, internalformat, width, height);
     };
     const originalDeleteTexture = prototype.deleteTexture;
     prototype.deleteTexture = function (texture) {
@@ -291,7 +290,9 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     () =>
       (
         window as Window & {
-          __webglMemory: { textureUploads: Array<Record<string, number | string | null>> };
+          __webglMemory: {
+            textureUploads: Array<Record<string, number | string | boolean | null>>;
+          };
         }
       ).__webglMemory.textureUploads,
   );
