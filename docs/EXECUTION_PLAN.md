@@ -85,12 +85,20 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 - M6 architecture is the implementation baseline. Work remains in review and no gate is complete.
 - `docs/PHYSICS_SPEC.md` defines the proposed physics adapter, existing EngineClock integration, authority rules, query surface, limits, and verification.
 - `docs/INPUT_SPEC.md` defines device adapters, semantic mappings, contexts, and fixed-tick snapshot semantics.
-- `docs/ADR/0003-physics-backend-adapter.md` records the pinned provisional Rapier 0.21.0 package, Apache-2.0 license, Vite WASM smoke build, and remaining real-browser verification.
-- `docs/ADR/0004-physics-transform-authority.md` defines conservative M6 root-body and unit-scale constraints pending integration tests.
+- `docs/ADR/0003-physics-backend-adapter.md` records the pinned provisional Rapier 0.21.0 package, Apache-2.0 license, Vite WASM smoke build, and Chromium runtime verification; deployment-header checks remain open.
+- `docs/ADR/0004-physics-transform-authority.md` defines conservative M6 root-body/unit-scale constraints and the tested input/gameplay/physics scheduler order.
 - `docs/acceptance/M6_PHYSICS_INPUT.md` is the authoritative M6 exit checklist.
-- The Editor receives a bounded visual UX cleanup as part of M6 integration; this is not the full Editor MVP and does not reorder M7–M10.
-- Initial engine packages and dependencies are now present on the M6 implementation branch; the production browser smoke and full CI gates remain open.
+- The Editor received a bounded visual UX cleanup: truthful renderer/save states, removal of decorative component checkmarks/foundation labels, and actionable empty-scene state. This is not the full Editor MVP and does not reorder M7–M10.
+- Initial `@engine/input` and `@engine/physics` packages are present. Rapier's standard WASM build was loaded in Chromium and exercised with fixed steps and raycast.
+
+## M6 verification snapshot — 2026-11-15
+
+- `pnpm check`: formatting, lint, workspace typecheck/build, and 129 unit tests passed.
+- `pnpm e2e`: 21 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
+- Dedicated Rapier browser smoke: WASM loaded, a dynamic body completed 60 fixed steps (Y=0.07456), and raycast returned a hit.
+- Production Vite smoke emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk.
+- Still open: deployment-header/target-browser checks, gamepad hardware E2E, character controller, Physics Playground, backend fake-conformance suite, physics performance report, and owner M6 sign-off.
 
 ## Next step
 
-Complete real-browser Rapier WASM verification and the package/API conformance gates, then continue M6.2–M6.6 in order. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
+Complete deployment-header/target-browser verification and backend conformance, then continue with the character controller, Physics Playground, and M6 performance gates in order. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.

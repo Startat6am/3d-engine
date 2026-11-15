@@ -135,6 +135,20 @@ describe('PhysicsSystem ECS integration', () => {
     physics.dispose();
   });
 
+  it('rejects non-unit-scale rigid bodies with an actionable error', async () => {
+    const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
+    const entity = runtime.world.createEntity();
+    runtime.world.add(entity, Transform, { ...createTransform(), scale: [2, 1, 1] });
+    runtime.world.add(entity, RigidBody, { type: 'dynamic', position: [0, 0, 0] });
+    const physics = await createTestPhysics();
+    const system = new PhysicsSystem(physics);
+    runtime.scheduler.add(new PhysicsPreUpdateSystem(system));
+    runtime.scheduler.add(system);
+    expect(() => runtime.advance(1 / 60)).toThrow('unit scale');
+    system.dispose();
+    physics.dispose();
+  });
+
   it('releases backend resources when ECS entities are destroyed', async () => {
     const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
     const entity = runtime.world.createEntity();

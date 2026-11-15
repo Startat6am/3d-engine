@@ -46,11 +46,31 @@ function validateMap(context: InputContext): void {
     );
   const actions = new Map<string, InputActionDefinition>();
   for (const action of context.map.actions) {
+    if (!['button', 'axis1D', 'axis2D'].includes(action.kind))
+      throw new InputError('input.invalid-map', `Unsupported action kind: ${String(action.kind)}`);
     if (!action.name.trim() || actions.has(action.name))
       throw new InputError('input.invalid-map', `Invalid or duplicate action: ${action.name}`);
     actions.set(action.name, action);
   }
   for (const binding of context.map.bindings) {
+    if (!['keyboard', 'mouse', 'gamepad'].includes(binding.source))
+      throw new InputError(
+        'input.invalid-map',
+        `Unsupported input source: ${String(binding.source)}`,
+      );
+    if (
+      binding.modifiers &&
+      binding.modifiers.some((modifier) => typeof modifier !== 'string' || !modifier.trim())
+    )
+      throw new InputError(
+        'input.invalid-map',
+        'Keyboard modifiers must be non-empty control codes',
+      );
+    if (binding.component !== undefined && binding.component !== 'x' && binding.component !== 'y')
+      throw new InputError(
+        'input.invalid-map',
+        `Unsupported axis component: ${String(binding.component)}`,
+      );
     if (!actions.has(binding.action))
       throw new InputError(
         'input.invalid-map',

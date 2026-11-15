@@ -1,109 +1,122 @@
 # Physics Specification
 
-**Status:** proposed M6 adapter contract  
-**Target package:** `@engine/physics` (not yet implemented)  
-**Contract version:** 0.1.0
+**Status:** M6 implementation in progress; public contract 0.1.0 is provisional  
+**Target package:** `@engine/physics`  
+**Acceptance:** [M6 Physics & Input](acceptance/M6_PHYSICS_INPUT.md)
 
 ## 1. Responsibility and boundaries
 
 Integrate rigid-body simulation without making a third-party physics library the canonical entity, transform, or serialized world model.
 
-- `engine-physics` owns engine-facing descriptors, `PhysicsWorld`, lifecycle-safe handles, queries, collision events, and backend adapters.
+- `engine-physics` owns engine-facing descriptors, the `PhysicsWorld` interface, lifecycle-safe handles, queries, collision events, ECS systems, and backend adapters.
 - `engine-core` remains the owner of ECS, entity identity, Transform, EngineRuntime, EngineClock, and scheduler phases.
-- `engine-geometry` may provide CPU mesh data for explicitly supported static mesh collider cooking.
 - Renderer consumes synchronized/presentation transforms and never steps or owns physics.
 - Serialization stores engine-owned authoring configuration, never backend runtime handles or WASM objects.
+- Gameplay systems obtain a body handle from `PhysicsSystem.getBodyHandle(entity)` and call engine-owned `PhysicsWorld` operations; they do not import Rapier.
 
 ## 2. Backend strategy
 
-Rapier 0.21.0 is pinned provisionally behind the engine-owned adapter: production dependency `@dimforge/rapier3d@0.21.0` (Apache-2.0); test-only dependency `@dimforge/rapier3d-compat@0.21.0`. No Rapier types may appear in public exports or serialized documents.
+Rapier 0.21.0 is pinned provisionally behind the engine-owned adapter:
 
-A Vite production smoke build confirmed a separate WASM asset (~1.17 MB, ~0.45 MB gzip) and lazy JS chunk (~52 KB gzip). `vite-plugin-wasm` is enabled and editor/player builds target ESNext for native top-level-await support. Actual browser runtime and deployment-header verification remain open. See [ADR 0003](ADR/0003-physics-backend-adapter.md).
+- Production: `@dimforge/rapier3d@0.21.0` (Apache-2.0).
+- Tests: `@dimforge/rapier3d-compat@0.21.0` as a development-only dependency.
+- `createPhysicsWorld()` returns the engine-owned `PhysicsWorld` interface. Rapier objects and types are not exported from the package root.
+- Vite uses `vite-plugin-wasm`; editor/player builds target ESNext for native top-level-await support.
 
-The adapter must be replaceable and pass a backend-neutral conformance suite. Backend-specific capabilities are exposed through explicit capability metadata rather than leaking backend objects.
+A production Vite smoke build emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk. A Chromium runtime smoke test loaded WASM, simulated a dynamic body for 60 fixed steps (final Y=0.07456), and returned a raycast hit. Deployment-header and additional-browser verification remain open. See [ADR 0003](ADR/0003-physics-backend-adapter.md).
 
-## 3. Coordinate and unit conventions
+## 3. Coordinate and transform conventions
 
-- Right-handed, Y-up world coordinates, consistent with the current engine transform/rendering convention.
+- Right-handed, Y-up world coordinates, consistent with the engine transform/rendering convention.
 - World distance units are treated as meters for physics.
-- Quaternions use `[x, y, z, w]`.
+- Quaternions use `[x, y, z, w]` and must be normalized.
 - Linear velocity is meters/second; angular velocity is radians/second; gravity is meters/second².
-- Collider dimensions are explicit physics-space dimensions. M6 rigid-body entities require unit ECS scale; non-unit scale is rejected rather than silently approximated.
-- M6 rigid-body entities must be root entities (`Transform.parent === null`). Parent-aware rigid-body synchronization is deferred until inverse-world conversion and non-uniform-scale/shear semantics are specified.
+- M6 rigid-body entities must be root entities (`Transform.parent === null`) and use unit ECS scale. Unsupported transforms fail with `physics.unsupported-transform`; they are never silently approximated.
+- Parent-aware bodies, non-uniform scale, and shear are deferred until world/local matrix conversion semantics are specified and tested.
 
-## 4. Simulation and runtime integration
+## 4. Runtime integration and scheduler order
 
-The existing `EngineRuntime` and `EngineClock` are the single source of fixed-step cadence. Physics MUST NOT create a second accumulator or call `step` from requestAnimationFrame/renderer callbacks. `PhysicsSystem` is registered in `fixed-update` and consumes the `SystemContext.deltaTime` from each fixed tick.
+The existing `EngineRuntime` and `EngineClock` are the only fixed-step clock. Physics MUST NOT create a second accumulator or step from requestAnimationFrame/renderer callbacks.
 
-- Default physics timestep: 1/60 second, supplied by the existing fixed-update context.
-- Existing `EngineClock` defaults currently cap frame delta at 0.25 seconds and fixed catch-up at 5 steps. Physics consumes those ticks; it does not silently change these global clock defaults.
-- Physics advances at most once per fixed-update tick.
-- Pause prevents backend stepping while the core runtime may continue editor/UI updates.
-- `requestSingleStep()` queues exactly one physics tick while paused; the next fixed-update consumes it. Unpausing clears any queued single-step.
-- If physics is paused, force/impulse commands must follow a documented policy; the proposed policy is queue bounded commands until the next active tick or explicit reset, with overflow diagnostics.
-- Physics synchronization writes dynamic poses into ECS before transform propagation.
-- Optional render interpolation is presentation-only and MUST NOT mutate authoritative ECS Transform.
+Register systems in this order:
 
-The exact order between gameplay fixed systems, physics stepping, and dynamic pose synchronization must be explicit and tested; incidental registration order is not a contract.
+1. `PhysicsPreUpdateSystem` in `pre-update`: validate transforms, create/remove rigid bodies and colliders, and make handles available before fixed gameplay systems.
+2. Gameplay fixed-update systems: read input snapshots, modify kinematic ECS targets, and apply forces/impulses through body handles.
+3. `PhysicsSystem` in `fixed-update`, after gameplay systems: refresh body/collider state, submit static/kinematic poses, call `PhysicsWorld.step(context.deltaTime)` exactly once, drain collision events, and synchronize dynamic poses back into ECS.
+4. Core transform propagation and renderer extraction run after fixed updates.
+
+`SystemContext` exposes `fixedStepIndex` and `fixedStepCount` for each fixed tick. The existing `EngineClock` defaults cap frame delta at 0.25 seconds and fixed catch-up at 5 steps; physics consumes those ticks without changing the global clock defaults.
+
+- Default fixed timestep is 1/60 second, supplied by the existing fixed-update context.
+- `PhysicsWorld.step(dt)` returns `true` when it advanced the backend and `false` when paused without a queued step.
+- `setPaused(true)` stops simulation while editor/UI updates may continue.
+- `requestSingleStep()` queues one backend tick while paused; the next fixed-update consumes it. Dynamic poses are synchronized after that step even though the world remains paused. Unpausing clears a queued single-step.
+- Forces/impulses update backend force/velocity state immediately; motion advances on resume or a requested single-step. There is no separate engine-side command queue yet.
+- Render interpolation is not implemented. If added, it must use presentation-only state and never overwrite authoritative ECS Transform.
 
 ## 5. Body authority and lifecycle
 
-| Body type | Authoritative source        | Synchronization                                       |
-| --------- | --------------------------- | ----------------------------------------------------- |
-| Static    | ECS Transform/configuration | ECS pose/config edits update backend before next step |
-| Kinematic | ECS/gameplay target         | Target pose is submitted before the next physics step |
-| Dynamic   | Physics simulation          | Physics pose is written to ECS after each fixed step  |
+| Body type | Authoritative source        | Synchronization                                               |
+| --------- | --------------------------- | ------------------------------------------------------------- |
+| Static    | ECS Transform/configuration | ECS pose is submitted before each physics step                |
+| Kinematic | ECS/gameplay target         | Next kinematic pose is submitted before each physics step     |
+| Dynamic   | Physics simulation          | Physics pose is written to ECS after each executed fixed step |
 
-Body and collider handles are opaque engine-owned identifiers with generation/lifecycle validation. Destroying an ECS entity destroys associated backend resources before stale references can be used. Reconfiguration is explicit and validated; backend state is not serialized.
+`PhysicsPreUpdateSystem` creates handles before gameplay fixed-update consumers run. `PhysicsSystem.getBodyHandle(entity)` and `getColliderHandle(entity)` return opaque handles or `null` when the entity has no registered body/collider. Destroying an ECS entity removes its backend resources. Replacing a descriptor object recreates the corresponding resource; backend state is never serialized.
 
-See [ADR 0004](ADR/0004-physics-transform-authority.md).
+## 6. Implemented and remaining capabilities
 
-## 6. M6 capability scope
+Initial adapter implementation:
 
-Required:
-
-- Static, kinematic, and dynamic rigid bodies.
-- Gravity, linear/angular velocity, mass/density, friction, restitution, damping, and sleeping controls where supported by the chosen adapter.
+- Static, kinematic-position, and dynamic rigid bodies.
+- Gravity, gravity scale, linear/angular damping, sleep control.
 - Box, sphere, capsule, cylinder, and convex-hull colliders.
-- Collision groups/masks and sensor colliders.
-- Collision enter/exit events with stable entity/collider identities.
-- Raycast and raycast-all.
-- Character controller suitable for a basic third-person/first-person playground.
-- Deterministic lifecycle and disposal tests.
+- Friction, restitution, density, sensor colliders, collision groups.
+- Collision enter/exit event draining with entity and collider identities.
+- Raycast and raycast-all with world-space results, collision-group filtering, and excluded entities.
+- Force/impulse operations, pause, single-step, ECS lifecycle and transform synchronization.
 
-Restricted:
+Still required for M6 acceptance:
 
-- Triangle-mesh colliders are opt-in and static-only in M6.
-- Dynamic triangle meshes, soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism are out of scope.
-- Character controller behavior is an adapter capability; it is not a full animation/motor framework.
+- Character controller suitable for the Physics Playground.
+- Explicit backend conformance suite/fake backend and resource limits for bodies, colliders, events, ray length, and mesh cooking.
+- Static-only triangle-mesh colliders (opt-in); no dynamic triangle meshes.
+- Physics Playground integration and performance report.
 
-## 7. Public API shape (proposed)
+Out of scope: soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism. Fixed-step alone does not guarantee bit-identical simulation across browsers or hardware.
 
-Public TypeScript types should remain engine-owned. Exact names must be reconciled with repository conventions before implementation.
+## 7. Public API shape
+
+The package root exposes engine-owned types and a `createPhysicsWorld()` factory. The backend implementation is private to the adapter.
 
 ```ts
 interface PhysicsWorld {
-  createBody(entity: EntityId, descriptor: RigidBodyDescriptor): PhysicsBodyHandle;
-  removeBody(handle: PhysicsBodyHandle): void;
-  createCollider(body: PhysicsBodyHandle, descriptor: ColliderDescriptor): ColliderHandle;
-  removeCollider(handle: ColliderHandle): void;
+  readonly paused: boolean;
   setPaused(paused: boolean): void;
-  step(fixedDeltaTime: number): void;
+  requestSingleStep(): void;
+  createBody(entity: EntityId, descriptor: RigidBodyDescriptor): PhysicsBodyHandle;
+  createCollider(body: PhysicsBodyHandle, descriptor: ColliderDescriptor): PhysicsColliderHandle;
+  removeCollider(handle: PhysicsColliderHandle): void;
+  removeBody(handle: PhysicsBodyHandle): void;
+  setKinematicTarget(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
+  setStaticPose(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
+  getPose(handle: PhysicsBodyHandle): PhysicsPose;
+  applyImpulse(handle: PhysicsBodyHandle, impulse: Vec3, wakeUp?: boolean): void;
+  applyForce(handle: PhysicsBodyHandle, force: Vec3, wakeUp?: boolean): void;
+  step(fixedDeltaTime: number): boolean;
   raycast(ray: Ray, options?: RaycastOptions): RaycastHit | null;
   raycastAll(ray: Ray, options?: RaycastOptions): readonly RaycastHit[];
+  drainCollisionEvents(): readonly CollisionEvent[];
   dispose(): void;
 }
 ```
 
-The interface defines force/impulse operations, kinematic target submission, collision-event draining, filtering, world-space queries, and typed error results. This sketch is not a frozen public API.
-
-Raycast input uses a world-space origin, normalized world-space direction, and finite non-negative max distance. Hit results include entity ID, collider ID, world-space point, world-space normal, and distance. `raycast` returns the nearest accepted hit; `raycastAll` returns hits sorted nearest-first. Excluded entities and collision-group filters are supported. Stale handles/entities are never returned as valid hits.
+Ray input uses a world-space origin, normalized world-space direction, and finite non-negative max distance. Hit results include entity ID, collider ID, world-space point/normal, and distance. `raycast` returns the nearest accepted hit; `raycastAll` returns hits nearest-first. Query filters support collision groups and excluded entities. Stale handles/entities are never returned as valid hits.
 
 ## 8. Errors and validation
 
-Stable error categories include:
+Implemented stable error categories include:
 
-- `physics.backend-unavailable`
 - `physics.backend-init-failed`
 - `physics.invalid-body-descriptor`
 - `physics.invalid-collider-descriptor`
@@ -111,18 +124,21 @@ Stable error categories include:
 - `physics.unsupported-transform`
 - `physics.stale-handle`
 - `physics.query-invalid`
-- `physics.resource-limit`
+- `physics.invalid-delta`
+- `physics.body-type-mismatch`
+- `physics.not-paused`
+- `physics.disposed`
 
-Validate finite values, positive dimensions, mass/density constraints, normalized rotations/directions, collision group ranges, root-body/unit-scale restrictions, and configured resource limits at the boundary. Errors must include relevant entity/operation context and recovery guidance.
+Resource-limit and backend-unavailable categories are reserved for the remaining M6 work. Validate finite values, positive dimensions, normalized rotations/directions, collision group ranges, and root-body/unit-scale restrictions at the boundary.
 
 ## 9. Performance, limits and security
 
 Measure body/collider counts, broadphase/narrowphase/solver time, query time, event processing time, allocations, WASM/JS memory, and bundle impact. Record browser, hardware, scene size, and build mode. Avoid allocations in contact/event hot paths where practical.
 
-Bound bodies, colliders, events, ray length, and mesh cooking work. Treat imported mesh data and project files as untrusted. Mesh cooking must have explicit triangle/vertex limits and cancellation/disposal semantics.
+Hard runtime resource limits and mesh-cooking limits are not implemented yet and remain an M6 gate. Treat imported mesh data and project files as untrusted; mesh cooking must have explicit triangle/vertex limits and cancellation/disposal semantics before it is enabled.
 
 ## 10. Tests and acceptance
 
-Adapter conformance; fixed-step integration; zero/one/multiple steps; catch-up; pause/single-step; body authority; root/scale validation; collider shape validation; filtering; event enter/exit and disposal; raycast miss/nearest/all/filter/distance; character controller; stale handles; entity destruction; backend init failure/rollback; repeated disposal; Physics Playground browser E2E.
+Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, and the browser WASM smoke path. Character controller, fake-backend conformance, additional browsers/deployment headers, performance budgets, and Physics Playground E2E remain open.
 
-The authoritative M6 gates are in [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).
+The authoritative M6 exit checklist is [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).

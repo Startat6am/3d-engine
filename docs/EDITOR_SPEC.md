@@ -34,13 +34,21 @@ Command undo/redo round-trips, hierarchy selection, inspector editing, gizmo tra
 
 M6 includes a bounded usability and truthfulness pass over the existing Editor, not completion of the full Editor MVP.
 
-Current observed issues to resolve before calling the M6 integration usable:
+Issues observed at the start of M6 (addressed by the initial cleanup pass):
 
 - The top bar says `EDITOR · INTERACTIVE PREVIEW` and the inspector/footer use generic foundation/ready labels that do not describe actual subsystem health.
 - The inspector displays static Mesh Renderer / Geometry rows with checkmarks rather than editable, authoritative component data.
 - The current editor is a compact scene shell, not yet the full hierarchy/asset-browser/gizmo workflow described by the MVP.
 - Technical diagnostics are available, but user-facing operation errors and empty states must remain visible and actionable.
 - The desktop three-column layout has a 760px body minimum width; narrow/mobile behavior is handled separately and needs an explicit regression check.
+
+Initial cleanup evidence:
+
+- The header now identifies Choreon and shows renderer loading/online/error state from the actual renderer lifecycle.
+- The footer distinguishes a new scene, saved state, and unsaved changes.
+- Decorative Mesh Renderer / Geometry checkmarks and the fake foundation build label were removed; the inspector shows the selected object's actual geometry source.
+- Empty scenes show a clear action hint, and the hierarchy reports only the actual object count.
+- Playwright covers renderer/save status, placeholder removal, empty-scene behavior, and the existing 360px mobile layout.
 
 M6 UX rules:
 

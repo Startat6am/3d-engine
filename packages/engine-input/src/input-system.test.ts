@@ -254,6 +254,17 @@ describe('InputSystem', () => {
         priority: 0,
       }),
     ).toThrow('requires an x/y component');
+    expect(() =>
+      input.addContext({
+        id: 'bad-source',
+        map: {
+          id: 'bad-source-map',
+          actions: [{ name: 'Fire', kind: 'button' }],
+          bindings: [{ action: 'Fire', source: 'midi' as never, control: 'NoteOn' }],
+        },
+        priority: 0,
+      }),
+    ).toThrow('Unsupported input source');
   });
 
   it('reports adapter transition queue overflow instead of silently dropping input', () => {

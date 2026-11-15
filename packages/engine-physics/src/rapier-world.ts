@@ -111,6 +111,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
       case 'kinematic':
         bodyDescriptor = this.#rapier.RigidBodyDesc.kinematicPositionBased();
         break;
+      default:
+        throw new PhysicsError(
+          'physics.invalid-body-descriptor',
+          `Unsupported rigid body type: ${String(descriptor.type)}`,
+        );
     }
     bodyDescriptor.setTranslation(...descriptor.position);
     bodyDescriptor.setRotation({ x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] });
@@ -251,6 +256,16 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   raycastAll(ray: Ray, options: RaycastOptions = {}): readonly RaycastHit[] {
     this.#assertActive();
     this.#validateRay(ray);
+    if (
+      options.collisionGroups !== undefined &&
+      (!Number.isInteger(options.collisionGroups) ||
+        options.collisionGroups < 0 ||
+        options.collisionGroups > 0xffffffff)
+    )
+      throw new PhysicsError(
+        'physics.query-invalid',
+        'Query collision groups must be an unsigned 32-bit integer',
+      );
     const direction = { x: ray.direction[0], y: ray.direction[1], z: ray.direction[2] };
     const origin = { x: ray.origin[0], y: ray.origin[1], z: ray.origin[2] };
     const rapierRay = new this.#rapier.Ray(origin, direction);
@@ -351,6 +366,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
           );
         result = this.#rapier.ColliderDesc.convexHull(shape.vertices);
         break;
+      default:
+        throw new PhysicsError(
+          'physics.unsupported-shape',
+          `Unsupported collider shape: ${String((shape as { type?: unknown }).type)}`,
+        );
     }
     if (!result)
       throw new PhysicsError(
@@ -386,8 +406,18 @@ export class RapierPhysicsWorld implements PhysicsWorld {
       result.setDensity(descriptor.density);
     }
     if (descriptor.sensor !== undefined) result.setSensor(descriptor.sensor);
-    if (descriptor.collisionGroups !== undefined)
+    if (descriptor.collisionGroups !== undefined) {
+      if (
+        !Number.isInteger(descriptor.collisionGroups) ||
+        descriptor.collisionGroups < 0 ||
+        descriptor.collisionGroups > 0xffffffff
+      )
+        throw new PhysicsError(
+          'physics.invalid-collider-descriptor',
+          'Collision groups must be an unsigned 32-bit integer',
+        );
       result.setCollisionGroups(descriptor.collisionGroups);
+    }
     result.setActiveEvents(this.#rapier.ActiveEvents.COLLISION_EVENTS);
     return result;
   }

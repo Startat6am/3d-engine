@@ -1,6 +1,6 @@
 # ADR 0004: Physics and ECS Transform Authority
 
-- **Status:** Proposed — requires M6 integration tests and owner acceptance
+- **Status:** Proposed — initial integration tests pass; owner acceptance remains open
 - **Date:** 2026-11-15
 - **Decision owners:** Choreon maintainers
 
@@ -34,11 +34,12 @@ The root-only/unit-scale restriction is a deliberate M6 limit, not a permanent e
 
 For each rendered frame:
 
-1. `pre-update`: apply authored static/kinematic pose changes and prepare input sample.
-2. For each existing fixed tick: gameplay fixed systems submit forces/targets; physics adapter steps exactly once; dynamic poses synchronize into ECS.
-3. `variable-update` and `post-update`: non-authoritative presentation/gameplay work.
-4. `transform-propagation`: rebuild derived world matrices.
-5. Renderer extracts presentation state.
+1. `pre-update`: `PhysicsPreUpdateSystem` validates ECS transforms and creates/removes backend bodies/colliders so handles exist before gameplay; `InputPreUpdateSystem` stages physical input.
+2. For each fixed tick, `InputFixedUpdateSystem` publishes the snapshot before gameplay fixed systems.
+3. Gameplay fixed systems submit forces/impulses and update kinematic ECS targets.
+4. `PhysicsSystem` runs after gameplay fixed systems, submits static/kinematic poses, steps exactly once, drains collision events, and writes dynamic poses into ECS.
+5. `variable-update` and `post-update`: non-authoritative presentation/gameplay work.
+6. `transform-propagation`: rebuild derived world matrices; renderer extracts presentation state.
 
 The exact relative order of gameplay fixed systems and physics sync must be explicit in scheduler registration/order tests; do not rely on incidental package registration order.
 
