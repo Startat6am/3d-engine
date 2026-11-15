@@ -1,6 +1,19 @@
 # Assets & Serialization Implementation Status
 
-**Status:** initial package slice plus editor, GLB, cache, and renderer integration; milestone exit gate remains open.
+**Status:** M5 complete as of 2026-11-15. Directory-project save/open, content verification, missing/tampered blob rollback, renderer lifecycle, and browser-memory diagnostics have green Node 22/Chromium CI and exact-head Vercel Previews.
+
+## M5 closeout — 2026-11-15
+
+- PR #82 implements the Editor directory-project adapter. Save writes and verifies immutable
+  SHA-256 blobs before committing `worlds/main.world`; open verifies every referenced asset
+  before applying the document.
+- PR #84 adds explicit missing-blob coverage. CI #321 passed 109/109 unit tests and
+  19/19 Chromium E2E; the directory-project E2E verifies the active scene remains intact
+  for both tampered and missing external assets.
+- PR #83 adds a repeatable browser lifecycle diagnostic. CI #319 passed 19/19 Chromium E2E.
+- Exact-head Vercel Previews for PRs #82, #83, and #84 reached READY.
+- The memory diagnostic measures renderer JS heap and API-requested WebGL allocations.
+  It does not measure whole-tab/process RSS or physical VRAM.
 
 ## Delivered
 
@@ -18,16 +31,16 @@
 
 - PR #66 fixes cancellation ownership for deduplicated imports: each consumer can abort its own wait without cancelling a shared load that still has other consumers. The cache aborts the underlying worker only when the last consumer leaves and disposes any resource that resolves after all consumers have aborted. GitHub Actions CI #211 passed on the code-bearing commit 42734ce5391a56f169340237f48b958b81060782 with Node 22: 99/99 workspace unit tests, typecheck, lint, Editor/Player builds, both 128 MiB peak-RSS stress budgets, and 16/16 Chromium E2E tests. The code-bearing commit 466b2714e43a79fee674ec275ae24801a5aeea4f has a READY Vercel Preview: https://3d-engine-4fvp01j0j-callback5.vercel.app. Later commits on this branch update documentation only. Local Node 25.9.0 checks also pass; Node 25 is outside the supported range.
 
-## Not yet delivered
+## Known limitations and future work
 
 - The v1 JSON Schema validates the stable document envelope and known record shapes while leaving extension/component payloads open. Cross-record invariants (unique IDs, reference resolution, acyclic dependencies) remain explicit semantic validation in TypeScript; the schema is not claimed to replace those checks.
 - GLB external/data URI buffers and images, sparse accessors, non-triangle primitive modes, GLB v1, glTF JSON with external buffers, skins, morph targets, and animation channels remain unsupported. Broader conformance fixtures remain open beyond the current interleaved-accessor, extension-declaration, and malformed-range coverage.
 - Core glTF sampler mag/min filters and wrap modes (repeat, mirrored repeat, clamp-to-edge) are applied. `KHR_texture_transform` offset/rotation/scale is applied independently per material channel. UV sets beyond TEXCOORD_0 are not imported; UV0 is currently reused for the core occlusion map. Per-channel normal scale and occlusion strength, alpha MASK cutoff, and double-sided material behavior are carried through import, renderer, and .world save/restore by PRs #61–#64. WebGL2 context restoration is verified end-to-end: the renderer redraws the restored scene and re-uploads textures (PR #59, CI #160).
 - GLB parsing and geometry/image construction run in a dedicated module worker (PR #65); shared-load cancellation is isolated per consumer (PR #66). Cancellation is cooperative through `AbortSignal`; there is no worker-backed import job queue or mid-accessor interruption for synchronous parsing.
 - Editor-specific entity/component conversion remains local to the editor. Asset references are not yet integrated into player packaging or AI authoring plans.
-- No standalone binary project asset store or archive container exists; source GLB payloads are embedded in the `.world` JSON for the current workflow.
+- Directory projects now use `worlds/main.world` plus immutable content-addressed blobs under `assets/sha256/`; single-file `.world` documents continue to support embedded Base64 payloads. Old blobs are retained and automatic garbage collection is not implemented.
 
-## Reliability work in progress (2026-11-12)
+## Historical reliability work (2026-11-12; superseded by M5 closeout)
 
 - GLB import budgets are enforced for source bytes, decoded BIN bytes, decoded geometry bytes, embedded texture bytes, vertices, and triangles. The importer emits typed `RESOURCE_LIMIT` failures before the corresponding large geometry/decode allocation where the metadata permits preflight checks.
 - Focused importer tests now cover triangle and embedded-texture budget rejection, hostile declared vertex counts rejected before geometry allocation, and 24 concurrent repeated imports with isolated output typed arrays and source-GLB immutability. The focused importer suite passes 24/24 tests; the full workspace suite passes 78/78 tests across 7 files, TypeScript project build and ESLint pass, and Editor/Player production builds succeed.
@@ -46,7 +59,7 @@
 - User-supplied test model is stored in `dl-models-test/` on `main`; do not copy it into synthetic fixtures or publish it in benchmark artifacts without explicit approval.
 - See [Execution Plan](EXECUTION_PLAN.md) for the ordered remaining M5 work and handoff state.
 
-## Next gates
+## Future follow-up (not M5 exit blockers)
 
 1. Expand GLB conformance fixtures beyond the current baseline, including extension-specific capability handling and deeper failure-path/resource rollback checks. PR #60 adds malformed JSON-root/array/object, negative BIN length, normalized accessor, fractional/misaligned offsets, unsafe count/stride, and invalid bufferView length cases.
 2. Expand schema coverage for component-specific contracts and add compatibility/conformance fixtures for schema evolution.
