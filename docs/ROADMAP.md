@@ -38,3 +38,8 @@ After the M5 asset identity, serialization, and import-lifecycle gates are stabl
 6. Evaluate **USD/USDZ** for larger composed scenes and production pipelines as a separate, later capability; do not treat it as a drop-in replacement for GLB.
 
 All source formats must normalize into the same versioned, format-neutral Choreon asset representation. Importer support is capability-based: report what was actually imported (geometry, hierarchy, materials, textures, skinning, animation), and emit actionable diagnostics for unsupported features. Format names alone must never imply complete feature support. This list is a proposed direction, not a committed delivery date or promise; each importer requires a contract, fixtures, compatibility notes, security limits, and license review. See [Asset Pipeline](ASSET_PIPELINE.md).
+
+
+## M5 — browser memory diagnostic
+
+Chromium acceptance records renderer JavaScript heap and requested WebGL buffer/texture allocation sizes through import, object removal, and repeat import/removal. It verifies tracked live GPU allocations return to baseline. These measurements are diagnostic only: they do not represent total browser-tab/process RSS, physical VRAM residency, or a universal device memory ceiling. See [Browser Memory Benchmark](../benchmarks/BROWSER_MEMORY.md).
