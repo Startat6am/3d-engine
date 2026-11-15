@@ -178,5 +178,5 @@ test('empty scenes show an actionable state instead of an empty placeholder insp
   await expect(
     page.getByText('Select an object in the Hierarchy or add a primitive to begin.'),
   ).toBeVisible();
-  await expect(page.getByText('0 OBJECTS')).toBeVisible();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
 });
