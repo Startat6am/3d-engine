@@ -4,11 +4,15 @@ import { GlbImporter } from '../packages/engine-gltf-importer/dist/index.js';
 const vertexCount = Number(process.env.GLB_STRESS_VERTICES ?? 1_000_002);
 const runs = Number(process.env.GLB_STRESS_RUNS ?? 3);
 const textureBytes = Number(process.env.GLB_STRESS_TEXTURE_BYTES ?? 0);
+const maxPeakRssDeltaMiB = Number(process.env.GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB ?? 0);
 if (!Number.isSafeInteger(vertexCount) || vertexCount < 3 || vertexCount % 3 !== 0) {
   throw new Error('GLB_STRESS_VERTICES must be a positive safe integer divisible by 3');
 }
 if (!Number.isSafeInteger(textureBytes) || textureBytes < 0 || textureBytes > 128 * 1024 * 1024) {
   throw new Error('GLB_STRESS_TEXTURE_BYTES must be an integer from 0 to 134217728');
+}
+if (!Number.isFinite(maxPeakRssDeltaMiB) || maxPeakRssDeltaMiB < 0) {
+  throw new Error('GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB must be a non-negative number');
 }
 if (!Number.isSafeInteger(runs) || runs < 1 || runs > 20) {
   throw new Error('GLB_STRESS_RUNS must be an integer from 1 to 20');
@@ -77,6 +81,13 @@ function memorySnapshot() {
   );
 }
 
+function peakRssSnapshotMiB() {
+  if (process.platform === 'win32') return null;
+  const { maxRSS } = process.resourceUsage();
+  // Node reports maxRSS in KiB (ru_maxrss units) on supported Unix platforms.
+  return Number((maxRSS / 1024).toFixed(2));
+}
+
 async function importOnce(importer, source, run) {
   const startedAt = performance.now();
   const imported = await importer.import(source, {
@@ -90,15 +101,18 @@ async function importOnce(importer, source, run) {
     wallMs,
     metadata: imported.metadata,
     memoryWhileResultRetainedMiB: memorySnapshot(),
+    peakRssWhileResultRetainedMiB: peakRssSnapshotMiB(),
   };
 }
 
 async function executeRuns() {
   await collectGarbage();
   const baseline = memorySnapshot();
+  const peakRssBaselineMiB = peakRssSnapshotMiB();
   const source = createSyntheticGlb(vertexCount, textureBytes);
   const sourceBytes = source.byteLength;
   const afterFixture = memorySnapshot();
+  const peakRssAfterFixtureMiB = peakRssSnapshotMiB();
   const results = [];
   const importer = new GlbImporter();
 
@@ -106,14 +120,29 @@ async function executeRuns() {
     const result = await importOnce(importer, source, run);
     await collectGarbage();
     result.memoryAfterReleaseMiB = memorySnapshot();
+    result.peakRssAfterReleaseMiB = peakRssSnapshotMiB();
     results.push(result);
   }
 
-  return { baseline, sourceBytes, afterFixture, results };
+  return {
+    baseline,
+    peakRssBaselineMiB,
+    sourceBytes,
+    afterFixture,
+    peakRssAfterFixtureMiB,
+    results,
+  };
 }
 
 const report = await executeRuns();
 await collectGarbage();
+const peakRssAfterSourceReleaseMiB = peakRssSnapshotMiB();
+const peakRssDeltaMiB =
+  report.peakRssBaselineMiB === null || peakRssAfterSourceReleaseMiB === null
+    ? null
+    : Number((peakRssAfterSourceReleaseMiB - report.peakRssBaselineMiB).toFixed(2));
+const peakRssBudgetExceeded =
+  maxPeakRssDeltaMiB > 0 && (peakRssDeltaMiB === null || peakRssDeltaMiB > maxPeakRssDeltaMiB);
 const output = {
   benchmark: 'choreon-glb-import-stress-v1',
   generatedFixture: true,
@@ -134,13 +163,25 @@ const output = {
     gcExposed: typeof globalThis.gc === 'function',
   },
   memoryBaselineMiB: report.baseline,
+  peakRssBaselineMiB: report.peakRssBaselineMiB,
   memoryAfterFixtureMiB: report.afterFixture,
+  peakRssAfterFixtureMiB: report.peakRssAfterFixtureMiB,
   memoryAfterSourceReleaseMiB: memorySnapshot(),
+  peakRssAfterSourceReleaseMiB,
+  peakRssDeltaMiB,
+  peakRssBudgetMiB: maxPeakRssDeltaMiB > 0 ? maxPeakRssDeltaMiB : null,
+  peakRssBudgetExceeded,
   runs: report.results,
   notes: [
-    'Memory figures are process snapshots, not a sampled peak-memory profile.',
+    'process.memoryUsage values are point-in-time snapshots; peakRss fields use the OS process high-water mark and include runtime startup plus the synthetic fixture.',
+    'Peak RSS is unavailable on Windows; the optional GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB budget is enforced only when configured.',
     'Run with --expose-gc for comparable post-release snapshots.',
     'Synthetic image payload bytes are copied as embedded image data; no image decode or GPU allocation is measured.',
   ],
 };
 process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
+if (peakRssBudgetExceeded) {
+  throw new Error(
+    `GLB peak RSS delta (${peakRssDeltaMiB} MiB) exceeds the configured budget (${maxPeakRssDeltaMiB} MiB)`,
+  );
+}

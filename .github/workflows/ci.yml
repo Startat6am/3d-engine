@@ -24,10 +24,13 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - name: GLB import stress benchmark (geometry)
+        env:
+          GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB: 128
         run: node --expose-gc benchmarks/glb-import-stress.mjs
       - name: GLB import stress benchmark (embedded image)
         env:
           GLB_STRESS_TEXTURE_BYTES: 16777216
+          GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB: 128
         run: node --expose-gc benchmarks/glb-import-stress.mjs
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e

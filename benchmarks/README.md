@@ -12,8 +12,9 @@ Controls:
 - `GLB_STRESS_VERTICES`: vertex count, must be divisible by three; defaults to 1,000,002.
 - `GLB_STRESS_RUNS`: sequential import count from 1 to 20; defaults to 3.
 - `GLB_STRESS_TEXTURE_BYTES`: embedded image payload bytes, from 0 to 128 MiB; defaults to 0.
+- `GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB`: optional maximum process peak-RSS increase over the pre-fixture baseline; defaults to 0 (disabled).
 
-The script generates a deterministic GLB in memory, imports it repeatedly, records importer phase timings and Node process memory snapshots, drops each imported result, and forces several GC passes when `--expose-gc` is available. Set `GLB_STRESS_TEXTURE_BYTES` to add one embedded image bufferView. The synthetic image bytes use a PNG MIME label but are not a valid encoded PNG; the importer copies their payload but this benchmark does not decode them. It outputs one JSON report to stdout and does not write a generated model file. The repository CI runs both the geometry-only and 16 MiB embedded-image cases on the supported Node 22 runtime after the workspace build; use those logs as the supported-runtime baseline.
+The script generates a deterministic GLB in memory, imports it repeatedly, records importer phase timings and Node process memory snapshots, drops each imported result, and forces several GC passes when `--expose-gc` is available. It also records `process.resourceUsage().maxRSS` as an OS process high-water mark at baseline, after fixture creation, while each result is retained, and after release; this captures peak process RSS between snapshots rather than sampling it on a timer. Node does not support this field on Windows, so those values are `null` there. Set `GLB_STRESS_TEXTURE_BYTES` to add one embedded image bufferView. The synthetic image bytes use a PNG MIME label but are not a valid encoded PNG; the importer copies their payload but this benchmark does not decode them. It outputs one JSON report to stdout and does not write a generated model file. The repository CI runs both the geometry-only and 16 MiB embedded-image cases on the supported Node 22 runtime after the workspace build; use those logs as the supported-runtime baseline.
 
 ## Recorded baseline (2026-11-12)
 
@@ -70,11 +71,24 @@ Environment: Node 22.23.4, Linux x64, 4 CPUs, 15,983 MiB reported host memory, e
 | ArrayBuffers after result release + GC | 11.47 MiB (source fixture only) | 27.47 MiB (source fixture only) |
 | ArrayBuffers after source release + GC |                        0.02 MiB |                        0.02 MiB |
 
-These are supported-runtime diagnostic baselines, not a peak-memory profile. ArrayBuffers return to the source-fixture footprint after the imported result is released and to the near-zero baseline after the source fixture is released. RSS remains higher due to process/runtime allocator retention. The 16 MiB image bufferView is a deterministic payload with an image/png MIME label but is not a valid PNG; this case measures payload retention/copying, not image decoding or GPU upload.
+These are supported-runtime diagnostic baselines. ArrayBuffers return to the source-fixture footprint after the imported result is released and to the near-zero baseline after the source fixture is released. The new `peakRss*MiB` fields report the process high-water mark, which includes Node startup, the fixture, and import work; use the difference from `peakRssBaselineMiB` to estimate the import's incremental contribution. RSS remains higher after release due to process/runtime allocator retention. CI now enforces a 128 MiB peak-RSS increase ceiling for each stress fixture; this leaves headroom above the initial 79.03 MiB embedded-image measurement and is rechecked on every run. The 16 MiB image bufferView is a deterministic payload with an image/png MIME label but is not a valid PNG; this case measures payload retention/copying, not image decoding or GPU upload.
 
 ## Limitations
 
 - This fixture measures geometry decode/build only: no embedded textures, image decode, GPU allocation, editor entity lifecycle, or WebGL context loss.
-- Memory is sampled at specific points, not continuously; a transient peak between samples may be missed.
+- `process.memoryUsage()` is sampled at specific points, so a transient heap/ArrayBuffer peak between snapshots may be missed. `process.resourceUsage().maxRSS` is the OS high-water mark and does capture the maximum process RSS, but includes runtime startup and fixture allocations. Windows does not expose Node's `maxRSS` field, so the benchmark reports `null` there.
 - Node `process.memoryUsage()` is not equivalent to browser tab memory. Repeat the benchmark on the supported Node version and add browser-specific acceptance instrumentation before making cross-runtime performance claims.
 - Do not place user-provided/private model files in this benchmark or commit generated fixture binaries.
+
+## Peak RSS high-water baseline (2026-11-12, Node 22 CI)
+
+The benchmark now records the OS process high-water mark through `process.resourceUsage().maxRSS`. Two independent supported-runner runs were collected (GitHub Actions #191 and #195; Node 22.23.4, Linux x64):
+
+| Fixture                           | CI run | Baseline RSS | After fixture |   Peak RSS | Peak increase | CI budget |
+| --------------------------------- | -----: | -----------: | ------------: | ---------: | ------------: | --------: |
+| 1,000,002 vertices, no image      |   #191 |    52.55 MiB |     65.68 MiB |  98.03 MiB |     45.48 MiB |   128 MiB |
+| 1,000,002 vertices, no image      |   #195 |    49.47 MiB |     65.74 MiB |  97.80 MiB |     48.33 MiB |   128 MiB |
+| 1,000,002 vertices + 16 MiB image |   #191 |    51.04 MiB |     81.93 MiB | 130.07 MiB |     79.03 MiB |   128 MiB |
+| 1,000,002 vertices + 16 MiB image |   #195 |    49.72 MiB |     81.74 MiB | 130.21 MiB |     80.49 MiB |   128 MiB |
+
+CI enforces `GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB=128` for both fixtures. The largest observed increase is 80.49 MiB, leaving 47.51 MiB of headroom. This is a process-RSS ceiling for these Node importer stress fixtures, measured relative to the process high-water baseline before fixture allocation. It is not a browser-tab, image-decoder, WebGL, or GPU memory ceiling. The fixture's image payload is copied but not decoded. Continue to keep browser/GPU memory lifecycle as a separate M5 acceptance item.
