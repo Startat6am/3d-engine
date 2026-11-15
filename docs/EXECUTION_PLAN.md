@@ -116,9 +116,18 @@ These are stacked dependencies. Preserve their order and do not merge a later PR
 
 - PR #69 ([project asset store ADR](https://github.com/Startat6am/3d-engine/pull/69)) records the accepted directory-project storage decision. `.world` remains a JSON manifest; directory projects store immutable content-addressed blobs under `assets/sha256/`, while optional Base64 `assetPayloads` remain supported for portable single-file snapshots. Save writes/verifies blobs before the manifest; open validates safe project-relative URIs and hashes before committing scene state. This is an architecture decision only; the storage adapter and Editor directory workflow remain open implementation gates. Rebase onto PR #79 before merge.
 
-
 ## Current M5 handoff — 2026-11-15
 
-- PRs #73–#80 are merged into `main`; their PBR material state, import rollback, GLB peak-RSS budget, persisted material validation, worker import, shared cancellation, renderer GPU teardown, and content-addressed asset-store ADR are integrated.
-- Browser memory diagnostic: renderer JS heap and API-requested WebGL allocations are measured in Chromium; this is a lifecycle diagnostic, not a whole-tab/process memory or physical-VRAM measurement and not a cross-device ceiling. The benchmark implementation is being carried forward on the current `main` line after resolving documentation overlap with the former stacked PR.
-- PR #82 remains the Editor directory-project storage implementation: `worlds/main.world` manifest plus immutable content-addressed asset blobs, validated before scene commit. M5 remains open until its exact-head Preview is ready and the directory save/open workflow is accepted.
+- PRs #73–#80 are merged into `main`; their PBR material state, import rollback, GLB peak-RSS
+budget, persisted material validation, worker import, shared cancellation, renderer GPU
+teardown, and content-addressed asset-store ADR are integrated.
+
+- Browser memory diagnostic: renderer JS heap and API-requested WebGL allocations are measured
+in Chromium; this is a lifecycle diagnostic, not a whole-tab/process memory or physical-VRAM
+measurement and not a cross-device ceiling. The benchmark implementation is being carried
+forward on the current `main` line after resolving documentation overlap with the former stacked
+PR.
+
+- PR #82 remains the Editor directory-project storage implementation: `worlds/main.world`
+manifest plus immutable content-addressed asset blobs, validated before scene commit. M5 remains
+open until its exact-head Preview is ready and the directory save/open workflow is accepted.
