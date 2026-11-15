@@ -2,8 +2,8 @@
 
 **Last updated:** 2026-11-15
 **Repository:** `Startat6am/3d-engine`
-**Current milestone:** M5 — Assets & Serialization (complete)
-**Next milestone:** M6 — Physics & Input (planning only)
+**Current milestone:** M6 — Physics & Input (planning active)
+**Previous milestone:** M5 — Assets & Serialization (complete)
 
 This file is the current handoff point. Older stacked-PR notes have been superseded
 by the M5 closeout recorded below. Historical implementation details remain in GitHub
@@ -15,8 +15,8 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 - M5 exit gates are complete: import/serialization/PBR/lifecycle checks, directory-project
   save/reopen, tampered-blob rollback, missing-blob rollback, and exact-head Previews.
 - M5 does not claim a whole-tab/process memory ceiling or a physical GPU-VRAM budget.
-- The next roadmap milestone is M6 Physics & Input. Do not accelerate the AI-authoring
-  milestone or change the agreed milestone order.
+- M6 planning is active. Do not accelerate the AI-authoring milestone or change the
+  agreed milestone order. No M6 implementation or acceptance gate is claimed complete.
 
 ## M5 closeout — 2026-11-15
 
@@ -78,7 +78,17 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 - Weak models must still use explicit contracts and deterministic validation.
 - “AI proposes, the system validates, the engine executes.”
 
+## M6 planning baseline — 2026-11-15
+
+- M6 architecture is approved as the basis for specification work; implementation has not started.
+- `docs/PHYSICS_SPEC.md` defines the proposed physics adapter, existing EngineClock integration, authority rules, query surface, limits, and verification.
+- `docs/INPUT_SPEC.md` defines device adapters, semantic mappings, contexts, and fixed-tick snapshot semantics.
+- `docs/ADR/0003-physics-backend-adapter.md` keeps Rapier provisional until the compatibility/WASM/license/bundle spike passes.
+- `docs/ADR/0004-physics-transform-authority.md` defines conservative M6 root-body and unit-scale constraints pending integration tests.
+- `docs/acceptance/M6_PHYSICS_INPUT.md` is the authoritative M6 exit checklist.
+- The Editor receives a bounded visual UX cleanup as part of M6 integration; this is not the full Editor MVP and does not reorder M7–M10.
+- No engine implementation, dependency pin, or M6 gate completion is claimed by this planning update.
+
 ## Next step
 
-Plan M6 Physics & Input against the existing subsystem contracts before implementation.
-Do not begin M10 AI authoring work or reorder milestones without explicit approval.
+Review the M6 contracts and acceptance gates, then implement in the order M6.0 → M6.1 → M6.2 → M6.3 → M6.4 → M6.5 → M6.6. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
