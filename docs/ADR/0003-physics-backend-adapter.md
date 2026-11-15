@@ -47,6 +47,7 @@ The Rapier adapter is an implementation detail. No Rapier object, handle, enum, 
 - [x] Measure compressed and uncompressed bundle impact.
 - [x] Verify the standard WASM module loads and simulates in Chromium.
 - [ ] Verify supported deployment headers and additional target browsers.
+- [ ] Review upstream maintenance/release cadence and record the supported browser matrix.
 - [ ] Exercise startup failure/cancellation and repeated start/stop/dispose lifecycle paths.
 - [ ] Compare adapter behavior against a fake backend conformance suite.
 

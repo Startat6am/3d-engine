@@ -94,11 +94,12 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 ## M6 verification snapshot — 2026-11-15
 
 - `pnpm check`: formatting, lint, workspace typecheck/build, and 129 unit tests passed.
-- `pnpm e2e`: 21 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
+- `pnpm e2e`: 22 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
 - Dedicated Rapier browser smoke: WASM loaded, a dynamic body completed 60 fixed steps (Y=0.07456), and raycast returned a hit.
 - Production Vite smoke emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk.
-- Still open: deployment-header/target-browser checks, gamepad hardware E2E, character controller, Physics Playground, backend fake-conformance suite, physics performance report, and owner M6 sign-off.
+- Player Physics Playground: five-body gravity/collision scene, keyboard movement, raycast, pause/resume, and single-step; Playwright also checks the 360px layout.
+- Still open: deployment-header/target-browser checks, Rapier maintenance review, physical gamepad E2E, character controller, fake-backend conformance, resource limits, physics performance report, and owner M6 sign-off.
 
 ## Next step
 
-Complete deployment-header/target-browser verification and backend conformance, then continue with the character controller, Physics Playground, and M6 performance gates in order. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
+Complete deployment-header/target-browser verification, Rapier maintenance review, and fake-backend conformance; then implement the character controller and resource limits before the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.

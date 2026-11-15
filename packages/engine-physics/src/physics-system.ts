@@ -63,6 +63,11 @@ export class PhysicsSystem implements WorldSystem {
   #disposed = false;
   readonly #collisionEvents: CollisionEvent[] = [];
   #preparedEntities: PreparedEntity[] = [];
+  #stepCount = 0;
+
+  get stepCount(): number {
+    return this.#stepCount;
+  }
 
   constructor(readonly physics: PhysicsWorld) {}
 
@@ -150,6 +155,7 @@ export class PhysicsSystem implements WorldSystem {
     }
 
     const stepped = this.physics.step(context.deltaTime);
+    if (stepped) this.#stepCount += 1;
     this.#collisionEvents.push(...this.physics.drainCollisionEvents());
     if (stepped) {
       for (const item of this.#preparedEntities) {
@@ -175,6 +181,7 @@ export class PhysicsSystem implements WorldSystem {
     this.#runtimeBodies.clear();
     this.#preparedEntities = [];
     this.#collisionEvents.length = 0;
+    this.#stepCount = 0;
   }
 }
 

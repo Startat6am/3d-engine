@@ -16,7 +16,7 @@ The format is an architectural direction, not yet a finalized or implemented pub
 - `packages/engine-geometry` — CPU-side mesh contracts and primitive geometry.
 - `packages/engine-renderer` — Three.js WebGL2 implementation behind an engine-owned adapter.
 - `apps/editor` — React authoring shell with hierarchy, inspector and live 3D viewport.
-- `apps/player` — minimal runtime host; no React or editor dependency.
+- `apps/player` — minimal runtime host and Physics Playground sample; no React or editor dependency.
 
 ## Requirements and commands
 

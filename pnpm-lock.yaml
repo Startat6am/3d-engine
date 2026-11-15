@@ -298,6 +298,12 @@ importers:
       '@engine/geometry':
         specifier: workspace:*
         version: link:../../packages/engine-geometry
+      '@engine/input':
+        specifier: workspace:*
+        version: link:../../packages/engine-input
+      '@engine/physics':
+        specifier: workspace:*
+        version: link:../../packages/engine-physics
       '@engine/renderer':
         specifier: workspace:*
         version: link:../../packages/engine-renderer

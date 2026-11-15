@@ -78,10 +78,9 @@ Initial adapter implementation:
 
 Still required for M6 acceptance:
 
-- Character controller suitable for the Physics Playground.
+- Character controller and optional static-only triangle-mesh colliders (opt-in); no dynamic triangle meshes.
 - Explicit backend conformance suite/fake backend and resource limits for bodies, colliders, events, ray length, and mesh cooking.
-- Static-only triangle-mesh colliders (opt-in); no dynamic triangle meshes.
-- Physics Playground integration and performance report.
+- Physics Playground performance report and broader browser/device verification.
 
 Out of scope: soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism. Fixed-step alone does not guarantee bit-identical simulation across browsers or hardware.
 
@@ -139,6 +138,6 @@ Hard runtime resource limits and mesh-cooking limits are not implemented yet and
 
 ## 10. Tests and acceptance
 
-Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, and the browser WASM smoke path. Character controller, fake-backend conformance, additional browsers/deployment headers, performance budgets, and Physics Playground E2E remain open.
+Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, and the browser WASM smoke path. The Player Physics Playground now demonstrates gravity, collisions, body types, keyboard movement, raycast, pause, and single-step with browser E2E coverage. Character controller, fake-backend conformance, additional browsers/deployment headers, and performance budgets remain open.
 
 The authoritative M6 exit checklist is [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).

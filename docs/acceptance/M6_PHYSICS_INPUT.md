@@ -11,6 +11,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Confirm package names, exports, TypeScript conventions, and runtime phase integration against current source.
 - [x] Verify Rapier 0.21.0 / Apache-2.0, Vite WASM asset emission, lazy loading, and Chromium runtime simulation + raycast smoke; see ADR 0003.
 - [ ] Verify deployment headers and additional target browsers.
+- [ ] Review upstream Rapier maintenance/release cadence and record the supported browser matrix.
 - [x] Publish the physics and input contracts, stable error categories, minimal examples, and explicit unsupported capabilities.
 - [x] Keep backend-specific types out of public engine APIs.
 
@@ -45,7 +46,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 ## M6.4 — Input mapping
 
 - [x] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots.
-- [ ] Keyboard, mouse, and standard gamepad adapters are verified in all supported browsers; keyboard/mouse unit smoke exists, physical gamepad coverage remains open.
+- [ ] Keyboard/mouse action mapping is verified in Chromium through the Player Playground; verify the supported browser matrix and physical gamepad coverage before closing this gate.
 - [x] Edge transitions survive frames with no fixed tick and are consumed once across multiple fixed ticks.
 - [ ] Focus loss and gamepad disconnect neutralize state in browser hardware tests; pointer lock is not acquired by this adapter.
 - [x] Context priority, dead zones, map validation, queue bounds, and listener disposal are unit-tested.
@@ -58,15 +59,16 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 - [x] Replace preview/foundation labels with truthful application and runtime status; no fake “READY” when renderer/runtime failed. Initial renderer and scene-save states are now derived from actual state.
 - [x] Remove or hide non-functional component rows, dead controls, empty placeholder sections, and decorative status indicators until they have real behavior. Static Inspector component checkmarks and foundation/READY labels have been removed.
 - [x] Keep working scene hierarchy, viewport, transform inspector, import, save/open, undo/redo, and diagnostics discoverable (existing Editor E2E remains green).
-- [ ] Add a focused Physics Playground scene demonstrating gravity, collision, body types, raycast, and input-driven movement.
-- [ ] Expose only real physics controls: simulation pause/resume, single-step, and relevant debug visualization when implemented.
+- [x] Add a focused Player Physics Playground demonstrating gravity, collision, body types, raycast, and keyboard-driven movement; Playwright exercises the browser route.
+- [x] Expose real simulation pause/resume and single-step controls in the Player Physics Playground.
+- [ ] Add physics debug visualization when implemented.
 - [x] Show actionable loading/error/empty states; errors must not be hidden in console-only output.
 - [x] Ensure the workspace remains usable at desktop and narrow mobile widths; no horizontal overflow or inaccessible critical controls (Playwright mobile viewport checks pass).
-- [ ] Visual smoke review is recorded with screenshots or browser evidence at representative desktop and mobile viewports.
+- [x] Browser smoke/E2E evidence is recorded for the Player Physics Playground and Editor at desktop and mobile viewports; screenshot review remains a final owner UX check.
 
 ## M6.6 — CI and documentation closeout
 
-- [x] Unit, build, lint, typecheck, and browser E2E checks pass. Adapter-conformance and full Physics Playground integration remain open.
+- [x] Unit, build, lint, typecheck, and browser E2E checks pass (22 Playwright tests). Adapter-conformance and physics performance report remain open.
 - [ ] Performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
 - [x] Known limitations and backend compatibility are recorded in the specs and ADRs.
 - [ ] README, Roadmap, Execution Plan, subsystem specs, and ADRs receive final owner review for status consistency.

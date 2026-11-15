@@ -121,4 +121,4 @@ Map limits are 128 actions and 512 bindings. Browser adapter transition queue is
 
 Unit tests cover keyboard press/release and repeat suppression, press+release between frames, zero/multiple fixed steps, transient mouse delta accumulation, modifiers, vector normalization, gamepad dead-zone mapping, context priority/enable/disable, focus-loss neutralization, listener disposal, queue overflow, and invalid maps.
 
-Remaining M6 evidence: physical gamepad coverage in supported browsers, full input E2E in Player, and integration with the Physics Playground. Touch maps, pointer lock, absolute mouse position, device lifecycle events, and user-facing remapping UI are outside M6.
+Remaining M6 evidence: physical gamepad coverage in supported browsers and gamepad-specific browser E2E. Keyboard movement is exercised through semantic action snapshots in the Player Physics Playground E2E. Touch maps, pointer lock, absolute mouse position, device lifecycle events, and user-facing remapping UI are outside M6.

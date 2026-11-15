@@ -58,7 +58,7 @@ M6 UX rules:
 4. Keep the primary scene-editing surface visually dominant. Put secondary technical diagnostics and physics tuning in collapsible, labeled panels.
 5. Show a clear empty-selection inspector state, a clear empty-scene state, loading progress, and actionable failures.
 6. Use consistent spacing, readable labels, keyboard focus, adequate hit targets, and no horizontal overflow at supported desktop/mobile widths.
-7. The Physics Playground is a focused sample/workspace for demonstrating M6, not a placeholder tab. Its controls must be wired to actual physics/input state.
+7. The Physics Playground is a focused Player sample route (`apps/player/physics-playground.html`), linked from the Player start page, not a placeholder Editor tab. Its controls are wired to actual physics/input state.
 8. Do not introduce decorative tabs, disabled controls without explanation, fake asset counts, or simulated values.
 
 M6 visual acceptance is a limited quality gate, not a claim that the full Editor MVP (gizmos, asset browser, plugin system, full command/transaction history) is complete. See [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).
