@@ -39,6 +39,11 @@ export interface MaterialDescriptor {
   readonly transparent: boolean;
   readonly wireframe: boolean;
   readonly emissiveColor?: number;
+  readonly alphaMode?: 'OPAQUE' | 'MASK' | 'BLEND';
+  readonly alphaCutoff?: number;
+  readonly doubleSided?: boolean;
+  readonly normalScale?: readonly [number, number];
+  readonly occlusionStrength?: number;
   readonly baseColorTexture?: TextureSource;
   readonly metallicRoughnessTexture?: TextureSource;
   readonly normalTexture?: TextureSource;
