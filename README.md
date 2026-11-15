@@ -48,6 +48,8 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [ECS](docs/ECS_SPEC.md)                            | Entity, component, system and transform model                   |
 | [Asset pipeline](docs/ASSET_PIPELINE.md)           | Import, identity, caching and disposal                          |
 | [Physics](docs/PHYSICS_SPEC.md)                    | Physics integration contract                                    |
+| [Input](docs/INPUT_SPEC.md)                          | Device-independent input mapping and fixed-tick snapshots      |
+| [M6 acceptance](docs/acceptance/M6_PHYSICS_INPUT.md) | Physics, input, editor UX and CI exit gates                     |
 | [Editor](docs/EDITOR_SPEC.md)                      | Authoring application                                           |
 | [Runtime](docs/RUNTIME_SPEC.md)                    | Player lifecycle and frame scheduling                           |
 | [AI agent authoring](docs/AI_AGENT_SPEC.md)        | Prompt-to-object/world workflow, validation and approval        |
@@ -56,7 +58,7 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Status
 
-Foundation scaffold is implemented and its CI exit gate has passed; this is not a feature-complete engine. ECS component storage/query scheduling, transform hierarchy, world serialization, asset pipeline, physics, animation, audio, input, editor commands/undo and AI authoring remain future gated milestones. The browser E2E smoke test and GitHub Actions CI pass on PR #2. Foundation remains in progress until the remaining package-boundary, renderer, lifecycle and integration acceptance gates are implemented and measured.
+M2–M5 are complete. M6 Physics & Input is the active planning milestone; its contracts and acceptance gates are being prepared before implementation. Physics and input packages do not yet exist. The Editor remains an incremental authoring shell, not the full Editor MVP; M6 includes a bounded visual UX cleanup and a real Physics Playground integration. AI authoring remains at its later roadmap milestone and is not being accelerated.
 
 ## Deployment
 
