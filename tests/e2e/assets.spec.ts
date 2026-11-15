@@ -505,6 +505,23 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect(page.getByText('Could not open project folder', { exact: true })).toBeVisible();
   await expect(page.getByText(/External asset hash mismatch/)).toBeVisible();
   await expect(page.getByText('AfterFailedOpen')).toBeVisible();
+
+  // A missing external image must also fail before replacing the active scene.
+  await page.evaluate((path) => {
+    const files = (window as Window & { __projectFiles: Map<string, { bytes: Uint8Array }> })
+      .__projectFiles;
+    files.delete(path);
+  }, texturePath);
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'after-missing-blob.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['AfterMissingBlob']),
+  });
+  await expect(page.getByText('AfterMissingBlob')).toBeVisible();
+  await menu.getByRole('button', { name: 'Open Project Folder…' }).click();
+  await expect(page.getByText('Could not open project folder', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Project file not found:/)).toBeVisible();
+  await expect(page.getByText('AfterMissingBlob')).toBeVisible();
 });
 
 test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
