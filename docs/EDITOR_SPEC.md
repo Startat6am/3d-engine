@@ -30,6 +30,29 @@ Unsaved changes are surfaced; failed save preserves dirty state. Unsupported plu
 
 Command undo/redo round-trips, hierarchy selection, inspector editing, gizmo transforms, save/reopen, plugin isolation, and Playwright E2E smoke tests.
 
+## M6 visual UX quality scope
+
+M6 includes a bounded usability and truthfulness pass over the existing Editor, not completion of the full Editor MVP.
+
+Current observed issues to resolve before calling the M6 integration usable:
+- The top bar says `EDITOR · INTERACTIVE PREVIEW` and the inspector/footer use generic foundation/ready labels that do not describe actual subsystem health.
+- The inspector displays static Mesh Renderer / Geometry rows with checkmarks rather than editable, authoritative component data.
+- The current editor is a compact scene shell, not yet the full hierarchy/asset-browser/gizmo workflow described by the MVP.
+- Technical diagnostics are available, but user-facing operation errors and empty states must remain visible and actionable.
+- The desktop three-column layout has a 760px body minimum width; narrow/mobile behavior is handled separately and needs an explicit regression check.
+
+M6 UX rules:
+1. Do not display a feature as available unless its action works end-to-end. Remove, hide, or clearly mark placeholders; do not use decorative checkmarks or fake readiness indicators.
+2. Distinguish application state (editing/play mode), renderer state, project dirty/saved state, and physics state. Each status must derive from a real source.
+3. Preserve working hierarchy, viewport, transform editing, import, save/open, undo/redo, and diagnostics while reorganizing controls.
+4. Keep the primary scene-editing surface visually dominant. Put secondary technical diagnostics and physics tuning in collapsible, labeled panels.
+5. Show a clear empty-selection inspector state, a clear empty-scene state, loading progress, and actionable failures.
+6. Use consistent spacing, readable labels, keyboard focus, adequate hit targets, and no horizontal overflow at supported desktop/mobile widths.
+7. The Physics Playground is a focused sample/workspace for demonstrating M6, not a placeholder tab. Its controls must be wired to actual physics/input state.
+8. Do not introduce decorative tabs, disabled controls without explanation, fake asset counts, or simulated values.
+
+M6 visual acceptance is a limited quality gate, not a claim that the full Editor MVP (gizmos, asset browser, plugin system, full command/transaction history) is complete. See [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).
+
 ## Current implementation slice (in review)
 
 The Editor currently has a bounded snapshot history for scene entity edits (100 snapshots), with Undo/Redo toolbar actions and Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, and Ctrl/Cmd+Y shortcuts. Text-entry controls retain their native editing shortcuts. A new edit after undo clears the redo branch. This is an interim scene-document history service; it is not yet the planned engine-editor command/transaction system, and pointer gestures are not grouped into transactions.
