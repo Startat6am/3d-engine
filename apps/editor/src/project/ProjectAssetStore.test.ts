@@ -197,6 +197,18 @@ describe('directory project asset store', () => {
     await expect(loadDirectoryProject(store)).rejects.toMatchObject({ code: 'HASH_MISMATCH' });
   });
 
+  it('rejects a missing external blob before returning a world document', async () => {
+    const source = new MemoryProjectFileStore();
+    const manifest = await saveDirectoryProject(source, await fixture());
+    const missingStore = new MemoryProjectFileStore();
+    await missingStore.writeFile('worlds/main.world', await source.readFile('worlds/main.world'));
+
+    const missingAsset = (manifest.assets as AssetRecord[])[0]!;
+    expect(source.has(missingAsset.uri)).toBe(true);
+    expect(missingStore.has(missingAsset.uri)).toBe(false);
+    await expect(loadDirectoryProject(missingStore)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
   it('rejects traversal paths before attempting external file access', async () => {
     const store = new MemoryProjectFileStore();
     const document = await fixture();
