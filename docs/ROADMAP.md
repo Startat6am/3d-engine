@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** M2–M5 complete; M6 Physics & Input planning is active. M5 exit evidence is recorded in [Execution Plan](EXECUTION_PLAN.md). M6 specifications and acceptance gates are being prepared before implementation; AI authoring remains at its existing later milestone.
+**Status:** M2–M5 complete; M6 Physics & Input implementation is in progress. M5 exit evidence is recorded in [Execution Plan](EXECUTION_PLAN.md). M6 packages and integration are under development; acceptance gates remain open. AI authoring remains at its existing later milestone.
 
 | Milestone                                  | Deliverables                                                                                                                                                                                       | Exit gate                                                                                                                                                                                                                            |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

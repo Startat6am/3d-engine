@@ -15,11 +15,13 @@ The current transform model stores local TRS plus parent identity. Dynamic rigid
 Use the existing `EngineRuntime` clock and fixed-update phase as the sole simulation clock. Physics steps only from fixed ticks. Synchronize physics results into ECS before transform propagation and render extraction.
 
 Authority by body type:
+
 - **Static:** ECS Transform is authoritative. Transform edits update the physics pose before the next step.
 - **Kinematic:** ECS/gameplay target is authoritative. The adapter receives a target pose for the next fixed tick.
 - **Dynamic:** Physics simulation is authoritative. The resulting pose is written back to ECS after each fixed tick.
 
 M6 conservative transform constraints:
+
 - A rigid-body entity must be a root entity (`Transform.parent === null`).
 - A rigid-body entity must use unit ECS scale; collider dimensions are specified explicitly in physics units.
 - Unsupported parented bodies and non-unit scale are rejected with stable diagnostics, never silently approximated.
@@ -31,6 +33,7 @@ The root-only/unit-scale restriction is a deliberate M6 limit, not a permanent e
 ## Phase ordering
 
 For each rendered frame:
+
 1. `pre-update`: apply authored static/kinematic pose changes and prepare input sample.
 2. For each existing fixed tick: gameplay fixed systems submit forces/targets; physics adapter steps exactly once; dynamic poses synchronize into ECS.
 3. `variable-update` and `post-update`: non-authoritative presentation/gameplay work.

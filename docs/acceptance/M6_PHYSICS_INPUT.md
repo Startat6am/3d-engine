@@ -1,6 +1,6 @@
 # M6 — Physics & Input Acceptance
 
-**Status:** planning baseline; no M6 implementation is claimed complete.  
+**Status:** implementation in progress; no M6 acceptance gate is claimed complete.  
 **Milestone order:** M6 follows M5 and precedes M7. M10 AI authoring remains deferred.
 
 This document is the M6 exit checklist. A gate passes only with implementation, automated evidence, documented limitations, and a verified browser example where specified.
@@ -9,13 +9,13 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 - [ ] Read and follow `SUBSYSTEM_CONTRACTS.md`.
 - [ ] Confirm package names, exports, TypeScript conventions, and runtime phase integration against current source.
-- [ ] Verify candidate Rapier version, WASM packaging/loading, browser support, license, bundle impact, and maintenance status; record the evidence in an ADR before pinning a dependency.
+- [ ] Complete real-browser Rapier WASM execution and deployment-header verification. Package/version 0.21.0, Apache-2.0 license, Vite asset emission, and lazy chunking have been checked provisionally; see ADR 0003.
 - [ ] Publish the physics and input contracts, stable error categories, minimal examples, and explicit unsupported capabilities.
 - [ ] Keep backend-specific types out of public engine APIs.
 
 ## M6.1 — Physics adapter and world lifecycle
 
-- [ ] `@engine/physics` exposes an engine-owned `PhysicsWorld` contract and descriptors for bodies, colliders, filters, queries, and events.
+- [ ] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [ ] Rapier is confined to an adapter module; tests can substitute a fake backend.
 - [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state.
 - [ ] Create/destroy/reconfigure operations are safe; stale body/collider handles are rejected.
@@ -42,7 +42,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 ## M6.4 — Input mapping
 
-- [ ] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots.
+- [ ] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots. Initial implementation and unit coverage exist; browser hardware coverage remains open.
 - [ ] Keyboard, mouse, and standard gamepad adapters work in supported browsers.
 - [ ] Edge transitions survive frames with no fixed tick and are consumed once across multiple fixed ticks.
 - [ ] Focus loss, pointer-lock loss, and gamepad disconnect neutralize state.
@@ -53,8 +53,8 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 M6 does not claim completion of the full Editor MVP. It does require that the new systems are discoverable and that existing visible UI does not misrepresent unfinished functionality.
 
-- [ ] Replace preview/foundation labels with truthful application and runtime status; no fake “READY” when renderer/runtime failed.
-- [ ] Remove or hide non-functional component rows, dead controls, empty placeholder sections, and decorative status indicators until they have real behavior.
+- [ ] Replace preview/foundation labels with truthful application and runtime status; no fake “READY” when renderer/runtime failed. Initial renderer and scene-save states are now derived from actual state.
+- [ ] Remove or hide non-functional component rows, dead controls, empty placeholder sections, and decorative status indicators until they have real behavior. Static Inspector component checkmarks and foundation/READY labels have been removed.
 - [ ] Keep working scene hierarchy, viewport, transform inspector, import, save/open, undo/redo, and diagnostics discoverable.
 - [ ] Add a focused Physics Playground scene demonstrating gravity, collision, body types, raycast, and input-driven movement.
 - [ ] Expose only real physics controls: simulation pause/resume, single-step, and relevant debug visualization when implemented.

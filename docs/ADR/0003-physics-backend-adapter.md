@@ -1,6 +1,6 @@
 # ADR 0003: Isolate the Physics Backend Behind an Engine-Owned Adapter
 
-- **Status:** Proposed — requires M6 compatibility spike and owner acceptance
+- **Status:** Proposed — package/build spike verified; real-browser compatibility and owner acceptance remain open
 - **Date:** 2026-11-15
 - **Decision owners:** Choreon maintainers
 
@@ -8,13 +8,14 @@
 
 M6 requires rigid-body simulation, collision events, queries, and browser deployment. The engine must retain ownership of entities, transforms, serialized scene data, and public contracts. A physics vendor's types and lifecycle must not become the engine's canonical world model.
 
-Rapier is the current candidate because it provides a browser/WASM-capable rigid-body engine. Its exact version, distribution mode, license, browser compatibility, maintenance status, and bundle cost have not yet been verified for this repository.
+Rapier 0.21.0 is selected provisionally. Production uses `@dimforge/rapier3d@0.21.0` (Apache-2.0) with Vite's WASM module plugin and an ESNext build target. The `@dimforge/rapier3d-compat@0.21.0` distribution is a development-only test dependency; it is not part of the production bundle. A Vite production smoke build emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk. This confirms build-time asset handling and code splitting, not yet execution in every supported browser or deployment environment.
 
 ## Proposed decision
 
 Define an engine-owned `PhysicsWorld` contract and isolate the selected backend behind an adapter in `@engine/physics`.
 
 The public boundary exposes engine-owned descriptors and values for:
+
 - rigid-body type and configuration;
 - collider shapes, dimensions, materials, and collision groups;
 - lifecycle-safe body/collider handles;
@@ -28,11 +29,13 @@ The Rapier adapter is an implementation detail. No Rapier object, handle, enum, 
 ## Consequences
 
 **Positive**
+
 - Backend can be replaced or supplemented without changing ECS, scene format, editor, or gameplay-facing APIs.
 - A fake adapter can test lifecycle, synchronization, and query semantics independently.
 - Serialization stores engine-owned configuration, never backend runtime objects.
 
 **Costs and constraints**
+
 - Adapter conformance tests and value conversion are required.
 - Backend-specific capabilities may not map one-to-one; capability differences must be explicit.
 - WASM initialization and disposal become explicit lifecycle concerns.
@@ -46,4 +49,4 @@ The Rapier adapter is an implementation detail. No Rapier object, handle, enum, 
 - Exercise startup failure, cancellation, repeated start/stop/dispose, body destruction, stale handles, raycasts, and event ordering.
 - Compare adapter behavior against a fake backend conformance suite.
 
-Until these checks pass, Rapier remains a candidate, not a pinned or accepted dependency.
+The exact package versions are pinned for the M6 spike, but this ADR remains proposed until real-browser WASM execution, deployment-header compatibility, and CI evidence pass. No Rapier types are exposed from `@engine/physics` public exports.

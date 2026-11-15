@@ -35,6 +35,7 @@ Command undo/redo round-trips, hierarchy selection, inspector editing, gizmo tra
 M6 includes a bounded usability and truthfulness pass over the existing Editor, not completion of the full Editor MVP.
 
 Current observed issues to resolve before calling the M6 integration usable:
+
 - The top bar says `EDITOR · INTERACTIVE PREVIEW` and the inspector/footer use generic foundation/ready labels that do not describe actual subsystem health.
 - The inspector displays static Mesh Renderer / Geometry rows with checkmarks rather than editable, authoritative component data.
 - The current editor is a compact scene shell, not yet the full hierarchy/asset-browser/gizmo workflow described by the MVP.
@@ -42,6 +43,7 @@ Current observed issues to resolve before calling the M6 integration usable:
 - The desktop three-column layout has a 760px body minimum width; narrow/mobile behavior is handled separately and needs an explicit regression check.
 
 M6 UX rules:
+
 1. Do not display a feature as available unless its action works end-to-end. Remove, hide, or clearly mark placeholders; do not use decorative checkmarks or fake readiness indicators.
 2. Distinguish application state (editing/play mode), renderer state, project dirty/saved state, and physics state. Each status must derive from a real source.
 3. Preserve working hierarchy, viewport, transform editing, import, save/open, undo/redo, and diagnostics while reorganizing controls.

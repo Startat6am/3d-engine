@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('editor shell loads with a 3D viewport and hierarchy', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle(/Universal 3D Engine/);
+  await expect(page).toHaveTitle(/Choreon/);
   await expect(page.getByText('HIERARCHY')).toBeVisible();
   await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toBeVisible();
@@ -148,4 +148,35 @@ test('mobile transform panel collapses to a small translucent toggle and expands
   await page.getByRole('button', { name: 'Expand transform panel' }).click();
   await expect(page.getByRole('button', { name: 'Move mode' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Collapse transform panel' })).toBeVisible();
+});
+
+test('editor reports real renderer and save state without placeholder components', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await expect(page.locator('.topbar .status')).toContainText('RENDERER ONLINE');
+  await expect(page.getByText('NEW SCENE')).toBeVisible();
+  await expect(page.getByText('COMPONENTS')).toHaveCount(0);
+  await expect(page.getByText('Mesh Renderer')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Sphere/ })
+    .click();
+  await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
+  await page.locator('details.file-menu > summary').click();
+  await page.getByRole('button', { name: 'Save World…' }).click();
+  await expect(page.getByText('SAVED')).toBeVisible();
+});
+
+test('empty scenes show an actionable state instead of an empty placeholder inspector', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('Empty scene')).toBeVisible();
+  await expect(
+    page.getByText('Select an object in the Hierarchy or add a primitive to begin.'),
+  ).toBeVisible();
+  await expect(page.getByText('0 OBJECTS')).toBeVisible();
 });

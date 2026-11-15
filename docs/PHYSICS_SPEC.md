@@ -16,9 +16,9 @@ Integrate rigid-body simulation without making a third-party physics library the
 
 ## 2. Backend strategy
 
-Rapier is the candidate backend, isolated behind the engine-owned adapter. No Rapier types may appear in public exports or serialized documents.
+Rapier 0.21.0 is pinned provisionally behind the engine-owned adapter: production dependency `@dimforge/rapier3d@0.21.0` (Apache-2.0); test-only dependency `@dimforge/rapier3d-compat@0.21.0`. No Rapier types may appear in public exports or serialized documents.
 
-Before pinning a version, the M6 spike MUST verify package/version, license, browser support, WASM loading under Vite production builds, deployment headers, maintenance status, bundle size, and lazy-loading behavior. See [ADR 0003](ADR/0003-physics-backend-adapter.md).
+A Vite production smoke build confirmed a separate WASM asset (~1.17 MB, ~0.45 MB gzip) and lazy JS chunk (~52 KB gzip). `vite-plugin-wasm` is enabled and editor/player builds target ESNext for native top-level-await support. Actual browser runtime and deployment-header verification remain open. See [ADR 0003](ADR/0003-physics-backend-adapter.md).
 
 The adapter must be replaceable and pass a backend-neutral conformance suite. Backend-specific capabilities are exposed through explicit capability metadata rather than leaking backend objects.
 
@@ -33,13 +33,13 @@ The adapter must be replaceable and pass a backend-neutral conformance suite. Ba
 
 ## 4. Simulation and runtime integration
 
-The existing `EngineRuntime` and `EngineClock` are the single source of fixed-step cadence. Physics MUST NOT create a second accumulator or call `step` from requestAnimationFrame/renderer callbacks.
+The existing `EngineRuntime` and `EngineClock` are the single source of fixed-step cadence. Physics MUST NOT create a second accumulator or call `step` from requestAnimationFrame/renderer callbacks. `PhysicsSystem` is registered in `fixed-update` and consumes the `SystemContext.deltaTime` from each fixed tick.
 
 - Default physics timestep: 1/60 second, supplied by the existing fixed-update context.
 - Existing `EngineClock` defaults currently cap frame delta at 0.25 seconds and fixed catch-up at 5 steps. Physics consumes those ticks; it does not silently change these global clock defaults.
 - Physics advances at most once per fixed-update tick.
 - Pause prevents backend stepping while the core runtime may continue editor/UI updates.
-- Single-step queues exactly one physics tick and is observable in tests.
+- `requestSingleStep()` queues exactly one physics tick while paused; the next fixed-update consumes it. Unpausing clears any queued single-step.
 - If physics is paused, force/impulse commands must follow a documented policy; the proposed policy is queue bounded commands until the next active tick or explicit reset, with overflow diagnostics.
 - Physics synchronization writes dynamic poses into ECS before transform propagation.
 - Optional render interpolation is presentation-only and MUST NOT mutate authoritative ECS Transform.
@@ -48,11 +48,11 @@ The exact order between gameplay fixed systems, physics stepping, and dynamic po
 
 ## 5. Body authority and lifecycle
 
-| Body type | Authoritative source | Synchronization |
-| --- | --- | --- |
-| Static | ECS Transform/configuration | ECS pose/config edits update backend before next step |
-| Kinematic | ECS/gameplay target | Target pose is submitted before the next physics step |
-| Dynamic | Physics simulation | Physics pose is written to ECS after each fixed step |
+| Body type | Authoritative source        | Synchronization                                       |
+| --------- | --------------------------- | ----------------------------------------------------- |
+| Static    | ECS Transform/configuration | ECS pose/config edits update backend before next step |
+| Kinematic | ECS/gameplay target         | Target pose is submitted before the next physics step |
+| Dynamic   | Physics simulation          | Physics pose is written to ECS after each fixed step  |
 
 Body and collider handles are opaque engine-owned identifiers with generation/lifecycle validation. Destroying an ECS entity destroys associated backend resources before stale references can be used. Reconfiguration is explicit and validated; backend state is not serialized.
 
@@ -61,6 +61,7 @@ See [ADR 0004](ADR/0004-physics-transform-authority.md).
 ## 6. M6 capability scope
 
 Required:
+
 - Static, kinematic, and dynamic rigid bodies.
 - Gravity, linear/angular velocity, mass/density, friction, restitution, damping, and sleeping controls where supported by the chosen adapter.
 - Box, sphere, capsule, cylinder, and convex-hull colliders.
@@ -71,6 +72,7 @@ Required:
 - Deterministic lifecycle and disposal tests.
 
 Restricted:
+
 - Triangle-mesh colliders are opt-in and static-only in M6.
 - Dynamic triangle meshes, soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism are out of scope.
 - Character controller behavior is an adapter capability; it is not a full animation/motor framework.
@@ -93,13 +95,14 @@ interface PhysicsWorld {
 }
 ```
 
-The final API must define force/impulse operations, kinematic target submission, collision event subscription, filtering, query coordinate spaces, and typed error results. This sketch is not a frozen public API.
+The interface defines force/impulse operations, kinematic target submission, collision-event draining, filtering, world-space queries, and typed error results. This sketch is not a frozen public API.
 
 Raycast input uses a world-space origin, normalized world-space direction, and finite non-negative max distance. Hit results include entity ID, collider ID, world-space point, world-space normal, and distance. `raycast` returns the nearest accepted hit; `raycastAll` returns hits sorted nearest-first. Excluded entities and collision-group filters are supported. Stale handles/entities are never returned as valid hits.
 
 ## 8. Errors and validation
 
 Stable error categories include:
+
 - `physics.backend-unavailable`
 - `physics.backend-init-failed`
 - `physics.invalid-body-descriptor`

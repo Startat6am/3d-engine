@@ -1,7 +1,7 @@
 # Input Specification
 
-**Status:** proposed M6 contract  
-**Target package:** `@engine/input` (not yet implemented)  
+**Status:** M6 contract draft; implementation in progress  
+**Target package:** `@engine/input` (initial implementation present; acceptance remains open)  
 **Contract version:** 0.1.0
 
 ## 1. Responsibility and boundaries
@@ -18,26 +18,26 @@ React, renderer, physics backend, and browser globals MUST NOT leak into the pub
 
 ## 2. M6 supported devices
 
-| Device | M6 baseline | Notes |
-| --- | --- | --- |
-| Keyboard | Required | Physical code based bindings; ignore key-repeat for edge transitions |
-| Mouse | Required | Buttons, position, movement and wheel; pointer lock is optional and not required for exit |
-| Gamepad | Required baseline adapter | Standard Gamepad mapping, connection/disconnection, axis dead zones |
-| Touch | Deferred | Editor viewport gestures remain app-owned; no general touch action map in M6 |
+| Device   | M6 baseline               | Notes                                                                                     |
+| -------- | ------------------------- | ----------------------------------------------------------------------------------------- |
+| Keyboard | Required                  | Physical code based bindings; ignore key-repeat for edge transitions                      |
+| Mouse    | Required                  | Buttons, position, movement and wheel; pointer lock is optional and not required for exit |
+| Gamepad  | Required baseline adapter | Standard Gamepad mapping, connection/disconnection, axis dead zones                       |
+| Touch    | Deferred                  | Editor viewport gestures remain app-owned; no general touch action map in M6              |
 
 Browser adapter owns DOM listeners on an explicitly supplied target. It must detach every listener and release pointer-lock/focus hooks on dispose.
 
 ## 3. Public concepts
 
-- **InputDevice** — physical source with stable device identity and lifecycle.
+- **InputSource** — keyboard, mouse, or gamepad physical control namespace.
 - **InputAction** — named semantic action with declared value kind: `button`, `axis1D`, or `axis2D`.
 - **InputBinding** — maps a physical control plus modifiers/scale/dead-zone settings to an action.
-- **InputMap** — versioned collection of action declarations and bindings.
+- **InputMap** — collection of action declarations and physical bindings.
 - **InputContext** — enabled map with priority and optional consumption of lower-priority bindings.
 - **InputSnapshot** — immutable state for one simulation tick.
 - **InputSystem** — samples adapters, resolves contexts, and publishes snapshots.
 
-Initial public API shape (names are proposed and must be checked against implementation conventions before code):
+Implemented API shape (contract remains provisional until M6 acceptance):
 
 ```ts
 interface InputSnapshot {
@@ -49,29 +49,33 @@ interface InputSnapshot {
 }
 
 interface InputSystem {
+  addAdapter(adapter: InputDeviceAdapter): void;
+  addContext(context: InputContext): void;
   enableContext(id: string): void;
   disableContext(id: string): void;
-  getSnapshot(): InputSnapshot;
+  prepareFrame(): void;
+  fixedUpdate(context: SystemContext): void;
+  snapshot(contextId?: string): InputSnapshot;
   dispose(): void;
 }
 ```
 
-No method may return a mutable internal buffer. Unknown action names return a typed diagnostic or a documented neutral value; the final choice must be consistent across the package and tests.
+No method may return a mutable internal buffer. Unknown action/context names throw `InputError` with stable codes. Snapshots are immutable and action names are scoped to a context; `snapshot()` without an ID reads the highest-priority active context.
 
 ## 4. Sampling and fixed-step semantics
 
-The runtime already provides `EngineClock` and scheduler phases. Input MUST NOT introduce a second frame clock or fixed-step accumulator.
+The runtime already provides `EngineClock` and scheduler phases. `SystemContext` now carries `fixedStepIndex` and `fixedStepCount` on fixed-update ticks. Input MUST NOT introduce a second frame clock or fixed-step accumulator. Register `InputPreUpdateSystem` in `pre-update` and `InputFixedUpdateSystem` before gameplay fixed systems so the snapshot is ready for consumers.
 
 1. Browser/device adapters enqueue physical transitions and update latest analog values.
 2. During `pre-update`, InputSystem drains the event queue, updates device state, resolves active contexts, and stages an immutable frame sample.
-3. Before each `fixed-update` tick, the staged sample is exposed as the current simulation snapshot.
-4. A press/release edge is delivered to exactly one fixed tick, even when a rendered frame contains multiple fixed ticks.
-5. If a rendered frame has no fixed tick, edge transitions remain pending; they must not be lost.
-6. Held state and analog values remain visible to every fixed tick in that rendered frame.
-7. Multiple transitions in one frame preserve order. A press and release between two rendered frames must not silently disappear.
-8. Variable-update may read a separate latest-frame view for UI only; gameplay decisions should use fixed-tick snapshots.
+3. The staged sample is resolved into one immutable snapshot per active context on each fixed tick.
+4. Press/release edges are delivered only to fixed tick index zero; later ticks in the same rendered frame see held state but no repeated edge.
+5. If a rendered frame has no fixed tick, edge transitions remain pending; they must not be lost. A press and release between ticks preserve both edges.
+6. Mouse delta and wheel bindings are transient: values accumulate across rendered frames with no fixed tick, are delivered once to the first fixed tick, and are zero on later ticks.
+7. Held keyboard/mouse/gamepad button state and non-transient analog values remain visible to every fixed tick in that rendered frame.
+8. Variable-update UI should not use gameplay snapshots as a substitute for a separate UI input path.
 
-The exact scheduler hook needed to expose a per-fixed-tick snapshot must be specified in the integration design; do not mutate `SystemContext` ad hoc or add hidden global state.
+`InputPreUpdateSystem` stages the frame; `InputFixedUpdateSystem` uses the explicit fixed-step index to consume edges/transient values once. The scheduler owns the clock and tick count.
 
 ## 5. Mapping rules
 
@@ -87,9 +91,9 @@ The exact scheduler hook needed to expose a per-fixed-tick snapshot must be spec
 ## 6. Focus, disconnect and lifecycle
 
 - On window blur, document visibility loss, or target focus loss as configured by the host, pressed keyboard/mouse controls are released and analog values neutralized.
-- A disconnected gamepad immediately neutralizes its controls and emits a device lifecycle event.
+- A disconnected gamepad immediately neutralizes its button and axis values. A separate device lifecycle event stream is not yet implemented.
 - Repeated keydown events do not create repeated `wasPressed` edges.
-- Pointer-lock loss is observable and must not leave a mouse button logically stuck.
+- Pointer lock is not acquired by the M6 browser adapter. If a host later enables pointer lock, that host must neutralize mouse state on lock loss.
 - Disposal is idempotent, removes listeners, clears queues, neutralizes snapshots, and releases references to DOM targets.
 - No input event listener may be installed at module import time.
 
@@ -101,9 +105,10 @@ Use stable error categories, not message-string matching:
 - `input.unknown-action` — requested action is not declared.
 - `input.duplicate-context` — duplicate context identity.
 - `input.unsupported-control` — binding references an unsupported control.
-- `input.adapter-unavailable` — device API is absent or unavailable.
+- `input.adapter-unavailable` — reserved for an unavailable device adapter.
+- `input.queue-overflow` — bounded transition queue overflow.
 
-Validate at map registration boundaries: non-empty IDs, unique action IDs per map, finite scales/dead zones, valid value-kind/binding compatibility, and bounded binding counts.
+Validate at map registration boundaries: non-empty IDs, unique action IDs per map, finite scales/dead zones, valid value-kind/binding compatibility, and limits of 128 actions / 512 bindings per map. Transition queues are bounded (1,024 adapter events; 2,048 pending system events) and overflow is surfaced as `input.queue-overflow`.
 
 ## 8. Performance and security
 
@@ -115,8 +120,8 @@ Validate at map registration boundaries: non-empty IDs, unique action IDs per ma
 
 ## 9. Tests and acceptance
 
-Required tests: keyboard press/hold/release, key-repeat suppression, press+release between frames, zero/multiple fixed steps, modifier matching, axis clamping/dead zone, context priority/consumption, gamepad connect/disconnect, focus loss neutralization, listener disposal, queue overflow, invalid-map diagnostics, and browser adapter E2E smoke test.
+Implemented tests cover keyboard press/release and repeat suppression, press+release between frames, zero/multiple fixed steps, transient mouse delta accumulation, modifier matching, axis normalization/dead zone, context priority/enable/disable, focus-loss neutralization, listener disposal, and physics-independent snapshot behavior. Gamepad browser hardware, queue overflow, and full browser E2E remain open acceptance items.
 
 ## 10. Compatibility and open decisions
 
-The 0.1.0 contract is proposed, not stable. Before implementation, confirm naming and package conventions, exact scheduler integration, standard gamepad mapping, context consumption behavior, and whether mouse delta is sampled per frame or accumulated per fixed tick. Touch action maps and user-facing binding-remap UI are outside M6.
+The 0.1.0 contract is provisional, not stable. Browser adapter uses `KeyboardEvent.code`, `MouseEvent.button`, `Gamepad0:ButtonN`, and `Gamepad0:AxisN` control names. Mouse delta/wheel are accumulated until one fixed tick. Pointer lock, touch action maps, device lifecycle events, and user-facing binding-remap UI are outside the current implementation scope; hardware/browser coverage remains part of M6 acceptance.

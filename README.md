@@ -34,31 +34,31 @@ pnpm e2e
 
 Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCHITECTURE.md), and [Roadmap](docs/ROADMAP.md).
 
-| Document                                           | Purpose                                                         |
-| -------------------------------------------------- | --------------------------------------------------------------- |
-| [Project identity](docs/PROJECT_IDENTITY.md)       | Choreon, Choreonome and `.choreon` naming                       |
-| [Engine specification](docs/ENGINE_SPEC.md)        | Product scope, requirements, non-goals and acceptance           |
-| [Architecture](docs/ARCHITECTURE.md)               | Package boundaries and dependency direction                     |
-| [Roadmap](docs/ROADMAP.md)                         | Gated implementation sequence                                   |
-| [Subsystem contracts](docs/SUBSYSTEM_CONTRACTS.md) | Contract-first design, machine-readable specs, errors and tests |
-| [Foundation status](docs/FOUNDATION_STATUS.md)     | Implemented scaffold, verification and remaining gates          |
-| [API specification](docs/API_SPEC.md)              | Public contracts and compatibility policy                       |
-| [Data format](docs/DATA_FORMAT.md)                 | Versioned project/world serialization                           |
-| [Rendering](docs/RENDERING_SPEC.md)                | Renderer abstraction and graphics capabilities                  |
-| [ECS](docs/ECS_SPEC.md)                            | Entity, component, system and transform model                   |
-| [Asset pipeline](docs/ASSET_PIPELINE.md)           | Import, identity, caching and disposal                          |
-| [Physics](docs/PHYSICS_SPEC.md)                    | Physics integration contract                                    |
-| [Input](docs/INPUT_SPEC.md)                          | Device-independent input mapping and fixed-tick snapshots      |
+| Document                                             | Purpose                                                         |
+| ---------------------------------------------------- | --------------------------------------------------------------- |
+| [Project identity](docs/PROJECT_IDENTITY.md)         | Choreon, Choreonome and `.choreon` naming                       |
+| [Engine specification](docs/ENGINE_SPEC.md)          | Product scope, requirements, non-goals and acceptance           |
+| [Architecture](docs/ARCHITECTURE.md)                 | Package boundaries and dependency direction                     |
+| [Roadmap](docs/ROADMAP.md)                           | Gated implementation sequence                                   |
+| [Subsystem contracts](docs/SUBSYSTEM_CONTRACTS.md)   | Contract-first design, machine-readable specs, errors and tests |
+| [Foundation status](docs/FOUNDATION_STATUS.md)       | Implemented scaffold, verification and remaining gates          |
+| [API specification](docs/API_SPEC.md)                | Public contracts and compatibility policy                       |
+| [Data format](docs/DATA_FORMAT.md)                   | Versioned project/world serialization                           |
+| [Rendering](docs/RENDERING_SPEC.md)                  | Renderer abstraction and graphics capabilities                  |
+| [ECS](docs/ECS_SPEC.md)                              | Entity, component, system and transform model                   |
+| [Asset pipeline](docs/ASSET_PIPELINE.md)             | Import, identity, caching and disposal                          |
+| [Physics](docs/PHYSICS_SPEC.md)                      | Physics integration contract                                    |
+| [Input](docs/INPUT_SPEC.md)                          | Device-independent input mapping and fixed-tick snapshots       |
 | [M6 acceptance](docs/acceptance/M6_PHYSICS_INPUT.md) | Physics, input, editor UX and CI exit gates                     |
-| [Editor](docs/EDITOR_SPEC.md)                      | Authoring application                                           |
-| [Runtime](docs/RUNTIME_SPEC.md)                    | Player lifecycle and frame scheduling                           |
-| [AI agent authoring](docs/AI_AGENT_SPEC.md)        | Prompt-to-object/world workflow, validation and approval        |
-| [Testing](docs/TESTING_SPEC.md)                    | Quality gates and benchmark methodology                         |
-| [ADRs](docs/ADR/)                                  | Accepted and proposed architecture decisions                    |
+| [Editor](docs/EDITOR_SPEC.md)                        | Authoring application                                           |
+| [Runtime](docs/RUNTIME_SPEC.md)                      | Player lifecycle and frame scheduling                           |
+| [AI agent authoring](docs/AI_AGENT_SPEC.md)          | Prompt-to-object/world workflow, validation and approval        |
+| [Testing](docs/TESTING_SPEC.md)                      | Quality gates and benchmark methodology                         |
+| [ADRs](docs/ADR/)                                    | Accepted and proposed architecture decisions                    |
 
 ## Status
 
-M2–M5 are complete. M6 Physics & Input is the active planning milestone; its contracts and acceptance gates are being prepared before implementation. Physics and input packages do not yet exist. The Editor remains an incremental authoring shell, not the full Editor MVP; M6 includes a bounded visual UX cleanup and a real Physics Playground integration. AI authoring remains at its later roadmap milestone and is not being accelerated.
+M2–M5 are complete. M6 Physics & Input is in progress: initial `@engine/physics` and `@engine/input` packages, fixed-tick integration, and Editor UX cleanup are under development; acceptance gates remain open. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at its later roadmap milestone and is not being accelerated.
 
 ## Deployment
 
