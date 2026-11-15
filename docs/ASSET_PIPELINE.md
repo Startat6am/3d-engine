@@ -48,6 +48,14 @@ Stable AssetId independent of path; path/URI is project-relative. Registry store
 
 CPU descriptors may outlive renderer device resources. GPU handles are backend-owned and recreated after device/context loss. Ownership is explicit; disposal is idempotent. Avoid implicit global caches with unbounded lifetime.
 
+## Project asset storage
+
+Directory projects keep `.world` as the JSON manifest and store binary payloads separately in an immutable content-addressed tree: `assets/sha256/<first-two-hex>/<sha256-digest>.<ext>`. The world asset record carries the stable logical asset ID, content hash, MIME/type metadata, and a project-relative URI. The digest determines storage identity; asset IDs are not filesystem paths. The extension is selected from an allowlisted MIME mapping, with `.bin` for unknown binary types.
+
+The v1 optional `assetPayloads` array remains supported for self-contained single-file `.world` exports and older fixtures. Folder-project saves omit Base64 payloads, write and verify binary blobs first, and replace the `.world` manifest last. Opening resolves all project-relative URIs and verifies hashes before committing the staged scene. Missing or mismatched blobs reject the open atomically. Unreferenced content-addressed blobs are harmless; garbage collection is explicit and never part of normal save.
+
+Filesystem access belongs in an Editor-side storage adapter. Core packages consume a small byte-oriented interface and do not depend on DOM or File System Access API types. Browsers without directory access keep the single-file `.world` fallback. Reject absolute paths, URL schemes, backslashes, NUL bytes, empty segments, and `.` / `..` traversal; all paths remain beneath the user-selected project root. See [ADR-0002](ADR/0002-project-asset-store.md) for the accepted decision and implementation acceptance tests.
+
 ## Dependencies
 
 Serialization defines persisted references. Asset IDs are unique within a world document; entity references, embedded source payloads, and dependency edges must resolve, and the dependency graph must be acyclic. Renderer consumes decoded geometry/material/texture data; animation/audio consume their respective asset types.
