@@ -26,6 +26,7 @@ describe('AssetRegistry', () => {
     expect(() => normalizeAssetUri('../outside.glb')).toThrow(AssetRegistryError);
     expect(() => normalizeAssetUri('https://example.com/model.glb')).toThrow(AssetRegistryError);
     expect(() => normalizeAssetUri('/absolute/model.glb')).toThrow(AssetRegistryError);
+    expect(() => normalizeAssetUri('assets/bad\0name.glb')).toThrow(AssetRegistryError);
   });
 
   it('registers, queries, filters and removes assets', () => {

@@ -32,6 +32,12 @@ import {
 } from '@engine/renderer/contracts';
 import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
+import {
+  BrowserProjectFileStore,
+  loadDirectoryProject,
+  saveDirectoryProject,
+  type DirectoryHandleLike,
+} from '../project/ProjectAssetStore.js';
 
 type TransformNumberInputProps = {
   readonly value: number;
@@ -77,6 +83,12 @@ function TransformNumberInput({ value, label, onCommit }: TransformNumberInputPr
 }
 
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
+
+interface DirectoryPickerWindow extends Window {
+  showDirectoryPicker?: (options?: {
+    readonly mode?: 'read' | 'readwrite';
+  }) => Promise<DirectoryHandleLike>;
+}
 type TransformMode = 'position' | 'rotation' | 'scale';
 type DiagnosticEntry = {
   id: number;
@@ -191,7 +203,7 @@ function mergeAssetRegistry(current: AssetRegistry, serialized: readonly unknown
       const asset = pending[index]!;
       const existing = merged.get(asset.id!);
       if (existing) {
-        if (existing.contentHash !== asset.contentHash || existing.uri !== asset.uri) {
+        if (existing.contentHash !== asset.contentHash || existing.kind !== asset.kind) {
           throw new Error(`World asset identity conflicts with the current project: ${asset.id}`);
         }
         pending.splice(index, 1);
@@ -309,6 +321,7 @@ export function EditorApp() {
   const [worldName, setWorldName] = useState('Untitled World');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
   const assetRegistryRef = useRef(new AssetRegistry());
   const assetImportServiceRef = useRef(new AssetImportService());
@@ -492,7 +505,7 @@ export function EditorApp() {
     );
   };
 
-  const saveWorld = () => {
+  const createWorldDocument = (): WorldDocument => {
     const worldDocument: WorldDocument = {
       format: 'universal-3d-world',
       schemaVersion: '1.0.0',
@@ -609,6 +622,11 @@ export function EditorApp() {
       assetPayloads: [...assetPayloadsRef.current.values()],
       extensions: {},
     };
+    return worldDocument;
+  };
+
+  const saveWorld = () => {
+    const worldDocument = createWorldDocument();
     const blob = new Blob([serializeWorld(worldDocument)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = window.document.createElement('a');
@@ -618,12 +636,19 @@ export function EditorApp() {
     URL.revokeObjectURL(url);
   };
 
-  const loadWorld = async (file?: File) => {
-    if (!file) return;
+  const loadWorld = async (
+    source?: File | WorldDocument,
+    options: { readonly replaceAssets?: boolean } = {},
+  ): Promise<boolean> => {
+    if (!source) return false;
+    const sourceName = source instanceof File ? source.name : 'main.world';
     try {
-      const root = parseWorld(await file.text());
-      const restoredAssetRegistry = mergeAssetRegistry(assetRegistryRef.current, root.assets);
-      const restoredAssetPayloads = new Map(assetPayloadsRef.current);
+      const root = source instanceof File ? parseWorld(await source.text()) : source;
+      const restoredAssetRegistry = mergeAssetRegistry(
+        options.replaceAssets ? new AssetRegistry() : assetRegistryRef.current,
+        root.assets,
+      );
+      const restoredAssetPayloads = new Map(options.replaceAssets ? [] : assetPayloadsRef.current);
       for (const payload of root.assetPayloads ?? []) {
         const assetId = payload.assetId as AssetId;
         if (!restoredAssetRegistry.has(assetId)) {
@@ -800,15 +825,80 @@ export function EditorApp() {
       assetRegistryRef.current = restoredAssetRegistry;
       assetPayloadsRef.current = restoredAssetPayloads;
       commitEntities(parsed);
+      if (options.replaceAssets) {
+        for (const lease of assetResourceLeasesRef.current) lease.release();
+        assetResourceLeasesRef.current = [];
+      }
       setSelectedId(parsed[0]?.id ?? '');
-      setWorldName(root.world.name || file.name.replace(/\.world$/i, ''));
+      setWorldName(root.world.name || sourceName.replace(/\.world$/i, ''));
+      projectDirectoryRef.current = null;
+      return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       pushDiagnostic({
         level: 'error',
         source: 'World',
-        message: `Could not open ${file.name}`,
+        message: `Could not open ${sourceName}`,
         details: message,
+      });
+      return false;
+    }
+  };
+
+  const directoryPicker = () => (window as DirectoryPickerWindow).showDirectoryPicker;
+
+  const saveProjectDirectory = async () => {
+    try {
+      const picker = directoryPicker();
+      if (!projectDirectoryRef.current && !picker) {
+        throw new Error(
+          'Directory projects are not supported in this browser. Use Save World instead.',
+        );
+      }
+      const directory = projectDirectoryRef.current ?? (await picker!({ mode: 'readwrite' }));
+      projectDirectoryRef.current = directory;
+      await saveDirectoryProject(new BrowserProjectFileStore(directory), createWorldDocument());
+      pushDiagnostic({
+        level: 'info',
+        source: 'Project',
+        message: 'Project folder saved',
+        details: 'Binary assets were written and hash-verified before worlds/main.world.',
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      pushDiagnostic({
+        level: 'error',
+        source: 'Project',
+        message: 'Could not save project folder',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const openProjectDirectory = async () => {
+    try {
+      const picker = directoryPicker();
+      if (!picker)
+        throw new Error(
+          'Directory projects are not supported in this browser. Use Open World instead.',
+        );
+      const directory = await picker({ mode: 'readwrite' });
+      const document = await loadDirectoryProject(new BrowserProjectFileStore(directory));
+      if (!(await loadWorld(document, { replaceAssets: true }))) return;
+      projectDirectoryRef.current = directory;
+      pushDiagnostic({
+        level: 'info',
+        source: 'Project',
+        message: 'Project folder opened',
+        details: 'All external asset files were hash-verified before the scene was committed.',
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      pushDiagnostic({
+        level: 'error',
+        source: 'Project',
+        message: 'Could not open project folder',
+        details: error instanceof Error ? error.message : String(error),
       });
     }
   };
@@ -1252,6 +1342,24 @@ export function EditorApp() {
             >
               Save World…
             </button>
+            {directoryPicker() ? (
+              <>
+                <button
+                  className="toolbar-button"
+                  style={{ display: 'block', width: '100%', textAlign: 'left' }}
+                  onClick={() => void openProjectDirectory()}
+                >
+                  Open Project Folder…
+                </button>
+                <button
+                  className="toolbar-button"
+                  style={{ display: 'block', width: '100%', textAlign: 'left' }}
+                  onClick={() => void saveProjectDirectory()}
+                >
+                  Save Project Folder…
+                </button>
+              </>
+            ) : null}
           </div>
         </details>
         <input
