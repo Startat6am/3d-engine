@@ -310,9 +310,49 @@ interface ResourceCacheEntry<TResource> {
   resource?: TResource;
   promise: Promise<TResource>;
   readonly dispose: (resource: TResource) => void;
+  readonly controller?: AbortController;
 }
 
-/** Deduplicates concurrent resource loads and disposes a resource after its final lease. */
+function createResourceAbortError(): Error {
+  const error = new Error('Resource acquisition was aborted');
+  error.name = 'AbortError';
+  return error;
+}
+
+function waitForResource<TResource>(
+  promise: Promise<TResource>,
+  signal?: AbortSignal,
+): Promise<TResource> {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.reject(createResourceAbortError());
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = () => signal.removeEventListener('abort', onAbort);
+    const onAbort = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(createResourceAbortError());
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (resource) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(resource);
+      },
+      (error: unknown) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      },
+    );
+  });
+}
+
+/** Deduplicates shared loads; one consumer abort cannot cancel work still leased by others. */
 export class AssetResourceCache<TResource> {
   readonly #entries = new Map<string, ResourceCacheEntry<TResource>>();
 
@@ -365,22 +405,26 @@ export class AssetResourceCache<TResource> {
 
   async acquire(
     key: string,
-    load: () => TResource | Promise<TResource>,
+    load: (signal: AbortSignal) => TResource | Promise<TResource>,
     dispose: (resource: TResource) => void,
+    signal?: AbortSignal,
   ): Promise<AssetResourceLease<TResource>> {
     if (!key.trim()) throw new TypeError('Resource cache key must not be empty');
+    if (signal?.aborted) throw createResourceAbortError();
 
     let entry = this.#entries.get(key);
     if (entry) {
       entry.references += 1;
     } else {
-      const loadPromise = Promise.resolve().then(load);
+      const controller = new AbortController();
+      const loadPromise = Promise.resolve().then(() => load(controller.signal));
       const created: ResourceCacheEntry<TResource> = {
         references: 1,
         settled: false,
         disposed: false,
         promise: loadPromise,
         dispose,
+        controller,
       };
       entry = created;
       created.promise = loadPromise.then(
@@ -401,7 +445,8 @@ export class AssetResourceCache<TResource> {
 
     const current = entry;
     try {
-      const resource = await current.promise;
+      const resource = await waitForResource(current.promise, signal);
+      if (signal?.aborted) throw createResourceAbortError();
       let released = false;
       return Object.freeze({
         resource,
@@ -414,9 +459,15 @@ export class AssetResourceCache<TResource> {
       });
     } catch (error) {
       current.references -= 1;
-      if (current.references === 0 && this.#entries.get(key) === current) {
-        this.#entries.delete(key);
+      if (current.references === 0) {
+        if (!current.settled) {
+          current.controller?.abort();
+          if (this.#entries.get(key) === current) this.#entries.delete(key);
+        } else if (this.#entries.get(key) === current) {
+          this.#disposeEntry(key, current);
+        }
       }
+      if (signal?.aborted) throw createResourceAbortError();
       throw error;
     }
   }
