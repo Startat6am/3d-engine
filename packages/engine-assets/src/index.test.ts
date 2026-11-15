@@ -128,6 +128,24 @@ describe('AssetImportService', () => {
     expect(result.data.meshes).toBe(1);
   });
 
+  it('passes a source-restoration callback through importer context', async () => {
+    const service = new AssetImportService();
+    const restoredSource = new ArrayBuffer(16);
+    const onSourceRestored = vi.fn();
+    service.register({
+      id: 'test.glb',
+      version: '1.0.0',
+      extensions: ['glb'],
+      async import(_source, context) {
+        context.onSourceRestored?.(restoredSource);
+        return { kind: 'model', data: null, dependencies: [], metadata: {} };
+      },
+    });
+
+    await service.import('ship.glb', new ArrayBuffer(8), { onSourceRestored });
+    expect(onSourceRestored).toHaveBeenCalledWith(restoredSource);
+  });
+
   it('rejects extension collisions and unsupported formats', async () => {
     const service = new AssetImportService();
     const importer = {

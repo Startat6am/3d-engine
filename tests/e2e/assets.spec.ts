@@ -161,6 +161,22 @@ test('GLB imports register stable project assets and survive world save/reopen',
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const stats = { created: 0, terminated: 0 };
+    window.Worker = class extends NativeWorker {
+      constructor(scriptURL: string | URL, options?: WorkerOptions) {
+        super(scriptURL, options);
+        stats.created += 1;
+      }
+
+      override terminate(): void {
+        stats.terminated += 1;
+        super.terminate();
+      }
+    };
+    Object.defineProperty(window, '__workerStats', { value: stats, configurable: true });
+  });
   await page.goto('/');
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'triangle.glb',
@@ -168,6 +184,12 @@ test('GLB imports register stable project assets and survive world save/reopen',
     buffer: makeTriangleGlb(),
   });
   await expect(page.getByText('TriangleNode')).toBeVisible();
+  const workerStats = await page.evaluate(() => {
+    const stats = (window as Window & { __workerStats?: { created: number; terminated: number } })
+      .__workerStats;
+    return stats ? { ...stats } : null;
+  });
+  expect(workerStats).toEqual({ created: 1, terminated: 1 });
   await expect(page.getByRole('alert')).toHaveCount(0);
   await page.waitForTimeout(250);
   expect(consoleErrors).toEqual([]);

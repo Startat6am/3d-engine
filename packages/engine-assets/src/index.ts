@@ -167,6 +167,8 @@ export interface AssetImportContext {
   readonly settings: Readonly<Record<string, string | number | boolean>>;
   /** Importers must observe this signal during long-running decode work. */
   readonly signal: AbortSignal;
+  /** Worker-backed importers return transferred source bytes before resolving. */
+  readonly onSourceRestored?: (source: ArrayBuffer) => void;
 }
 
 export interface AssetImporter<TData = unknown> {
@@ -256,6 +258,7 @@ export class AssetImportService {
     options: {
       readonly settings?: Readonly<Record<string, string | number | boolean>>;
       readonly signal?: AbortSignal;
+      readonly onSourceRestored?: (source: ArrayBuffer) => void;
     } = {},
   ): Promise<ImportedAsset<TData>> {
     const normalizedUri = normalizeAssetUri(uri);
@@ -276,6 +279,7 @@ export class AssetImportService {
         uri: normalizedUri,
         settings: options.settings ?? {},
         signal,
+        ...(options.onSourceRestored ? { onSourceRestored: options.onSourceRestored } : {}),
       });
       throwIfImportAborted(signal);
       return result as ImportedAsset<TData>;

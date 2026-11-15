@@ -15,6 +15,7 @@ import type { GlbAsset } from '@engine/gltf-importer';
 import type { WorldAssetPayload } from '@engine/serialization';
 import { EditorHistory } from './EditorHistory.js';
 import { readPbrMaterialState } from './materialValidation.js';
+import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
   createBoxGeometry,
@@ -821,15 +822,15 @@ export function EditorApp() {
     };
     let pendingLease: AssetResourceLease<ImportedAsset<GlbAsset>> | null = null;
     try {
-      const [three, gltf] = await Promise.all([import('three'), import('@engine/gltf-importer')]);
+      const three = await import('three');
       ensureImportActive();
       const { Matrix4, Quaternion, Vector3 } = three;
-      const importer = new gltf.GlbImporter();
+      const importer = new WorkerGlbImporter();
       if (!glbImporterRegisteredRef.current) {
         assetImportServiceRef.current.register(importer);
         glbImporterRegisteredRef.current = true;
       }
-      const sourceBytes = await file.arrayBuffer();
+      let sourceBytes = await file.arrayBuffer();
       ensureImportActive();
       const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'import.glb';
       const uri = `imports/${safeFileName}`;
@@ -840,6 +841,9 @@ export function EditorApp() {
         () =>
           assetImportServiceRef.current.import<GlbAsset>(uri, sourceBytes, {
             signal: controller.signal,
+            onSourceRestored: (restoredSource) => {
+              sourceBytes = restoredSource;
+            },
           }),
         () => {
           // CPU mesh buffers are garbage-collected after the final editor lease is released.
