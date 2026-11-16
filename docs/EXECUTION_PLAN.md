@@ -1,6 +1,6 @@
 # M6 Execution Plan — Physics/Input
 
-Updated: 2026-11-16
+Updated: 2026-11-17
 
 PR: [#87](https://github.com/Startat6am/3d-engine/pull/87)
 Branch: `feat/m6-physics-input-core`
@@ -20,7 +20,11 @@ Branch: `feat/m6-physics-input-core`
   action. Run #374 passed on the code-fix commit; run #386 passed on the code
   HEAD `910bc3687ad8c3a99bd1f853407b0987beb5e026`; run #387 passed on latest
   HEAD `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`, including 178/178 Vitest
-  tests and 22/22 Chromium E2E.
+  tests and 22/22 Chromium E2E. Run #390 passed on `222ffbb`.
+- Run #392 passed on code HEAD `35e71ab15532b7800a32ffd04a7b688c30cb63d1`:
+  180/180 Vitest tests, format, lint, typecheck, builds, both GLB benchmarks,
+  Chromium installation, and 22/22 Chromium E2E. The added conformance test
+  checks Fake/Rapier parity for single-step rejection and resume cancellation.
 - Vercel Preview for the code-bearing commit is READY and SSO-protected.
 
 ## Completed M6 implementation
@@ -29,7 +33,7 @@ Branch: `feat/m6-physics-input-core`
    offset/up, grounded state, and collision results.
 2. Physics lifecycle: entity/body/collider teardown, world disposal,
    reinitialization, and WASM init-failure recovery tests.
-3. FakePhysicsWorld and Rapier share a conformance test contract. Rapier supports opt-in static-only triangle meshes with bounded vertex/index buffers and rejects non-static bodies.
+3. FakePhysicsWorld and Rapier share a conformance test contract, including pause/single-step semantics. Rapier supports opt-in static-only triangle meshes with bounded vertex/index buffers and rejects non-static bodies.
 4. Input: keyboard, mouse, gamepad, focus/visibility loss, disconnect,
    reconnect, axis/button neutralization, and transition coverage.
 5. Preliminary performance report and reproducible Node benchmark.
