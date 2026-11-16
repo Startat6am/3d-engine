@@ -44,7 +44,7 @@ These snapshots are not a controlled memory comparison: garbage collection was n
 
 - The observed p95 fixed-step cost rises from about 0.68 ms at 100 bodies to about 3.39 ms at 1,000 bodies in this sparse, mostly non-contacting workload. This is comfortably below a 16.67 ms simulation tick in this particular Node run, but is not a browser frame-time guarantee.
 - Raycast latency is sub-millisecond in the observed runs. The small measured values are affected by timer granularity, JIT, cache state, and virtualization; do not extrapolate linearly or compare runs from different hosts without repeating the methodology.
-- The main body scenarios intentionally produce no contact events; event cost is covered separately by the 925-event drain case.
+- The main body scenarios produce no new collision-start events during the measured window after warm-up; bodies have already settled on the floor. Event-start/drain cost is covered separately by the 925-event stress case.
 - Event object allocation volume, WASM linear-memory high-water mark, browser process RSS, GPU memory, and allocation/GC profiles were not instrumented.
 - No browser engine (Chromium/Firefox/WebKit), physical desktop, mobile device, or production deployment was benchmarked here. Browser-specific profiling and repeat runs on dedicated hardware remain open.
 - No performance budget or acceptance threshold has been approved by the project owner; this report does not close the M6 performance gate.
