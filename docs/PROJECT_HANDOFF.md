@@ -1,6 +1,6 @@
 # Project Handoff — M6 Physics/Input
 
-Updated: 2026-11-16
+Updated: 2026-11-17
 
 Repository: `Startat6am/3d-engine`
 PR: [#87](https://github.com/Startat6am/3d-engine/pull/87)
@@ -36,6 +36,12 @@ Branch: `feat/m6-physics-input-core`
   format, lint, typecheck, 178/178 Vitest tests, builds, both GLB benchmarks,
   Playwright Chromium installation, and 22/22 Chromium E2E. The test asserts
   that the error-entry count increases after the missing-blob open action.
+- Run #390 passed on commit `222ffbbdfc8bd67bb7eebfb1d47ba9888fece2ee`.
+- Run #392 passed on current code HEAD `35e71ab15532b7800a32ffd04a7b688c30cb63d1`:
+  format, lint, typecheck, 180/180 Vitest tests, builds, both GLB benchmarks,
+  Playwright Chromium installation, and 22/22 Chromium E2E. The added shared
+  conformance case verifies that single-step requests are rejected while
+  running and that resuming cancels a queued single-step.
 
 ### Vercel deployment inspection — 2026-11-16
 
@@ -69,7 +75,7 @@ Branch: `feat/m6-physics-input-core`
   snap-to-ground, offset/up configuration, grounded state, and collisions.
 - Physics lifecycle integration with entity/body/collider teardown and
   world disposal/reinitialization coverage.
-- Shared Fake/Rapier conformance contract. Rapier also supports opt-in static-only triangle meshes with bounded vertex/index buffers and explicit rejection on dynamic/kinematic bodies.
+- Shared Fake/Rapier conformance contract, including matching pause/single-step rejection and resume-cancellation semantics. Rapier also supports opt-in static-only triangle meshes with bounded vertex/index buffers and explicit rejection on dynamic/kinematic bodies.
 - Keyboard, mouse, and gamepad input.
 - Blur/visibility releases, transient mouse reset, gamepad disconnect and
   reconnect, and negative-axis neutralization.
