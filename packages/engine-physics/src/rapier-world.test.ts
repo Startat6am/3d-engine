@@ -27,6 +27,25 @@ async function createTestPhysics(
 }
 
 describe('RapierPhysicsWorld adapter', () => {
+  it('reports WASM initialization failure and recovers on a subsequent create', async () => {
+    setRapierModuleLoaderForTests(async () => {
+      throw new Error('synthetic WASM startup failure');
+    });
+
+    try {
+      await expect(RapierPhysicsWorld.create()).rejects.toMatchObject({
+        code: 'physics.backend-init-failed',
+        message: 'Rapier WebAssembly initialization failed',
+      });
+    } finally {
+      setRapierModuleLoaderForTests(null);
+    }
+
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    expect(physics.step(1 / 60)).toBe(true);
+    physics.dispose();
+  });
+
   it('steps dynamic bodies with the supplied fixed delta and supports pause', async () => {
     const physics = await createTestPhysics();
     const entity = new EngineRuntime().world.createEntity();
