@@ -1,6 +1,6 @@
 # ADR 0003: Isolate the Physics Backend Behind an Engine-Owned Adapter
 
-- **Status:** Proposed — package, Vite build, and Chromium runtime smoke verified; deployment-header and owner acceptance remain open
+- **Status:** Proposed — engine-owned adapter implemented; Fake/Rapier conformance suite passes; deployment-header, browser-matrix, and owner acceptance remain open
 - **Date:** 2026-11-15
 - **Decision owners:** Choreon maintainers
 
@@ -49,6 +49,6 @@ The Rapier adapter is an implementation detail. No Rapier object, handle, enum, 
 - [ ] Verify supported deployment headers and additional target browsers.
 - [ ] Review upstream maintenance/release cadence and record the supported browser matrix.
 - [ ] Exercise startup failure/cancellation and repeated start/stop/dispose lifecycle paths.
-- [ ] Compare adapter behavior against a fake backend conformance suite.
+- [x] Compare adapter behavior against a fake backend conformance suite (shared contract tests run against FakePhysicsWorld and Rapier).
 
 The exact package versions are pinned for the M6 spike. This ADR remains proposed until deployment-header/target-browser compatibility and owner acceptance pass. No Rapier types are exposed from `@engine/physics` public exports.

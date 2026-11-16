@@ -79,7 +79,6 @@ Initial adapter implementation:
 Still required for M6 acceptance:
 
 - Character controller and optional static-only triangle-mesh colliders (opt-in); no dynamic triangle meshes.
-- Explicit backend conformance suite/fake backend.
 - Physics Playground performance report and broader browser/device verification.
 
 The Rapier adapter now enforces configurable limits for live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count. Defaults are exported as `DEFAULT_PHYSICS_RESOURCE_LIMITS`; applications may override individual values through `createPhysicsWorld({ limits })`. Collision-event overflow drains the backend queue, retains no more than the configured limit, and throws `physics.resource-limit` so truncation is never silent.
@@ -142,6 +141,6 @@ Runtime limits are implemented for bodies, colliders, collision events per drain
 
 ## 10. Tests and acceptance
 
-Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, configured resource limits and explicit collision-event overflow, and the browser WASM smoke path. The Player Physics Playground now demonstrates gravity, collisions, body types, keyboard movement, raycast, pause, and single-step with browser E2E coverage. Character controller, fake-backend conformance, additional browsers/deployment headers, and performance budgets remain open.
+Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, configured resource limits and explicit collision-event overflow, and the browser WASM smoke path. The Player Physics Playground now demonstrates gravity, collisions, body types, keyboard movement, raycast, pause, and single-step with browser E2E coverage. Character controller, additional browsers/deployment headers, and performance budgets remain open. A test-only FakePhysicsWorld and shared Fake/Rapier PhysicsWorld conformance suite now cover lifecycle, pose synchronization, stale handles, pause/single-step, empty queries/events, and disposal.
 
 The authoritative M6 exit checklist is [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).

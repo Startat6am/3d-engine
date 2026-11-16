@@ -19,7 +19,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 - [x] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [x] Rapier is confined to an adapter module; no Rapier types appear in public package-root exports.
-- [ ] Tests can substitute a fake backend and run the adapter conformance suite.
+- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (10 shared conformance tests pass).
 - [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state.
 - [x] Create/destroy operations are safe; stale body/collider handles are rejected. Descriptor replacement is supported; in-place mutation of descriptor objects is not.
 - [x] Disposal releases backend resources and is idempotent.
@@ -69,7 +69,7 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 
 ## M6.6 — CI and documentation closeout
 
-- [x] Unit, build, lint, typecheck, and browser E2E checks pass (22 Playwright tests). Adapter-conformance and physics performance report remain open.
+- [x] Unit, build, lint, typecheck, and browser E2E checks pass (22 Playwright tests reported on the submitted PR head). Shared adapter conformance tests now pass for Fake and Rapier (10 tests). Physics performance report remains open.
 - [ ] Performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
 - [x] Known limitations and backend compatibility are recorded in the specs and ADRs.
 - [ ] README, Roadmap, Execution Plan, subsystem specs, and ADRs receive final owner review for status consistency.

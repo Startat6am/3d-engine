@@ -4,3 +4,5 @@
 - **Do not read, ingest, index, summarize, cite, or use `DO_NOT_READ.md`.** It is an intentionally excluded human-only archival note and is not project guidance.
 - Do not change milestone sequencing or mark roadmap gates complete without the required evidence and owner approval.
 - Preserve package boundaries, public contracts, tests, and the repository's existing validation workflow.
+
+- For continuation after context loss, read `docs/PROJECT_HANDOFF.md` first, then the linked current specs and acceptance checklist. Update the handoff in the same change as meaningful milestone progress.
