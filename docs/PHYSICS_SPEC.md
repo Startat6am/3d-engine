@@ -130,7 +130,8 @@ Implemented stable error categories include:
 
 - `physics.backend-init-failed`
 - `physics.invalid-body-descriptor`
-- `physics.invalid-collider-descriptor`\n- `physics.invalid-character-controller` — invalid character-controller target, movement, or configuration.
+- `physics.invalid-collider-descriptor`
+- `physics.invalid-character-controller` — invalid character-controller target, movement, or configuration.
 - `physics.unsupported-shape`
 - `physics.unsupported-transform`
 - `physics.stale-handle`
