@@ -625,7 +625,14 @@ export class RapierPhysicsWorld implements PhysicsWorld {
           const a = shape.indices[index]!;
           const b = shape.indices[index + 1]!;
           const c = shape.indices[index + 2]!;
-          if (a >= vertexCount || b >= vertexCount || c >= vertexCount || a === b || b === c || c === a)
+          if (
+            a >= vertexCount ||
+            b >= vertexCount ||
+            c >= vertexCount ||
+            a === b ||
+            b === c ||
+            c === a
+          )
             throw new PhysicsError(
               'physics.invalid-collider-descriptor',
               `Triangle mesh contains invalid triangle indices at offset ${index}`,
