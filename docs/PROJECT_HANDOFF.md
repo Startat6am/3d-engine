@@ -53,7 +53,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Character-controller API and Rapier floor-contact smoke are implemented. Focused verification: TypeScript project build and 36/36 physics adapter/conformance tests passed; full workspace checks are pending. The pinned pnpm 12.18.0 executable is absent from this sandbox, so commands were run through the installed project binaries rather than claiming a successful `pnpm check`.
+Character-controller API and Rapier floor-contact/snap-to-ground smoke are implemented. Latest local validation in the Node 25 sandbox: TypeScript project build, Prettier check, ESLint, and 166/166 unit tests across 13 files passed; 30/30 shared Fake/Rapier conformance tests passed. The pinned pnpm 12.18.0 executable is absent, so this is not recorded as `pnpm check`; supported Node 22.12.x validation, production build, slope/autostep coverage, and exact-head CI remain open.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 
