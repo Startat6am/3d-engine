@@ -120,11 +120,20 @@ export class PhysicsSystem implements WorldSystem {
       }
       const colliderDescriptor = item.collider ?? null;
       if (runtime.colliderDescriptor !== colliderDescriptor) {
-        if (runtime.colliderHandle) this.physics.removeCollider(runtime.colliderHandle);
-        runtime.colliderHandle = null;
+        // Stage replacements before releasing the current collider. A backend validation
+        // or allocation failure must leave the previous working collider attached.
+        let nextColliderHandle: PhysicsColliderHandle | null = null;
+        try {
+          nextColliderHandle = colliderDescriptor
+            ? this.physics.createCollider(runtime.handle, colliderDescriptor)
+            : null;
+          if (runtime.colliderHandle) this.physics.removeCollider(runtime.colliderHandle);
+        } catch (error) {
+          if (nextColliderHandle) this.physics.removeCollider(nextColliderHandle);
+          throw error;
+        }
+        runtime.colliderHandle = nextColliderHandle;
         runtime.colliderDescriptor = colliderDescriptor;
-        if (colliderDescriptor)
-          runtime.colliderHandle = this.physics.createCollider(runtime.handle, colliderDescriptor);
       }
     }
 
