@@ -19,7 +19,8 @@ export type ColliderShape =
   | { readonly type: 'sphere'; readonly radius: number }
   | { readonly type: 'capsule'; readonly halfHeight: number; readonly radius: number }
   | { readonly type: 'cylinder'; readonly halfHeight: number; readonly radius: number }
-  | { readonly type: 'convex-hull'; readonly vertices: Float32Array };
+  | { readonly type: 'convex-hull'; readonly vertices: Float32Array }
+  | { readonly type: 'triangle-mesh'; readonly vertices: Float32Array; readonly indices: Uint32Array };
 
 export interface ColliderDescriptor {
   readonly shape: ColliderShape;
@@ -78,6 +79,10 @@ export interface PhysicsResourceLimits {
   readonly maxRayDistance: number;
   /** Maximum vertices accepted by one convex-hull descriptor. */
   readonly maxConvexHullVertices: number;
+  /** Maximum vertices accepted by one static triangle-mesh descriptor. */
+  readonly maxTriangleMeshVertices: number;
+  /** Maximum indices accepted by one static triangle-mesh descriptor. */
+  readonly maxTriangleMeshIndices: number;
 }
 
 export const DEFAULT_PHYSICS_RESOURCE_LIMITS: PhysicsResourceLimits = Object.freeze({
@@ -86,6 +91,8 @@ export const DEFAULT_PHYSICS_RESOURCE_LIMITS: PhysicsResourceLimits = Object.fre
   maxCollisionEventsPerDrain: 16_384,
   maxRayDistance: 10_000,
   maxConvexHullVertices: 65_536,
+  maxTriangleMeshVertices: 65_536,
+  maxTriangleMeshIndices: 196_608,
 });
 
 export type PhysicsCharacterControllerHandle = string & {
