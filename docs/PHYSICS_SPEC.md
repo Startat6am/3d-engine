@@ -89,6 +89,8 @@ Call moveCharacterController once per fixed tick for a controlled collider; repe
 
 - Physics Playground performance report and broader browser/device verification.
 
+A preliminary Node/Rapier microbenchmark is recorded in [M6 Physics Performance Report](PHYSICS_PERFORMANCE_REPORT.md). It measures 100/500/1,000-body fixed-step and raycast workloads plus a 925-event drain case on a shared virtualized Node host; it is not browser/device performance sign-off, and memory/allocation profiling remains incomplete.
+
 The Rapier adapter now enforces configurable limits for live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count. Defaults are exported as `DEFAULT_PHYSICS_RESOURCE_LIMITS`; applications may override individual values through `createPhysicsWorld({ limits })`. Collision-event overflow drains the backend queue, retains no more than the configured limit, and throws `physics.resource-limit` so truncation is never silent.
 
 Out of scope: soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism. Fixed-step alone does not guarantee bit-identical simulation across browsers or hardware.

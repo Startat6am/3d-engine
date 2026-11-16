@@ -52,7 +52,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots.
 - [ ] Keyboard/mouse action mapping is verified in Chromium through the Player Playground; verify the supported browser matrix and physical gamepad coverage before closing this gate.
 - [x] Edge transitions survive frames with no fixed tick and are consumed once across multiple fixed ticks.
-- [ ] Focus loss, document visibility changes, and gamepad disconnect neutralize state. Simulated browser-adapter unit tests now cover blur/visibility release, clearing accumulated mouse delta/wheel values, and gamepad button/axis neutralization; physical browser/gamepad verification remains open. Pointer lock is not acquired by this adapter.
+- [ ] Focus loss, document visibility changes, and gamepad disconnect neutralize state. Simulated browser-adapter unit tests cover blur/visibility release, clearing accumulated mouse delta/wheel values, neutralizing positive and negative gamepad axes, and gamepad disconnect/reconnect transitions. Gamepad polling is suspended while blurred/hidden. Physical browser/gamepad verification remains open. Pointer lock is not acquired by this adapter.
 - [x] Context priority, dead zones, map validation, queue bounds, and listener disposal are unit-tested.
 - [x] Gameplay-facing APIs use semantic actions; the input package does not expose DOM events to game systems.
 
@@ -73,8 +73,8 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 ## M6.6 — CI and documentation closeout
 
 - [x] Local formatting, lint, typecheck, and 166 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (30 tests).
-- [ ] Exact-head CI and browser E2E rerun; the previous submitted PR head reported 22/22 Playwright tests passing, but the current sandbox cannot launch Chromium because libglib-2.0.so.0 is missing.
-- [ ] Physics performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
+- [ ] Exact-head CI and browser E2E rerun: PR HEAD `2a8bb4c523bf8d065268ca7a1601055296abb738` passed GitHub Actions run #353, including 22/22 Chromium Playwright tests. Re-run CI after the pending focus/gamepad regression fix is committed.
+- [ ] Physics performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context. A preliminary Node/Rapier report and reproducible benchmark exist (`docs/PHYSICS_PERFORMANCE_REPORT.md`), but browser/device profiling, controlled memory/WASM and allocation measurements, dense-contact workloads, and owner-approved budgets are still missing.
 - [x] Known limitations and backend compatibility are recorded in the specs and ADRs.
 - [ ] README, Roadmap, Execution Plan, subsystem specs, and ADRs receive final owner review for status consistency.
 - [ ] Owner reviews the evidence and explicitly accepts M6 before M7 work begins.

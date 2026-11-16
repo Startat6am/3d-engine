@@ -23,9 +23,12 @@ export class BrowserInputAdapter implements InputDeviceAdapter {
   #mouseDeltaX = 0;
   #mouseDeltaY = 0;
   #wheel = 0;
+  #windowFocused = true;
+  #documentVisible: boolean;
 
   constructor(target: Window) {
     this.#window = target;
+    this.#documentVisible = target.document.visibilityState === 'visible';
     this.#listen(target, 'keydown', ((event: KeyboardEvent) => {
       if (event.repeat || event.isComposing) return;
       this.#set('keyboard', event.code, 1);
@@ -43,9 +46,16 @@ export class BrowserInputAdapter implements InputDeviceAdapter {
     this.#listen(target, 'wheel', ((event: WheelEvent) => {
       this.#wheel += event.deltaY;
     }) as EventListener);
-    this.#listen(target, 'blur', (() => this.#releaseAll()) as EventListener);
+    this.#listen(target, 'blur', (() => {
+      this.#windowFocused = false;
+      this.#releaseAll();
+    }) as EventListener);
+    this.#listen(target, 'focus', (() => {
+      this.#windowFocused = true;
+    }) as EventListener);
     this.#listen(target.document, 'visibilitychange', (() => {
-      if (target.document.visibilityState !== 'visible') this.#releaseAll();
+      this.#documentVisible = target.document.visibilityState === 'visible';
+      if (!this.#documentVisible) this.#releaseAll();
     }) as EventListener);
   }
 
@@ -104,6 +114,7 @@ export class BrowserInputAdapter implements InputDeviceAdapter {
   }
 
   #pollGamepads(): void {
+    if (!this.#windowFocused || !this.#documentVisible) return;
     const getGamepads = this.#window.navigator.getGamepads?.bind(this.#window.navigator);
     if (!getGamepads) return;
     const values = this.#values.get('gamepad')!;
@@ -133,7 +144,7 @@ export class BrowserInputAdapter implements InputDeviceAdapter {
     this.#wheel = 0;
     for (const source of ['keyboard', 'mouse', 'gamepad'] as const) {
       for (const [control, value] of this.#values.get(source)!) {
-        if (value > 0) this.#set(source, control, 0);
+        if (value !== 0) this.#set(source, control, 0);
       }
     }
   }

@@ -402,4 +402,53 @@ describe('BrowserInputAdapter', () => {
     ]);
     adapter.dispose();
   });
+
+  it('neutralizes negative gamepad axes on blur and accepts a reconnected gamepad', async () => {
+    const { BrowserInputAdapter } = await import('./browser-adapter.js');
+    const target = new EventTarget() as Window;
+    const documentTarget = new EventTarget() as Document;
+    Object.defineProperty(documentTarget, 'visibilityState', { value: 'visible' });
+    Object.defineProperty(target, 'document', { value: documentTarget });
+
+    let connected = true;
+    const button = { pressed: true, value: 1, touched: true };
+    const axes = [-0.8];
+    const gamepad = {
+      connected: true,
+      index: 0,
+      buttons: [button],
+      axes,
+    } as unknown as Gamepad;
+    Object.defineProperty(target, 'navigator', {
+      value: { getGamepads: () => (connected ? [gamepad] : []) },
+    });
+
+    const adapter = new BrowserInputAdapter(target);
+    const pressed = adapter.sample().find((item) => item.source === 'gamepad')!;
+    expect(pressed.values.get('Gamepad0:Axis0')).toBe(-0.8);
+    expect(pressed.values.get('Gamepad0:Button0')).toBe(1);
+
+    target.dispatchEvent(new Event('blur'));
+    const released = adapter.sample().find((item) => item.source === 'gamepad')!;
+    expect(released.values.get('Gamepad0:Axis0')).toBe(0);
+    expect(released.values.get('Gamepad0:Button0')).toBe(0);
+    expect(released.transitions).toEqual([
+      { source: 'gamepad', control: 'Gamepad0:Button0', pressed: false },
+    ]);
+
+    connected = false;
+    adapter.sample();
+    target.dispatchEvent(new Event('focus'));
+    connected = true;
+    axes[0] = 0.65;
+    button.pressed = true;
+    button.value = 1;
+    const reconnected = adapter.sample().find((item) => item.source === 'gamepad')!;
+    expect(reconnected.values.get('Gamepad0:Axis0')).toBe(0.65);
+    expect(reconnected.values.get('Gamepad0:Button0')).toBe(1);
+    expect(reconnected.transitions).toEqual([
+      { source: 'gamepad', control: 'Gamepad0:Button0', pressed: true },
+    ]);
+    adapter.dispose();
+  });
 });

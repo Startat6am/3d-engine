@@ -88,7 +88,7 @@ The scheduler owns tick count and cadence. Input never creates a second accumula
 
 ## 6. Focus, disconnect and lifecycle
 
-- Window blur and document visibility loss release pressed keyboard/mouse controls and neutralize analog values.
+- Window blur and document visibility loss release pressed keyboard/mouse controls and neutralize analog values. Gamepad polling is suspended while the window is blurred or the document is hidden, so a still-connected controller cannot immediately reintroduce stale held/axis state on the next sample; polling resumes on focus/visibility restoration.
 - A disconnected gamepad immediately neutralizes its button and axis values. A separate device lifecycle event stream is not implemented yet.
 - Repeated keydown events do not create repeated `wasPressed` edges.
 - Pointer lock is not acquired by the M6 adapter. If a host later enables it, the host must neutralize mouse state on lock loss.
@@ -119,6 +119,6 @@ Map limits are 128 actions and 512 bindings. Browser adapter transition queue is
 
 ## 9. Tests and remaining acceptance
 
-Unit tests cover keyboard press/release and repeat suppression, press+release between frames, zero/multiple fixed steps, transient mouse delta accumulation, modifiers, vector normalization, gamepad dead-zone mapping, context priority/enable/disable, focus-loss neutralization, listener disposal, queue overflow, and invalid maps.
+Unit tests cover keyboard press/release and repeat suppression, press+release between frames, zero/multiple fixed steps, transient mouse delta accumulation, modifiers, vector normalization, gamepad dead-zone mapping, context priority/enable/disable, focus-loss neutralization for positive and negative gamepad axes, gamepad disconnect/reconnect transitions, listener disposal, queue overflow, and invalid maps. Physical gamepad/browser E2E remains an acceptance gate.
 
 Remaining M6 evidence: physical gamepad coverage in supported browsers and gamepad-specific browser E2E. Keyboard movement is exercised through semantic action snapshots in the Player Physics Playground E2E. Touch maps, pointer lock, absolute mouse position, device lifecycle events, and user-facing remapping UI are outside M6.
