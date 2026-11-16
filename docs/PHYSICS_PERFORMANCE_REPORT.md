@@ -2,21 +2,21 @@
 
 **Date:** 2026-11-16  
 **Status:** preliminary Node/Rapier microbenchmark; not an M6 performance acceptance sign-off  
-**Benchmark:** [\`packages/engine-physics/bench/physics-performance.mjs\`](../packages/engine-physics/bench/physics-performance.mjs)
+**Benchmark:** [`packages/engine-physics/bench/physics-performance.mjs`](../packages/engine-physics/bench/physics-performance.mjs)
 
 ## Environment
 
 - Runtime: Node.js 22.13.0; V8 12.4.254.21-node.22; pnpm 12.18.0.
 - Platform: Linux x64 in a Vercel-hosted shared sandbox.
 - Reported hardware: 2 vCPU, Intel Xeon Processor @ 2.90 GHz; approximately 4.49 GB host-visible memory.
-- Physics: Rapier 0.21.0 through the engine adapter, using the \`@dimforge/rapier3d-compat\` WASM distribution for Node execution. This is not a browser production-WASM benchmark.
+- Physics: Rapier 0.21.0 through the engine adapter, using the `@dimforge/rapier3d-compat` WASM distribution for Node execution. This is not a browser production-WASM benchmark.
 - The sandbox is virtualized/shared; CPU scheduling and memory pressure are not controlled. Results are directional and must not be treated as stable hardware baselines.
 
 ## Method
 
 - Fixed step: 1/60 s.
 - Scenarios: 100, 500, and 1,000 dynamic sphere bodies, each with one collider, plus one static box floor (body/collider totals shown below).
-- Bodies use gravity \`[0, -9.81, 0]\`, radius 0.25, and \`canSleep: false\`; positions are distributed on a regular grid.
+- Bodies use gravity `[0, -9.81, 0]`, radius 0.25, and `canSleep: false`; positions are distributed on a regular grid.
 - Each scenario runs 120 warm-up steps, then measures 600 fixed steps individually. Collision events are drained every step.
 - Each scenario executes 3,000 downward raycasts after the simulation run. Hit rate is recorded; timings include JavaScript call overhead.
 - A separate event-pressure case creates 25 dynamic and 25 static sphere bodies at the same position, executes one step, then measures the event drain.
@@ -53,10 +53,10 @@ These snapshots are not a controlled memory comparison: garbage collection was n
 
 From the repository root, with dependencies installed and package builds complete:
 
-\`\`\`sh
+```sh
 pnpm --filter "./packages/**" build
 node packages/engine-physics/bench/physics-performance.mjs
-\`\`\`
+```
 
 The script uses the compatibility Rapier package for Node and the adapter's test loader seam. It does not alter the production backend selection.
 
