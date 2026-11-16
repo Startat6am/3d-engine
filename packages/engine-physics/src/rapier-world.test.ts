@@ -333,9 +333,9 @@ describe('RapierPhysicsWorld adapter', () => {
     const secondController = secondWorld.createCharacterController(secondCollider);
     secondWorld.step(1 / 60);
 
-    expect(secondWorld.moveCharacterController(secondController, [0.25, 0, 0]).translation).toEqual([
-      0.25, 0, 0,
-    ]);
+    expect(secondWorld.moveCharacterController(secondController, [0.25, 0, 0]).translation).toEqual(
+      [0.25, 0, 0],
+    );
     secondWorld.dispose();
   });
 

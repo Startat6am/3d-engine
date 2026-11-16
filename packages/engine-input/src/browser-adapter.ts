@@ -126,6 +126,11 @@ export class BrowserInputAdapter implements InputDeviceAdapter {
   }
 
   #releaseAll(): void {
+    // Discard relative input accumulated before focus was lost. Replaying stale
+    // mouse motion or wheel input after returning to the tab feels like a jump.
+    this.#mouseDeltaX = 0;
+    this.#mouseDeltaY = 0;
+    this.#wheel = 0;
     for (const source of ['keyboard', 'mouse', 'gamepad'] as const) {
       for (const [control, value] of this.#values.get(source)!) {
         if (value > 0) this.#set(source, control, 0);

@@ -324,4 +324,82 @@ describe('BrowserInputAdapter', () => {
     ]);
     adapter.dispose();
   });
+
+  it('releases held controls and discards transient mouse input when the document is hidden', async () => {
+    const { BrowserInputAdapter } = await import('./browser-adapter.js');
+    const target = new EventTarget() as Window;
+    const documentTarget = new EventTarget() as Document;
+    let visibilityState: DocumentVisibilityState = 'visible';
+    Object.defineProperty(documentTarget, 'visibilityState', {
+      get: () => visibilityState,
+      configurable: true,
+    });
+    Object.defineProperty(target, 'document', { value: documentTarget });
+    Object.defineProperty(target, 'navigator', { value: { getGamepads: () => [] } });
+    const adapter = new BrowserInputAdapter(target);
+
+    const keyDown = new Event('keydown') as KeyboardEvent;
+    Object.defineProperties(keyDown, {
+      code: { value: 'KeyW' },
+      repeat: { value: false },
+      isComposing: { value: false },
+    });
+    target.dispatchEvent(keyDown);
+    const mouseMove = new Event('mousemove') as MouseEvent;
+    Object.defineProperties(mouseMove, { movementX: { value: 18 }, movementY: { value: -7 } });
+    target.dispatchEvent(mouseMove);
+    const wheel = new Event('wheel') as WheelEvent;
+    Object.defineProperty(wheel, 'deltaY', { value: 120 });
+    target.dispatchEvent(wheel);
+
+    visibilityState = 'hidden';
+    documentTarget.dispatchEvent(new Event('visibilitychange'));
+    const samples = adapter.sample();
+    const keyboard = samples.find((item) => item.source === 'keyboard')!;
+    const mouse = samples.find((item) => item.source === 'mouse')!;
+    expect(keyboard.values.get('KeyW')).toBe(0);
+    expect(keyboard.transitions).toEqual([
+      { source: 'keyboard', control: 'KeyW', pressed: true },
+      { source: 'keyboard', control: 'KeyW', pressed: false },
+    ]);
+    expect(mouse.values.get('DeltaX')).toBe(0);
+    expect(mouse.values.get('DeltaY')).toBe(0);
+    expect(mouse.values.get('Wheel')).toBe(0);
+    adapter.dispose();
+  });
+
+  it('releases gamepad buttons and axes after a controller disconnects', async () => {
+    const { BrowserInputAdapter } = await import('./browser-adapter.js');
+    const target = new EventTarget() as Window;
+    const documentTarget = new EventTarget() as Document;
+    Object.defineProperty(documentTarget, 'visibilityState', { value: 'visible' });
+    Object.defineProperty(target, 'document', { value: documentTarget });
+    let connected = true;
+    const gamepad = {
+      index: 0,
+      connected: true,
+      buttons: [{ pressed: true, value: 1 }],
+      axes: [0.75],
+    } as unknown as Gamepad;
+    Object.defineProperty(target, 'navigator', {
+      value: { getGamepads: () => (connected ? [gamepad] : [null]) },
+    });
+    const adapter = new BrowserInputAdapter(target);
+
+    const pressed = adapter.sample().find((item) => item.source === 'gamepad')!;
+    expect(pressed.values.get('Gamepad0:Button0')).toBe(1);
+    expect(pressed.values.get('Gamepad0:Axis0')).toBe(0.75);
+    expect(pressed.transitions).toEqual([
+      { source: 'gamepad', control: 'Gamepad0:Button0', pressed: true },
+    ]);
+
+    connected = false;
+    const disconnected = adapter.sample().find((item) => item.source === 'gamepad')!;
+    expect(disconnected.values.get('Gamepad0:Button0')).toBe(0);
+    expect(disconnected.values.get('Gamepad0:Axis0')).toBe(0);
+    expect(disconnected.transitions).toEqual([
+      { source: 'gamepad', control: 'Gamepad0:Button0', pressed: false },
+    ]);
+    adapter.dispose();
+  });
 });

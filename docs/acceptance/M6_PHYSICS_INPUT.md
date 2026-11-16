@@ -20,7 +20,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [x] Rapier is confined to an adapter module; no Rapier types appear in public package-root exports.
 - [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (30 shared conformance tests pass).
-- [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state. A Rapier WASM failure/recovery test was added in commit `b41401dd2496c5c974eefe69ede2721125840fda`; it remains pending exact-head CI.
+- [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state. Rapier WASM failure/recovery test passes in the current branch-head local suite (Node 25.9); exact-head CI on the supported Node 22.12.x runtime remains pending.
 - [x] Create/destroy operations are safe; stale body/collider handles are rejected. Descriptor replacement is supported; in-place mutation of descriptor objects is not.
 - [x] Disposal releases backend resources and is idempotent.
 
@@ -39,7 +39,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Box, sphere, capsule, cylinder, and convex-hull descriptors validate dimensions and finite values.
 - [x] Configurable positive limits bound live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count; overflow is surfaced as a typed resource-limit error.
 - [ ] Static triangle-mesh collider support is explicitly scoped and opt-in; unsupported mesh/body combinations fail clearly.
-- [ ] Kinematic capsule character controller resolves movement against obstacles, reports grounded/collision normals, and is covered for flat ground, slope limits, autostep, snap-to-ground, and lifecycle cleanup. Initial API/lifecycle and flat-ground/snap-to-ground smoke tests exist. Rapier slope-limit integration tests (25° climbable with a 30° limit; 55° blocked by a 30° limit) passed exact-head CI run #343. Autostep integration tests were added in commit `0c548ae20eefb3c6661de8935f6a99ff82500aea` (0.4-unit step under a 0.45 limit; 0.8-unit step over the limit). Teardown/recreation and world-dispose/reinitialization tests were added in commit `625846e9ddaa6245ed3d7e23f4963d093fde1eda`; all new tests await exact-head CI.
+- [ ] Kinematic capsule character controller resolves movement against obstacles, reports grounded/collision normals, and is covered for flat ground, slope limits, autostep, snap-to-ground, and lifecycle cleanup. Initial API/lifecycle and flat-ground/snap-to-ground smoke tests exist. Rapier slope-limit integration tests (25° climbable with a 30° limit; 55° blocked by a 30° limit) passed exact-head CI run #343. Autostep integration tests pass locally (0.4-unit step under a 0.45 limit; 0.8-unit step over the limit). Teardown/recreation and world-dispose/reinitialization tests also pass in the current branch-head local suite. Exact-head CI on the supported Node 22.12.x runtime remains pending.
 - [x] Collision enter/exit events include stable entity and collider identities; sphere-sensor enter/exit are tested against both Fake and Rapier.
 - [x] Removing a collider or body during active contact emits exactly one exit event with stable identities; covered by Fake/Rapier conformance tests.
 - [x] Collision events obey mutual collision-group filtering; tested against Fake and Rapier.
@@ -52,7 +52,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots.
 - [ ] Keyboard/mouse action mapping is verified in Chromium through the Player Playground; verify the supported browser matrix and physical gamepad coverage before closing this gate.
 - [x] Edge transitions survive frames with no fixed tick and are consumed once across multiple fixed ticks.
-- [ ] Focus loss and gamepad disconnect neutralize state in browser hardware tests; pointer lock is not acquired by this adapter.
+- [ ] Focus loss, document visibility changes, and gamepad disconnect neutralize state. Simulated browser-adapter unit tests now cover blur/visibility release, clearing accumulated mouse delta/wheel values, and gamepad button/axis neutralization; physical browser/gamepad verification remains open. Pointer lock is not acquired by this adapter.
 - [x] Context priority, dead zones, map validation, queue bounds, and listener disposal are unit-tested.
 - [x] Gameplay-facing APIs use semantic actions; the input package does not expose DOM events to game systems.
 
