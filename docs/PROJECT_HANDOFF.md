@@ -67,7 +67,7 @@ Branch: `feat/m6-physics-input-core`
   snap-to-ground, offset/up configuration, grounded state, and collisions.
 - Physics lifecycle integration with entity/body/collider teardown and
   world disposal/reinitialization coverage.
-- Shared Fake/Rapier conformance contract.
+- Shared Fake/Rapier conformance contract. Rapier also supports opt-in static-only triangle meshes with bounded vertex/index buffers and explicit rejection on dynamic/kinematic bodies.
 - Keyboard, mouse, and gamepad input.
 - Blur/visibility releases, transient mouse reset, gamepad disconnect and
   reconnect, and negative-axis neutralization.
@@ -96,7 +96,7 @@ Branch: `feat/m6-physics-input-core`
 - Verify deployed `.wasm` MIME, cache, CORS, and fallback headers through
   an authorized Vercel browser session.
 - Verify Firefox/WebKit and physical gamepad/mobile behavior.
-- Confirm whether static/triangle-mesh collider coverage is in M6 scope.
+- Confirm the M6 owner accepts the static-only triangle-mesh scope; dynamic/kinematic meshes and mesh cooking remain deferred.
 - Complete browser/device performance and memory/allocation profiling.
 - Obtain owner review and M6 sign-off.
 
