@@ -77,16 +77,14 @@ Initial adapter implementation:
 
 - Static, kinematic-position, and dynamic rigid bodies.
 - Gravity, gravity scale, linear/angular damping, sleep control.
-- Box, sphere, capsule, cylinder, and convex-hull colliders.
+- Box, sphere, capsule, cylinder, convex-hull, and opt-in static-only triangle-mesh colliders.
 - Friction, restitution, density, sensor colliders, collision groups.
 - Collision enter/exit event draining with entity and collider identities.
 - Raycast and raycast-all with world-space results, collision-group filtering, and excluded entities.
 - Force/impulse operations, pause, single-step, ECS lifecycle and transform synchronization.
 - Engine-owned kinematic capsule character controller with collision-resolved movement, grounded state, collision normals, configurable up direction, slope limits, optional autostep, and snap-to-ground.
 
-Still required for M6 acceptance:
-
-- Optional static-only triangle-mesh colliders (opt-in); no dynamic triangle meshes.
+Static triangle meshes are opt-in and may only be attached to static rigid bodies. The adapter rejects triangle meshes on dynamic or kinematic bodies before creating a backend collider. Vertex and index buffers are bounded independently by `maxTriangleMeshVertices` and `maxTriangleMeshIndices`; malformed triangle indices are rejected before Rapier cooking. Dynamic/kinematic triangle meshes, automatic mesh cooking, and convex decomposition remain out of scope.
 
 ### Character controller scope (M6)
 
@@ -98,7 +96,7 @@ Call moveCharacterController once per fixed tick for a controlled collider; repe
 
 A preliminary Node/Rapier microbenchmark is recorded in [M6 Physics Performance Report](PHYSICS_PERFORMANCE_REPORT.md). It measures 100/500/1,000-body fixed-step and raycast workloads plus a 925-event drain case on a shared virtualized Node host; it is not browser/device performance sign-off, and memory/allocation profiling remains incomplete.
 
-The Rapier adapter now enforces configurable limits for live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count. Defaults are exported as `DEFAULT_PHYSICS_RESOURCE_LIMITS`; applications may override individual values through `createPhysicsWorld({ limits })`. Collision-event overflow drains the backend queue, retains no more than the configured limit, and throws `physics.resource-limit` so truncation is never silent.
+The Rapier adapter now enforces configurable limits for live bodies, live colliders, collision events per drain, ray length, convex-hull vertices, and static triangle-mesh vertices/indices. Defaults are exported as `DEFAULT_PHYSICS_RESOURCE_LIMITS`; applications may override individual values through `createPhysicsWorld({ limits })`. Collision-event overflow drains the backend queue, retains no more than the configured limit, and throws `physics.resource-limit` so truncation is never silent.
 
 Out of scope: soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism. Fixed-step alone does not guarantee bit-identical simulation across browsers or hardware.
 
