@@ -438,7 +438,7 @@ describe('RapierPhysicsWorld adapter', () => {
     physics.dispose();
   });
 
-  it('supports static-only triangle meshes for dynamic-body collision and ray queries', async () => {
+  it('supports static mesh collision and ray queries', async () => {
     const physics = await createTestPhysics();
     const world = new EngineRuntime().world;
     const floorEntity = world.createEntity();
@@ -469,7 +469,7 @@ describe('RapierPhysicsWorld adapter', () => {
     physics.dispose();
   });
 
-  it('rejects triangle meshes on non-static bodies and validates bounded mesh buffers', async () => {
+  it('rejects non-static meshes and bounds mesh buffers', async () => {
     const physics = await createTestPhysics({
       limits: { maxTriangleMeshVertices: 3, maxTriangleMeshIndices: 3 },
     });
