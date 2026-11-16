@@ -163,6 +163,91 @@ describe('RapierPhysicsWorld adapter', () => {
     physics.dispose();
   });
 
+  it('steps onto an obstacle within the configured autostep height', async () => {
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    const world = new EngineRuntime().world;
+    const floorEntity = world.createEntity();
+    const stepEntity = world.createEntity();
+    const characterEntity = world.createEntity();
+
+    const floor = physics.createBody(floorEntity, {
+      type: 'static',
+      position: [1, -0.5, 0],
+    });
+    physics.createCollider(floor, { shape: { type: 'box', halfExtents: [4, 0.5, 3] } });
+
+    const step = physics.createBody(stepEntity, {
+      type: 'static',
+      position: [0.5, 0.2, 0],
+    });
+    physics.createCollider(step, { shape: { type: 'box', halfExtents: [0.3, 0.2, 1] } });
+
+    const character = physics.createBody(characterEntity, {
+      type: 'kinematic',
+      position: [-1.5, 0.76, 0],
+    });
+    const capsule = physics.createCollider(character, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const controller = physics.createCharacterController(capsule, {
+      offset: 0.01,
+      autostep: { maxHeight: 0.45, minWidth: 0.2 },
+    });
+
+    // Refresh Rapier's character query broadphase after creating the scene.
+    physics.step(1 / 60);
+    const movement = physics.moveCharacterController(controller, [3, 0, 0]);
+
+    expect(movement.translation[0]).toBeGreaterThan(2.2);
+    expect(movement.translation[1]).toBeGreaterThan(0.25);
+    expect(movement.collisions.some((collision) => collision.entity === stepEntity)).toBe(true);
+
+    physics.removeCharacterController(controller);
+    physics.dispose();
+  });
+
+  it('does not autostep an obstacle above the configured height', async () => {
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    const world = new EngineRuntime().world;
+    const floorEntity = world.createEntity();
+    const stepEntity = world.createEntity();
+    const characterEntity = world.createEntity();
+
+    const floor = physics.createBody(floorEntity, {
+      type: 'static',
+      position: [1, -0.5, 0],
+    });
+    physics.createCollider(floor, { shape: { type: 'box', halfExtents: [4, 0.5, 3] } });
+
+    const step = physics.createBody(stepEntity, {
+      type: 'static',
+      position: [0.5, 0.4, 0],
+    });
+    physics.createCollider(step, { shape: { type: 'box', halfExtents: [0.3, 0.4, 1] } });
+
+    const character = physics.createBody(characterEntity, {
+      type: 'kinematic',
+      position: [-1.5, 0.76, 0],
+    });
+    const capsule = physics.createCollider(character, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const controller = physics.createCharacterController(capsule, {
+      offset: 0.01,
+      autostep: { maxHeight: 0.45, minWidth: 0.2 },
+    });
+
+    physics.step(1 / 60);
+    const movement = physics.moveCharacterController(controller, [3, 0, 0]);
+
+    expect(movement.translation[0]).toBeLessThan(2);
+    expect(movement.translation[1]).toBeLessThan(0.15);
+    expect(movement.collisions.some((collision) => collision.entity === stepEntity)).toBe(true);
+
+    physics.removeCharacterController(controller);
+    physics.dispose();
+  });
+
   it('raycasts nearest-first and rejects stale handles', async () => {
     const physics = await createTestPhysics({ gravity: [0, 0, 0] });
     const world = new EngineRuntime().world;
