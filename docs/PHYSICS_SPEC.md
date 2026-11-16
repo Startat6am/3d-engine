@@ -104,6 +104,9 @@ interface PhysicsWorld {
   requestSingleStep(): void;
   createBody(entity: EntityId, descriptor: RigidBodyDescriptor): PhysicsBodyHandle;
   createCollider(body: PhysicsBodyHandle, descriptor: ColliderDescriptor): PhysicsColliderHandle;
+  createCharacterController(collider: PhysicsColliderHandle, options?: CharacterControllerOptions): PhysicsCharacterControllerHandle;
+  moveCharacterController(controller: PhysicsCharacterControllerHandle, desiredTranslation: Vec3): CharacterControllerMovement;
+  removeCharacterController(controller: PhysicsCharacterControllerHandle): void;
   removeCollider(handle: PhysicsColliderHandle): void;
   removeBody(handle: PhysicsBodyHandle): void;
   setKinematicTarget(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
@@ -127,7 +130,7 @@ Implemented stable error categories include:
 
 - `physics.backend-init-failed`
 - `physics.invalid-body-descriptor`
-- `physics.invalid-collider-descriptor`
+- `physics.invalid-collider-descriptor`\n- `physics.invalid-character-controller` — invalid character-controller target, movement, or configuration.
 - `physics.unsupported-shape`
 - `physics.unsupported-transform`
 - `physics.stale-handle`
