@@ -56,10 +56,16 @@ export class FakePhysicsWorld implements PhysicsWorld {
   setPaused(paused: boolean): void {
     this.#assertActive();
     this.#paused = paused;
+    if (!paused) this.#singleStep = false;
   }
 
   requestSingleStep(): void {
     this.#assertActive();
+    if (!this.#paused)
+      throw new PhysicsError(
+        'physics.not-paused',
+        'Single-step is only available while physics is paused',
+      );
     this.#singleStep = true;
   }
 
