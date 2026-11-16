@@ -88,7 +88,10 @@ describe('RapierPhysicsWorld adapter', () => {
     expect(movement.translation[1]).toBeGreaterThan(-1);
     expect(movement.translation[1]).toBeLessThan(0);
     expect(movement.grounded).toBe(true);
-    expect(movement.collisions.some((collision) => collision.entity === floorEntity)).toBe(true);
+    const floorCollision = movement.collisions.find((collision) => collision.entity === floorEntity);
+    expect(floorCollision).toBeDefined();
+    expect(floorCollision?.normal.every(Number.isFinite)).toBe(true);
+    expect(floorCollision?.normal[1]).toBeGreaterThan(0.9);
     physics.step(1 / 60);
     expect(physics.getPose(character).position[1]).toBeLessThan(1);
     physics.removeCharacterController(controller);
