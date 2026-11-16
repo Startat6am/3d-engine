@@ -1,9 +1,12 @@
 import type { EntityId } from '@engine/core';
 import {
   PhysicsError,
+  type CharacterControllerMovement,
+  type CharacterControllerOptions,
   type ColliderDescriptor,
   type CollisionEvent,
   type PhysicsBodyHandle,
+  type PhysicsCharacterControllerHandle,
   type PhysicsColliderHandle,
   type PhysicsPose,
   type PhysicsWorld,
@@ -35,6 +38,10 @@ interface FakeCollisionPair {
 export class FakePhysicsWorld implements PhysicsWorld {
   readonly #bodies = new Map<PhysicsBodyHandle, FakeBody>();
   readonly #colliders = new Map<PhysicsColliderHandle, FakeCollider>();
+  readonly #characterControllers = new Map<
+    PhysicsCharacterControllerHandle,
+    PhysicsColliderHandle
+  >();
   readonly #events: CollisionEvent[] = [];
   #activePairs = new Map<string, FakeCollisionPair>();
   #nextHandle = 0;
@@ -79,10 +86,82 @@ export class FakePhysicsWorld implements PhysicsWorld {
     return handle;
   }
 
+  createCharacterController(
+    colliderHandle: PhysicsColliderHandle,
+    options: CharacterControllerOptions = {},
+  ): PhysicsCharacterControllerHandle {
+    this.#assertActive();
+    const collider = this.#colliders.get(colliderHandle);
+    if (!collider) this.#stale('collider');
+    const body = this.#body(collider.body);
+    if (
+      body.type !== 'kinematic' ||
+      collider.descriptor.sensor ||
+      collider.descriptor.shape.type !== 'capsule'
+    )
+      throw new PhysicsError(
+        'physics.invalid-character-controller',
+        'Character controllers require a non-sensor capsule attached to a kinematic body',
+      );
+    const offset = options.offset ?? 0.01;
+    const up = options.up ?? [0, 1, 0];
+    if (
+      !Number.isFinite(offset) ||
+      offset <= 0 ||
+      !up.every(Number.isFinite) ||
+      Math.abs(Math.hypot(...up) - 1) > 1e-3
+    )
+      throw new PhysicsError(
+        'physics.invalid-character-controller',
+        'Character controller options are invalid',
+      );
+    const handle =
+      `fake-character-controller-${++this.#nextHandle}` as PhysicsCharacterControllerHandle;
+    this.#characterControllers.set(handle, colliderHandle);
+    return handle;
+  }
+
+  moveCharacterController(
+    handle: PhysicsCharacterControllerHandle,
+    desiredTranslation: Vec3,
+  ): CharacterControllerMovement {
+    this.#assertActive();
+    const colliderHandle = this.#characterControllers.get(handle);
+    if (!colliderHandle) this.#stale('character controller');
+    if (!desiredTranslation.every(Number.isFinite))
+      throw new PhysicsError(
+        'physics.invalid-character-controller',
+        'Character movement must be finite',
+      );
+    const collider = this.#colliders.get(colliderHandle);
+    if (!collider) this.#stale('collider');
+    const body = this.#body(collider.body);
+    if (body.type !== 'kinematic') this.#stale('character controller body');
+    body.pose = {
+      ...body.pose,
+      position: body.pose.position.map(
+        (value, index) => value + desiredTranslation[index]!,
+      ) as unknown as Vec3,
+    };
+    return {
+      translation: [...desiredTranslation] as unknown as Vec3,
+      grounded: false,
+      collisions: [],
+    };
+  }
+
+  removeCharacterController(handle: PhysicsCharacterControllerHandle): void {
+    this.#assertActive();
+    if (!this.#characterControllers.delete(handle)) this.#stale('character controller');
+  }
+
   removeCollider(handle: PhysicsColliderHandle): void {
     this.#assertActive();
     if (!this.#colliders.has(handle)) this.#stale('collider');
     this.#queueCollisionExits(handle);
+    for (const [controller, collider] of this.#characterControllers) {
+      if (collider === handle) this.#characterControllers.delete(controller);
+    }
     this.#colliders.delete(handle);
   }
 
@@ -91,6 +170,9 @@ export class FakePhysicsWorld implements PhysicsWorld {
     this.#body(handle);
     for (const [collider, record] of this.#colliders) {
       if (record.body === handle) {
+        for (const [controller, controlledCollider] of this.#characterControllers) {
+          if (controlledCollider === collider) this.#characterControllers.delete(controller);
+        }
         this.#queueCollisionExits(collider);
         this.#colliders.delete(collider);
       }
@@ -251,6 +333,7 @@ export class FakePhysicsWorld implements PhysicsWorld {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    this.#characterControllers.clear();
     this.#bodies.clear();
     this.#colliders.clear();
     this.#activePairs.clear();

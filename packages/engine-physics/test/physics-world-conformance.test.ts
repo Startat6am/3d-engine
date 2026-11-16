@@ -48,6 +48,102 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('rejects invalid ray queries consistently', async () => {
+      const physics = await createWorld();
+      const validRay = {
+        origin: [0, 0, 0] as const,
+        direction: [1, 0, 0] as const,
+        maxDistance: 10,
+      };
+      const invalidRays = [
+        { ...validRay, origin: [Number.NaN, 0, 0] as const },
+        { ...validRay, direction: [0, 0, 0] as const },
+        { ...validRay, direction: [2, 0, 0] as const },
+        { ...validRay, maxDistance: Number.POSITIVE_INFINITY },
+        { ...validRay, maxDistance: -1 },
+      ];
+
+      for (const ray of invalidRays) {
+        expect(() => physics.raycast(ray)).toThrow(
+          expect.objectContaining({ code: 'physics.query-invalid' }),
+        );
+        expect(() => physics.raycastAll(ray)).toThrow(
+          expect.objectContaining({ code: 'physics.query-invalid' }),
+        );
+      }
+      expect(() => physics.raycast(validRay, { collisionGroups: -1 })).toThrow(
+        expect.objectContaining({ code: 'physics.query-invalid' }),
+      );
+      expect(() => physics.raycastAll(validRay, { collisionGroups: 0x1_0000_0000 })).toThrow(
+        expect.objectContaining({ code: 'physics.query-invalid' }),
+      );
+      physics.dispose();
+    });
+
+    it('removes stale colliders from queries after their body is removed', async () => {
+      const physics = await createWorld();
+      const entity = new EngineRuntime().world.createEntity();
+      const body = physics.createBody(entity, { type: 'static', position: [0, 0, -2] });
+      const collider = physics.createCollider(body, {
+        shape: { type: 'sphere', radius: 0.5 },
+      });
+      const ray = {
+        origin: [0, 0, 0] as const,
+        direction: [0, 0, -1] as const,
+        maxDistance: 10,
+      };
+      physics.step(1 / 60);
+
+      expect(physics.raycast(ray)?.collider).toBe(collider);
+      physics.removeBody(body);
+      expect(physics.raycast(ray)).toBeNull();
+      expect(physics.raycastAll(ray)).toEqual([]);
+      expect(() => physics.removeCollider(collider)).toThrow(
+        expect.objectContaining({ code: 'physics.stale-handle' }),
+      );
+      physics.dispose();
+    });
+
+    it('moves a kinematic capsule through the character-controller contract', async () => {
+      const physics = await createWorld();
+      const entity = new EngineRuntime().world.createEntity();
+      const body = physics.createBody(entity, { type: 'kinematic', position: [0, 1, 0] });
+      const collider = physics.createCollider(body, {
+        shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+      });
+      const controller = physics.createCharacterController(collider, {
+        offset: 0.01,
+        up: [0, 1, 0],
+        maxSlopeClimbAngle: Math.PI / 4,
+        autostep: { maxHeight: 0.25, minWidth: 0.2 },
+        snapToGroundDistance: 0.1,
+      });
+      const movement = physics.moveCharacterController(controller, [1, 0, 0]);
+      expect(movement.translation).toEqual([1, 0, 0]);
+      expect(movement.collisions).toEqual([]);
+      expect(typeof movement.grounded).toBe('boolean');
+      physics.removeCharacterController(controller);
+      expect(() => physics.moveCharacterController(controller, [0, 0, 1])).toThrow(
+        expect.objectContaining({ code: 'physics.stale-handle' }),
+      );
+      physics.dispose();
+    });
+
+    it('invalidates character controllers when their collider is removed', async () => {
+      const physics = await createWorld();
+      const entity = new EngineRuntime().world.createEntity();
+      const body = physics.createBody(entity, { type: 'kinematic', position: [0, 0, 0] });
+      const collider = physics.createCollider(body, {
+        shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+      });
+      const controller = physics.createCharacterController(collider);
+      physics.removeCollider(collider);
+      expect(() => physics.moveCharacterController(controller, [0, 0, 1])).toThrow(
+        expect.objectContaining({ code: 'physics.stale-handle' }),
+      );
+      physics.dispose();
+    });
+
     it('implements pause and exactly one requested single step', async () => {
       const physics = await createWorld();
       const entity = new EngineRuntime().world.createEntity();

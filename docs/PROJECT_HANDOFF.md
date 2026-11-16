@@ -41,7 +41,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 - Test-only fake: `packages/engine-physics/test/fake-physics-world.ts`.
 - Shared suite: `packages/engine-physics/test/physics-world-conformance.test.ts`.
-- Both `FakePhysicsWorld` and Rapier run the same 9 conformance cases (18 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; exactly-once exit events on collider/body removal; nearest-first/all raycasts with collision-group filtering, entity exclusion, and max distance; mutual collision-group filtering for contact events; empty query/event behavior; idempotent disposal and disposed-state rejection.
+- Both `FakePhysicsWorld` and Rapier run the same 13 conformance cases (26 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; exactly-once exit events on collider/body removal; nearest-first/all raycasts with collision-group filtering, entity exclusion, and max distance; mutual collision-group filtering for contact events; invalid ray/query input rejection; stale collider removal from query results; kinematic capsule controller movement contract and collider-removal invalidation; empty query/event behavior; idempotent disposal and disposed-state rejection.
 - Fake backend models the `PhysicsWorld` contract with deliberately limited sphere raycasts and sphere/sphere overlap events; it is not a full geometry implementation or production solver. It is not exported from the package root and is not production functionality.
 - Vitest now includes `packages/**/test/**/*.test.ts` in addition to existing source tests.
 
@@ -53,7 +53,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Latest full `pnpm check` passed: formatting, ESLint, all workspace typechecks, production builds, and 153/153 unit tests across 13 test files, including the 18 shared Fake/Rapier conformance tests.
+Character-controller API and Rapier floor-contact smoke are implemented. Focused verification: TypeScript project build and 36/36 physics adapter/conformance tests passed; full workspace checks are pending. The pinned pnpm 12.18.0 executable is absent from this sandbox, so commands were run through the installed project binaries rather than claiming a successful `pnpm check`.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 
@@ -61,13 +61,12 @@ The repository declares Node `>=22.12.0 <23` and pnpm `12.18.0`. Prefer the decl
 
 ## 5. Remaining M6 work — recommended order
 
-1. **Expand conformance coverage:** invalid query inputs, stale collider behavior, and resource-limit semantics where applicable. Sphere-sensor enter/exit, collision group filtering, removal lifecycle, and ray-query behavior now pass against both adapters.
-2. **Character Controller:** decide and document the minimal M6 scope before implementation; test slopes/steps/grounding and disposal if included.
-3. **Initialization/lifecycle hardening:** failed WASM init, repeated create/dispose, cleanup on partial failure, actionable errors.
-4. **Input/browser evidence:** focus loss, visibility changes, gamepad disconnect, supported browser matrix, physical gamepad where hardware is available.
-5. **Rapier maintenance and deployment review:** release cadence, license/version review, WASM deployment headers, target browsers.
-6. **Physics performance report:** body/collider counts, fixed-step and query timings, collision-event allocations, memory, browser/runtime, and hardware context.
-7. **Final M6 owner review:** reconcile README, Roadmap, Execution Plan, specs, ADRs, checklist, CI and evidence. Only the project owner can accept M6 and authorize M7.
+1. **Character Controller integration evidence:** add Rapier obstacle tests for slope limits and autostep; flat-ground contact and snap-to-ground are covered. Fake coverage verifies only contract/lifecycle.
+2. **Initialization/lifecycle hardening:** failed WASM init, repeated create/dispose, cleanup on partial failure, actionable errors.
+3. **Input/browser evidence:** focus loss, visibility changes, gamepad disconnect, supported browser matrix, physical gamepad where hardware is available.
+4. **Rapier maintenance and deployment review:** release cadence, license/version review, WASM deployment headers, target browsers.
+5. **Physics performance report:** body/collider counts, fixed-step and query timings, collision-event allocations, memory, browser/runtime, and hardware context.
+6. **Final M6 owner review:** reconcile README, Roadmap, Execution Plan, specs, ADRs, checklist, CI and evidence. Only the project owner can accept M6 and authorize M7.
 
 ## 6. Commands
 

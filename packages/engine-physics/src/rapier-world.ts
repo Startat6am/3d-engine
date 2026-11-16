@@ -2,9 +2,12 @@ import type { EntityId } from '@engine/core';
 import type * as Rapier from '@dimforge/rapier3d';
 import {
   PhysicsError,
+  type CharacterControllerMovement,
+  type CharacterControllerOptions,
   type ColliderDescriptor,
   type CollisionEvent,
   type PhysicsBodyHandle,
+  type PhysicsCharacterControllerHandle,
   type PhysicsColliderHandle,
   type PhysicsPose,
   type PhysicsResourceLimits,
@@ -33,6 +36,10 @@ interface BodyRecord {
   readonly type: RigidBodyDescriptor['type'];
   readonly body: Rapier.RigidBody;
 }
+interface CharacterControllerRecord {
+  readonly collider: PhysicsColliderHandle;
+  readonly controller: Rapier.KinematicCharacterController;
+}
 interface ColliderRecord {
   readonly entity: EntityId;
   readonly body: PhysicsBodyHandle;
@@ -47,11 +54,16 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   readonly #bodies = new Map<PhysicsBodyHandle, BodyRecord>();
   readonly #bodyByEntity = new Map<EntityId, PhysicsBodyHandle>();
   readonly #colliders = new Map<PhysicsColliderHandle, ColliderRecord>();
+  readonly #characterControllers = new Map<
+    PhysicsCharacterControllerHandle,
+    CharacterControllerRecord
+  >();
   readonly #colliderByRapierHandle = new Map<number, PhysicsColliderHandle>();
   readonly #queuedCollisionEvents: CollisionEvent[] = [];
   readonly #activeCollisionPairs = new Map<string, CollisionEvent>();
   #nextBody = 1;
   #nextCollider = 1;
+  #nextCharacterController = 1;
   #paused = false;
   #singleStepRequested = false;
   #disposed = false;
@@ -171,11 +183,126 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     return handle;
   }
 
+  createCharacterController(
+    colliderHandle: PhysicsColliderHandle,
+    options: CharacterControllerOptions = {},
+  ): PhysicsCharacterControllerHandle {
+    this.#assertActive();
+    const collider = this.#collider(colliderHandle);
+    const body = this.#body(collider.body);
+    if (
+      body.type !== 'kinematic' ||
+      collider.collider.isSensor() ||
+      collider.collider.shapeType() !== this.#rapier.ShapeType.Capsule
+    )
+      throw new PhysicsError(
+        'physics.invalid-character-controller',
+        'Character controllers require a non-sensor capsule attached to a kinematic body',
+      );
+    const offset = options.offset ?? 0.01;
+    const up = options.up ?? [0, 1, 0];
+    const upLength = Math.hypot(...up);
+    const maxSlope = options.maxSlopeClimbAngle ?? Math.PI / 4;
+    const minSlope = options.minSlopeSlideAngle ?? Math.PI / 4;
+    if (
+      !Number.isFinite(offset) ||
+      offset <= 0 ||
+      !up.every(Number.isFinite) ||
+      Math.abs(upLength - 1) > 1e-3 ||
+      !Number.isFinite(maxSlope) ||
+      maxSlope < 0 ||
+      maxSlope > Math.PI / 2 ||
+      !Number.isFinite(minSlope) ||
+      minSlope < 0 ||
+      minSlope > Math.PI / 2 ||
+      (options.autostep !== undefined &&
+        (!Number.isFinite(options.autostep.maxHeight) ||
+          options.autostep.maxHeight <= 0 ||
+          !Number.isFinite(options.autostep.minWidth) ||
+          options.autostep.minWidth <= 0)) ||
+      (options.snapToGroundDistance !== undefined &&
+        (!Number.isFinite(options.snapToGroundDistance) || options.snapToGroundDistance <= 0))
+    )
+      throw new PhysicsError(
+        'physics.invalid-character-controller',
+        'Character controller options are invalid',
+      );
+    const controller = this.#world.createCharacterController(offset);
+    controller.setUp({ x: up[0], y: up[1], z: up[2] });
+    controller.setMaxSlopeClimbAngle(maxSlope);
+    controller.setMinSlopeSlideAngle(minSlope);
+    if (options.autostep)
+      controller.enableAutostep(options.autostep.maxHeight, options.autostep.minWidth, false);
+    if (options.snapToGroundDistance !== undefined)
+      controller.enableSnapToGround(options.snapToGroundDistance);
+    const handle =
+      `character-controller:${this.#nextCharacterController++}` as PhysicsCharacterControllerHandle;
+    this.#characterControllers.set(handle, { collider: colliderHandle, controller });
+    return handle;
+  }
+
+  moveCharacterController(
+    handle: PhysicsCharacterControllerHandle,
+    desiredTranslation: Vec3,
+  ): CharacterControllerMovement {
+    this.#assertActive();
+    const record = this.#characterController(handle);
+    if (!desiredTranslation.every(Number.isFinite))
+      throw new PhysicsError(
+        'physics.invalid-character-controller',
+        'Character movement values must be finite',
+      );
+    const collider = this.#collider(record.collider).collider;
+    record.controller.computeColliderMovement(collider, {
+      x: desiredTranslation[0],
+      y: desiredTranslation[1],
+      z: desiredTranslation[2],
+    });
+    const movement = record.controller.computedMovement();
+    const bodyRecord = this.#body(this.#collider(record.collider).body);
+    const current = bodyRecord.body.translation();
+    bodyRecord.body.setNextKinematicTranslation({
+      x: current.x + movement.x,
+      y: current.y + movement.y,
+      z: current.z + movement.z,
+    });
+    const collisions: CharacterControllerMovement['collisions'][number][] = [];
+    for (let i = 0; i < record.controller.numComputedCollisions(); i++) {
+      const collision = record.controller.computedCollision(i);
+      if (!collision?.collider) continue;
+      const hit = this.#colliderByRapierHandle.get(collision.collider.handle);
+      const hitRecord = hit ? this.#colliders.get(hit) : undefined;
+      if (hitRecord)
+        collisions.push({
+          entity: hitRecord.entity,
+          normal: [collision.normal1.x, collision.normal1.y, collision.normal1.z],
+        });
+    }
+    return {
+      translation: [movement.x, movement.y, movement.z],
+      grounded: record.controller.computedGrounded(),
+      collisions,
+    };
+  }
+
+  removeCharacterController(handle: PhysicsCharacterControllerHandle): void {
+    this.#assertActive();
+    const record = this.#characterController(handle);
+    record.controller.free();
+    this.#characterControllers.delete(handle);
+  }
+
   removeCollider(handle: PhysicsColliderHandle): void {
     this.#assertActive();
     const record = this.#colliders.get(handle);
     if (!record)
       throw new PhysicsError('physics.stale-handle', `Unknown collider handle: ${handle}`);
+    for (const [controllerHandle, controller] of this.#characterControllers) {
+      if (controller.collider === handle) {
+        controller.controller.free();
+        this.#characterControllers.delete(controllerHandle);
+      }
+    }
     this.#captureCollisionEvents();
     this.#queueCollisionExits(handle);
     this.#world.removeCollider(record.collider, true);
@@ -189,6 +316,12 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     this.#captureCollisionEvents();
     for (const [colliderHandle, collider] of this.#colliders) {
       if (collider.body === handle) {
+        for (const [controllerHandle, controller] of this.#characterControllers) {
+          if (controller.collider === colliderHandle) {
+            controller.controller.free();
+            this.#characterControllers.delete(controllerHandle);
+          }
+        }
         this.#queueCollisionExits(colliderHandle);
         this.#colliderByRapierHandle.delete(collider.collider.handle);
         this.#colliders.delete(colliderHandle);
@@ -384,6 +517,8 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   dispose(): void {
     if (this.#disposed) return;
     this.#disposed = true;
+    for (const controller of this.#characterControllers.values()) controller.controller.free();
+    this.#characterControllers.clear();
     this.#events.free();
     this.#world.free();
     this.#bodies.clear();
@@ -392,6 +527,23 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     this.#colliderByRapierHandle.clear();
     this.#queuedCollisionEvents.length = 0;
     this.#activeCollisionPairs.clear();
+  }
+
+  #collider(handle: PhysicsColliderHandle): ColliderRecord {
+    const record = this.#colliders.get(handle);
+    if (!record)
+      throw new PhysicsError('physics.stale-handle', `Unknown collider handle: ${handle}`);
+    return record;
+  }
+
+  #characterController(handle: PhysicsCharacterControllerHandle): CharacterControllerRecord {
+    const record = this.#characterControllers.get(handle);
+    if (!record)
+      throw new PhysicsError(
+        'physics.stale-handle',
+        `Unknown character controller handle: ${handle}`,
+      );
+    return record;
   }
 
   #body(handle: PhysicsBodyHandle): BodyRecord {
@@ -518,8 +670,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   }
 
   #validateRay(ray: Ray): void {
-    this.#finite(ray.origin, 'Ray origin');
-    this.#finite(ray.direction, 'Ray direction');
+    if (!ray.origin.every(Number.isFinite) || !ray.direction.every(Number.isFinite))
+      throw new PhysicsError(
+        'physics.query-invalid',
+        'Ray origin and direction values must be finite',
+      );
     if (!Number.isFinite(ray.maxDistance) || ray.maxDistance < 0)
       throw new PhysicsError(
         'physics.query-invalid',

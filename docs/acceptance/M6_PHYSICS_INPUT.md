@@ -19,7 +19,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 - [x] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [x] Rapier is confined to an adapter module; no Rapier types appear in public package-root exports.
-- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (18 shared conformance tests pass).
+- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (26 shared conformance tests pass).
 - [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state.
 - [x] Create/destroy operations are safe; stale body/collider handles are rejected. Descriptor replacement is supported; in-place mutation of descriptor objects is not.
 - [x] Disposal releases backend resources and is idempotent.
@@ -39,12 +39,13 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Box, sphere, capsule, cylinder, and convex-hull descriptors validate dimensions and finite values.
 - [x] Configurable positive limits bound live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count; overflow is surfaced as a typed resource-limit error.
 - [ ] Static triangle-mesh collider support is explicitly scoped and opt-in; unsupported mesh/body combinations fail clearly.
+- [ ] Kinematic capsule character controller resolves movement against obstacles, reports grounded/collision normals, and is covered for flat ground, slope limits, autostep, snap-to-ground, and lifecycle cleanup. Initial API/lifecycle and flat-ground/snap-to-ground smoke tests exist; slope/autostep coverage remains open.
 - [x] Collision enter/exit events include stable entity and collider identities; sphere-sensor enter/exit are tested against both Fake and Rapier.
 - [x] Removing a collider or body during active contact emits exactly one exit event with stable identities; covered by Fake/Rapier conformance tests.
 - [x] Collision events obey mutual collision-group filtering; tested against Fake and Rapier.
 - [x] Raycast and raycast-all return distance, world-space hit point/normal, entity identity, and collider identity.
 - [x] Query filters support collision groups and excluded entities; nearest/all ordering and maximum distance are covered by the shared Fake/Rapier conformance suite.
-- [x] Tests cover nearest-hit ordering, max distance, excluded entities, stale handles, and collider validation; raycast-miss and collision-filtering edge cases remain open.
+- [x] Tests cover nearest-hit ordering, max distance, excluded entities, stale body/collider handles, collider validation, raycast misses, invalid ray values, invalid query collision groups, and removal of stale colliders from query results.
 
 ## M6.4 — Input mapping
 
@@ -71,7 +72,7 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 
 ## M6.6 — CI and documentation closeout
 
-- [x] Local formatting, lint, typecheck, production builds, and 153 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (18 tests).
+- [x] Local formatting, lint, typecheck, production builds, and 162 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (26 tests).
 - [ ] Exact-head CI and browser E2E rerun; the previous submitted PR head reported 22/22 Playwright tests passing, but the current sandbox cannot launch Chromium because libglib-2.0.so.0 is missing.
 - [ ] Physics performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
 - [ ] Performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.

@@ -88,12 +88,49 @@ export const DEFAULT_PHYSICS_RESOURCE_LIMITS: PhysicsResourceLimits = Object.fre
   maxConvexHullVertices: 65_536,
 });
 
+export type PhysicsCharacterControllerHandle = string & {
+  readonly __physicsCharacterControllerHandle: unique symbol;
+};
+
+export interface CharacterControllerOptions {
+  /** Positive separation maintained from nearby obstacles, in world units. */
+  readonly offset?: number;
+  readonly up?: Vec3;
+  /** Maximum climbable slope in radians. */
+  readonly maxSlopeClimbAngle?: number;
+  /** Minimum slope angle in radians before automatic sliding. */
+  readonly minSlopeSlideAngle?: number;
+  readonly autostep?: { readonly maxHeight: number; readonly minWidth: number };
+  readonly snapToGroundDistance?: number;
+}
+
+export interface CharacterControllerCollision {
+  readonly entity: EntityId;
+  readonly normal: Vec3;
+}
+
+export interface CharacterControllerMovement {
+  /** Collision-resolved translation for this request. */
+  readonly translation: Vec3;
+  readonly grounded: boolean;
+  readonly collisions: readonly CharacterControllerCollision[];
+}
+
 export interface PhysicsWorld {
   readonly paused: boolean;
   setPaused(paused: boolean): void;
   requestSingleStep(): void;
   createBody(entity: EntityId, descriptor: RigidBodyDescriptor): PhysicsBodyHandle;
   createCollider(body: PhysicsBodyHandle, descriptor: ColliderDescriptor): PhysicsColliderHandle;
+  createCharacterController(
+    collider: PhysicsColliderHandle,
+    options?: CharacterControllerOptions,
+  ): PhysicsCharacterControllerHandle;
+  moveCharacterController(
+    controller: PhysicsCharacterControllerHandle,
+    desiredTranslation: Vec3,
+  ): CharacterControllerMovement;
+  removeCharacterController(controller: PhysicsCharacterControllerHandle): void;
   removeCollider(handle: PhysicsColliderHandle): void;
   removeBody(handle: PhysicsBodyHandle): void;
   setKinematicTarget(handle: PhysicsBodyHandle, pose: PhysicsPose): void;

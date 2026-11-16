@@ -43,6 +43,37 @@ describe('RapierPhysicsWorld adapter', () => {
     expect(() => physics.getPose(body)).toThrow('disposed');
   });
 
+  it('resolves kinematic capsule movement against a floor and reports grounded state', async () => {
+    const physics = await createTestPhysics();
+    const world = new EngineRuntime().world;
+    const floorEntity = world.createEntity();
+    const characterEntity = world.createEntity();
+    const floor = physics.createBody(floorEntity, { type: 'static', position: [0, -0.5, 0] });
+    physics.createCollider(floor, { shape: { type: 'box', halfExtents: [5, 0.5, 5] } });
+    const character = physics.createBody(characterEntity, {
+      type: 'kinematic',
+      position: [0, 1, 0],
+    });
+    const capsule = physics.createCollider(character, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const controller = physics.createCharacterController(capsule, {
+      offset: 0.01,
+      snapToGroundDistance: 0.1,
+    });
+
+    physics.step(1 / 60);
+    const movement = physics.moveCharacterController(controller, [0, -1, 0]);
+    expect(movement.translation[1]).toBeGreaterThan(-1);
+    expect(movement.translation[1]).toBeLessThan(0);
+    expect(movement.grounded).toBe(true);
+    expect(movement.collisions.some((collision) => collision.entity === floorEntity)).toBe(true);
+    physics.step(1 / 60);
+    expect(physics.getPose(character).position[1]).toBeLessThan(1);
+    physics.removeCharacterController(controller);
+    physics.dispose();
+  });
+
   it('raycasts nearest-first and rejects stale handles', async () => {
     const physics = await createTestPhysics({ gravity: [0, 0, 0] });
     const world = new EngineRuntime().world;
