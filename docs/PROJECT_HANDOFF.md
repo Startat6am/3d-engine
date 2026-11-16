@@ -29,7 +29,8 @@ Branch: `feat/m6-physics-input-core`
   locator matching two accumulated Console entries in the directory-project
   missing-blob test, not a product failure.
 - Run #374 passed on the code-fix commit `8725c60f789747672ec56f9a21ea2cabce68c2c0`.
-- Run #377 passed on current HEAD `17a206437202d2455952ece8ca44912a1feae644`:
+- Run #377 passed on `17a206437202d2455952ece8ca44912a1feae644`; run #378
+  passed on latest HEAD `f9e16974904c99f5e662f3b0eb3430546b1172b7`:
   format, lint, typecheck, 176/176 Vitest tests, builds, both GLB benchmarks,
   Playwright Chromium installation, and 22/22 Chromium E2E. The test asserts
   that the error-entry count increases after the missing-blob open action.
