@@ -1,5 +1,38 @@
 # Project Handoff — Choreon / 3D Engine
 
+## Current verification status — 2026-11-16
+
+This section supersedes older validation snapshots below. Keep M6 open.
+
+### Locally verified
+
+- Environment: Node.js 22.13.0, pnpm 12.18.0 (within the repository's declared Node `>=22.12.0 <23` range; pnpm 12.18.0 requires Node 22.13.0 or newer).
+- `pnpm check`: passed — 176/176 Vitest tests, format, lint, typecheck, package builds, and Editor/Player production builds.
+- `pnpm e2e`: passed — 22/22 Chromium tests. The browser-memory repeat-import assertion now allows 20 seconds for the 2049×2049 fixture; local full E2E passed after this adjustment.
+- Physics lifecycle regression test now asserts collider removal when the ECS collider component is removed and body removal when its entity is destroyed.
+- Preliminary Node/Rapier benchmark and methodology are recorded in `docs/PHYSICS_PERFORMANCE_REPORT.md`.
+
+### Confirmed in GitHub Actions
+
+- Run #367 passed on code-bearing commit `619d4f780129adbfc52b002d98037a7f23381387`: install, format, lint, typecheck, tests, production builds, both GLB stress benchmarks, Playwright Chromium installation, and 22/22 E2E.
+- Run #370 is associated with the subsequent documentation-only maintenance snapshot commit `ed68fdcc5e257eec4864d2470724616842acf002`. Do not infer its terminal result from run #367; check its own Actions status.
+- Earlier run #353 passed on the pre-follow-up commit `2a8bb4c523bf8d065268ca7a1601055296abb738`; it is historical, not evidence for the later input fix.
+
+### Still unverified / acceptance remains open
+
+- The SSO-protected Vercel Preview has not been accessed through an authorized browser to inspect actual `.wasm` Content-Type, cache headers, CORS, or fallback responses. Do not infer these from config or an unauthenticated response.
+- Firefox/WebKit, physical gamepad hardware, and mobile browser coverage remain unverified; current browser E2E is Chromium.
+- Performance evidence is a preliminary shared-VM Node microbenchmark only. Browser/device timings, controlled WASM memory, allocation profiling, dense-contact workloads, and owner-approved budgets remain open.
+- Static-mesh/triangle-mesh physics scope, final owner review, and M6 sign-off remain open.
+
+### Upstream Rapier maintenance
+
+- JavaScript binding `@dimforge/rapier3d` is pinned at 0.21.0; npm currently lists 0.21.0 as latest. The upstream Rust changelog lists v0.35.0/v0.35.1 on 2026-08-08, following v0.34.0 on 2026-07-04 and v0.33.0 on 2026-06-05. This supports an active-maintenance assessment, not a guaranteed release schedule.
+- The version and build-variant review is recorded in `docs/PHYSICS_SPEC.md`. Keep the standard non-SIMD build; no SIMD variant was introduced. Browser support and deployed WASM headers remain open.
+
+---
+
+
 **Last updated:** 2026-11-16
 **Repository:** `Startat6am/3d-engine`
 **Active milestone:** M6 — Physics & Input
