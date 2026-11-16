@@ -61,7 +61,7 @@ The repository declares Node `>=22.12.0 <23` and pnpm `12.18.0`. Prefer the decl
 
 ## 5. Remaining M6 work — recommended order
 
-1. **Character Controller integration evidence:** add Rapier obstacle tests for slope limits and autostep; flat-ground contact and snap-to-ground are covered. Fake coverage verifies only contract/lifecycle.
+1. **Character Controller integration evidence:** run the newly added slope-limit tests on the exact branch head, fix any failures, then add Rapier autostep obstacle tests; flat-ground contact and snap-to-ground are covered. Fake coverage verifies only contract/lifecycle.
 2. **Initialization/lifecycle hardening:** failed WASM init, repeated create/dispose, cleanup on partial failure, actionable errors.
 3. **Input/browser evidence:** focus loss, visibility changes, gamepad disconnect, supported browser matrix, physical gamepad where hardware is available.
 4. **Rapier maintenance and deployment review:** release cadence, license/version review, WASM deployment headers, target browsers.
