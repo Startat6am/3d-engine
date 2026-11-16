@@ -64,7 +64,7 @@ The repository declares Node `>=22.12.0 <23` and pnpm `12.18.0`. The local Verce
 - Source review found a focus-loss bug: negative gamepad axes were not neutralized, and the next poll could restore stale state before focus returned. `BrowserInputAdapter` now clears all non-zero controls, suspends gamepad polling while blurred/hidden, and resumes it on focus/visibility restoration. A regression test covers negative axes, button release, and reconnect.
 - Clean local validation after this change: Node 22.13.0 / pnpm 12.18.0 `pnpm check` passes (176/176 Vitest tests, format, lint, typecheck, package builds, and Editor/Player production builds); `pnpm e2e` passes 22/22 Chromium tests after installing Playwright Chromium and OS dependencies.
 - A preliminary performance report and reproducible benchmark are recorded in `docs/PHYSICS_PERFORMANCE_REPORT.md` and `packages/engine-physics/bench/physics-performance.mjs`. It is not an acceptance sign-off; browser/device, controlled memory/WASM, allocation, dense-contact, and owner-budget evidence remain open.
-- These follow-up files still need a single commit, push to the existing PR branch, and exact-head GitHub Actions/Vercel verification.
+- Follow-up code and documentation are now published to PR #87 (input fix commit `37e3471`; current report-format follow-up `ade9a94`). GitHub Actions run #358 is in progress for `ade9a94315299838bd35bb0f342eca06c82c45de`; the matching Vercel Preview is building. Record final results only against the final HEAD.
 
 ## 5. Remaining M6 work — recommended order
 
