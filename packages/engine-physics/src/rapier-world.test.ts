@@ -11,6 +11,8 @@ async function createTestPhysics(
       readonly maxCollisionEventsPerDrain?: number;
       readonly maxRayDistance?: number;
       readonly maxConvexHullVertices?: number;
+      readonly maxTriangleMeshVertices?: number;
+      readonly maxTriangleMeshIndices?: number;
     };
   } = {},
 ) {
@@ -433,6 +435,90 @@ describe('RapierPhysicsWorld adapter', () => {
         },
       }),
     ).toThrow(/maxConvexHullVertices=4/);
+    physics.dispose();
+  });
+
+  it('supports static-only triangle meshes for dynamic-body collision and ray queries', async () => {
+    const physics = await createTestPhysics();
+    const world = new EngineRuntime().world;
+    const floorEntity = world.createEntity();
+    const ballEntity = world.createEntity();
+    const floor = physics.createBody(floorEntity, { type: 'static', position: [0, 0, 0] });
+    const floorCollider = physics.createCollider(floor, {
+      shape: {
+        type: 'triangle-mesh',
+        vertices: new Float32Array([-5, 0, -5, 5, 0, -5, 5, 0, 5, -5, 0, 5]),
+        indices: new Uint32Array([0, 2, 1, 0, 3, 2]),
+      },
+    });
+    const ball = physics.createBody(ballEntity, { type: 'dynamic', position: [0, 2, 0] });
+    physics.createCollider(ball, { shape: { type: 'sphere', radius: 0.5 } });
+
+    for (let tick = 0; tick < 120; tick++) physics.step(1 / 60);
+
+    const y = physics.getPose(ball).position[1];
+    expect(y).toBeGreaterThan(0.35);
+    expect(y).toBeLessThan(0.8);
+    const hit = physics.raycast({
+      origin: [4, 2, 0],
+      direction: [0, -1, 0],
+      maxDistance: 5,
+    });
+    expect(hit?.entity).toBe(floorEntity);
+    expect(hit?.collider).toBe(floorCollider);
+    physics.dispose();
+  });
+
+  it('rejects triangle meshes on non-static bodies and validates bounded mesh buffers', async () => {
+    const physics = await createTestPhysics({
+      limits: { maxTriangleMeshVertices: 3, maxTriangleMeshIndices: 3 },
+    });
+    const world = new EngineRuntime().world;
+    const dynamicEntity = world.createEntity();
+    const dynamicBody = physics.createBody(dynamicEntity, {
+      type: 'dynamic',
+      position: [0, 0, 0],
+    });
+    const triangleMesh = {
+      type: 'triangle-mesh' as const,
+      vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      indices: new Uint32Array([0, 1, 2]),
+    };
+    expect(() => physics.createCollider(dynamicBody, { shape: triangleMesh })).toThrow(
+      /Triangle-mesh colliders require a static rigid body/,
+    );
+
+    const staticBody = physics.createBody(world.createEntity(), {
+      type: 'static',
+      position: [0, 0, 0],
+    });
+    expect(() =>
+      physics.createCollider(staticBody, {
+        shape: {
+          type: 'triangle-mesh',
+          vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1, 0]),
+          indices: new Uint32Array([0, 1, 2]),
+        },
+      }),
+    ).toThrow(/maxTriangleMeshVertices=3/);
+    expect(() =>
+      physics.createCollider(staticBody, {
+        shape: {
+          type: 'triangle-mesh',
+          vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+          indices: new Uint32Array([0, 1, 2, 0, 2, 1]),
+        },
+      }),
+    ).toThrow(/maxTriangleMeshIndices=3/);
+    expect(() =>
+      physics.createCollider(staticBody, {
+        shape: {
+          type: 'triangle-mesh',
+          vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+          indices: new Uint32Array([0, 1, 3]),
+        },
+      }),
+    ).toThrow(/invalid triangle indices/);
     physics.dispose();
   });
 
