@@ -4,7 +4,6 @@
 **Repository:** `Startat6am/3d-engine`
 **Active milestone:** M6 — Physics & Input
 **Active branch:** `feat/m6-physics-input-core`
-**Character-controller implementation commit:** `ef58e6c38b2bd0d1fa6d50a3149e6c468d465d4e` — character-controller API and initial Rapier floor-contact evidence.
 **Active review:** [PR #87](https://github.com/Startat6am/3d-engine/pull/87)
 **Milestone state:** in progress; do not merge or mark M6 complete without owner review.
 
@@ -54,7 +53,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Character-controller API and Rapier floor-contact/snap-to-ground smoke are implemented. Latest local validation in the Node 25 sandbox: TypeScript project build, Prettier check, ESLint, and 166/166 unit tests across 13 files passed; 30/30 shared Fake/Rapier conformance tests passed. The pinned pnpm 12.18.0 executable is absent, so this is not recorded as `pnpm check`; the supported Node 22.12.x run, production builds, slope/autostep coverage, and exact-head CI remain open.
+Character-controller API and Rapier floor-contact smoke are implemented. Focused verification: TypeScript project build and 36/36 physics adapter/conformance tests passed; full workspace checks are pending. The pinned pnpm 12.18.0 executable is absent from this sandbox, so commands were run through the installed project binaries rather than claiming a successful `pnpm check`.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 

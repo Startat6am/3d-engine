@@ -105,11 +105,26 @@ export class FakePhysicsWorld implements PhysicsWorld {
       );
     const offset = options.offset ?? 0.01;
     const up = options.up ?? [0, 1, 0];
+    const maxSlope = options.maxSlopeClimbAngle ?? Math.PI / 4;
+    const minSlope = options.minSlopeSlideAngle ?? Math.PI / 4;
     if (
       !Number.isFinite(offset) ||
       offset <= 0 ||
       !up.every(Number.isFinite) ||
-      Math.abs(Math.hypot(...up) - 1) > 1e-3
+      Math.abs(Math.hypot(...up) - 1) > 1e-3 ||
+      !Number.isFinite(maxSlope) ||
+      maxSlope < 0 ||
+      maxSlope > Math.PI / 2 ||
+      !Number.isFinite(minSlope) ||
+      minSlope < 0 ||
+      minSlope > Math.PI / 2 ||
+      (options.autostep !== undefined &&
+        (!Number.isFinite(options.autostep.maxHeight) ||
+          options.autostep.maxHeight <= 0 ||
+          !Number.isFinite(options.autostep.minWidth) ||
+          options.autostep.minWidth <= 0)) ||
+      (options.snapToGroundDistance !== undefined &&
+        (!Number.isFinite(options.snapToGroundDistance) || options.snapToGroundDistance <= 0))
     )
       throw new PhysicsError(
         'physics.invalid-character-controller',

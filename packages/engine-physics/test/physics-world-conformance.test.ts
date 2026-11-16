@@ -129,6 +129,39 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('rejects invalid character-controller configuration consistently', async () => {
+      const physics = await createWorld();
+      const entity = new EngineRuntime().world.createEntity();
+      const body = physics.createBody(entity, { type: 'kinematic', position: [0, 0, 0] });
+      const collider = physics.createCollider(body, {
+        shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+      });
+      expect(() =>
+        physics.createCharacterController(collider, { maxSlopeClimbAngle: Math.PI }),
+      ).toThrow(expect.objectContaining({ code: 'physics.invalid-character-controller' }));
+      expect(() =>
+        physics.createCharacterController(collider, {
+          autostep: { maxHeight: 0.2, minWidth: 0 },
+        }),
+      ).toThrow(expect.objectContaining({ code: 'physics.invalid-character-controller' }));
+      physics.dispose();
+    });
+
+    it('invalidates character controllers when their body is removed', async () => {
+      const physics = await createWorld();
+      const entity = new EngineRuntime().world.createEntity();
+      const body = physics.createBody(entity, { type: 'kinematic', position: [0, 0, 0] });
+      const collider = physics.createCollider(body, {
+        shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+      });
+      const controller = physics.createCharacterController(collider);
+      physics.removeBody(body);
+      expect(() => physics.moveCharacterController(controller, [0, 0, 1])).toThrow(
+        expect.objectContaining({ code: 'physics.stale-handle' }),
+      );
+      physics.dispose();
+    });
+
     it('invalidates character controllers when their collider is removed', async () => {
       const physics = await createWorld();
       const entity = new EngineRuntime().world.createEntity();

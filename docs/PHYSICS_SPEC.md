@@ -85,7 +85,7 @@ Still required for M6 acceptance:
 
 The initial controller is deliberately narrow: it moves an existing non-sensor capsule collider attached to a kinematic rigid body. The engine API accepts a desired world-space translation and returns the collision-resolved translation, grounded flag, and obstacle entity/normal pairs. The Rapier adapter owns the controller object; the public API exposes only engine handles and values. Offset, up direction, climb/slide slope thresholds, optional autostep, and optional snap-to-ground are configurable. Controller handles are invalidated and backend resources freed when explicitly removed, when their collider/body is removed, or when the world is disposed.
 
-The controller does not own gravity, velocity, jump logic, input, or ECS transforms. Gameplay computes desired displacement (including gravity) and submits it once per fixed tick; the kinematic body remains under gameplay authority. Rapier's character query pipeline is refreshed by a simulation step, so the first movement query must follow an initial world step after scene colliders have been created. The test Fake backend is intentionally non-colliding and only verifies API/lifecycle behavior; grounding, slope, step, and obstacle resolution require Rapier integration tests. Dynamic-body pushing is disabled in this M6 scope. Triangle-mesh collider cooking remains separately deferred.
+Call moveCharacterController once per fixed tick for a controlled collider; repeated calls before a simulation step replace the pending kinematic target rather than accumulating input. Call moveCharacterController once per fixed tick for a controlled collider; repeated calls before a simulation step replace the pending kinematic target rather than accumulating input. The controller does not own gravity, velocity, jump logic, input, or ECS transforms. Gameplay computes desired displacement (including gravity) and submits it once per fixed tick; the kinematic body remains under gameplay authority. Rapier's character query pipeline is refreshed by a simulation step, so the first movement query must follow an initial world step after scene colliders have been created. The test Fake backend is intentionally non-colliding and only verifies API/lifecycle behavior; grounding, slope, step, and obstacle resolution require Rapier integration tests. Dynamic-body pushing is disabled in this M6 scope. Triangle-mesh collider cooking remains separately deferred.
 
 - Physics Playground performance report and broader browser/device verification.
 
@@ -104,9 +104,6 @@ interface PhysicsWorld {
   requestSingleStep(): void;
   createBody(entity: EntityId, descriptor: RigidBodyDescriptor): PhysicsBodyHandle;
   createCollider(body: PhysicsBodyHandle, descriptor: ColliderDescriptor): PhysicsColliderHandle;
-  createCharacterController(collider: PhysicsColliderHandle, options?: CharacterControllerOptions): PhysicsCharacterControllerHandle;
-  moveCharacterController(controller: PhysicsCharacterControllerHandle, desiredTranslation: Vec3): CharacterControllerMovement;
-  removeCharacterController(controller: PhysicsCharacterControllerHandle): void;
   removeCollider(handle: PhysicsColliderHandle): void;
   removeBody(handle: PhysicsBodyHandle): void;
   setKinematicTarget(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
@@ -131,7 +128,6 @@ Implemented stable error categories include:
 - `physics.backend-init-failed`
 - `physics.invalid-body-descriptor`
 - `physics.invalid-collider-descriptor`
-- `physics.invalid-character-controller` — invalid character-controller target, movement, or configuration.
 - `physics.unsupported-shape`
 - `physics.unsupported-transform`
 - `physics.stale-handle`
