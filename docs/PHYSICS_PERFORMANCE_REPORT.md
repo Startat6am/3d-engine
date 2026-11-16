@@ -25,10 +25,10 @@
 ## Results
 
 | Dynamic bodies | Total colliders | Creation (ms) | Fixed step mean (ms) | Fixed step median (ms) | Fixed step p95 (ms) | Raycast median (ms) | Raycast p95 (ms) | Ray hits |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 100 | 101 | 4.75 | 0.5613 | 0.3625 | 0.6782 | 0.0084 | 0.0118 | 100% |
-| 500 | 501 | 18.25 | 1.1627 | 1.1064 | 1.6248 | 0.0032 | 0.0046 | 100% |
-| 1,000 | 1,001 | 18.56 | 2.2020 | 1.9800 | 3.3944 | 0.0021 | 0.0034 | 100% |
+| -------------: | --------------: | ------------: | -------------------: | ---------------------: | ------------------: | ------------------: | ---------------: | -------: |
+|            100 |             101 |          4.75 |               0.5613 |                 0.3625 |              0.6782 |              0.0084 |           0.0118 |     100% |
+|            500 |             501 |         18.25 |               1.1627 |                 1.1064 |              1.6248 |              0.0032 |           0.0046 |     100% |
+|          1,000 |           1,001 |         18.56 |               2.2020 |                 1.9800 |              3.3944 |              0.0021 |           0.0034 |     100% |
 
 The separate collision-event case produced 925 drained events from 50 bodies / 50 colliders. The measured physics step was 2.9361 ms and the subsequent event drain was 1.8143 ms. This measures event count and drain wall time, not the number/size of internal allocations.
 
