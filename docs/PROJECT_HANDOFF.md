@@ -42,7 +42,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 - Test-only fake: `packages/engine-physics/test/fake-physics-world.ts`.
 - Shared suite: `packages/engine-physics/test/physics-world-conformance.test.ts`.
-- Both `FakePhysicsWorld` and Rapier run the same 13 conformance cases (26 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; exactly-once exit events on collider/body removal; nearest-first/all raycasts with collision-group filtering, entity exclusion, and max distance; mutual collision-group filtering for contact events; invalid ray/query input rejection; stale collider removal from query results; kinematic capsule controller movement contract and collider-removal invalidation; empty query/event behavior; idempotent disposal and disposed-state rejection.
+- Both `FakePhysicsWorld` and Rapier run the same 15 conformance cases (30 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; exactly-once exit events on collider/body removal; nearest-first/all raycasts with collision-group filtering, entity exclusion, and max distance; mutual collision-group filtering for contact events; invalid ray/query input rejection; stale collider removal from query results; kinematic capsule controller movement contract and collider-removal invalidation; empty query/event behavior; idempotent disposal and disposed-state rejection.
 - Fake backend models the `PhysicsWorld` contract with deliberately limited sphere raycasts and sphere/sphere overlap events; it is not a full geometry implementation or production solver. It is not exported from the package root and is not production functionality.
 - Vitest now includes `packages/**/test/**/*.test.ts` in addition to existing source tests.
 
@@ -54,7 +54,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Character-controller API and Rapier floor-contact/snap-to-ground smoke are implemented. Latest local validation in the Node 25 sandbox: TypeScript project build, Prettier check, ESLint, and 162/162 unit tests across 13 files passed; 26/26 shared Fake/Rapier conformance tests passed. The pinned pnpm 12.18.0 executable is absent, so this is not recorded as `pnpm check`; the supported Node 22.12.x run, production builds, slope/autostep coverage, and exact-head CI remain open.
+Character-controller API and Rapier floor-contact/snap-to-ground smoke are implemented. Latest local validation in the Node 25 sandbox: TypeScript project build, Prettier check, ESLint, and 162/162 unit tests across 13 files passed; 30/30 shared Fake/Rapier conformance tests passed. The pinned pnpm 12.18.0 executable is absent, so this is not recorded as `pnpm check`; the supported Node 22.12.x run, production builds, slope/autostep coverage, and exact-head CI remain open.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 
