@@ -74,6 +74,95 @@ describe('RapierPhysicsWorld adapter', () => {
     physics.dispose();
   });
 
+  it('climbs a slope below maxSlopeClimbAngle', async () => {
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    const world = new EngineRuntime().world;
+    const floorEntity = world.createEntity();
+    const rampEntity = world.createEntity();
+    const characterEntity = world.createEntity();
+
+    const floor = physics.createBody(floorEntity, {
+      type: 'static',
+      position: [-2, -0.5, 0],
+    });
+    physics.createCollider(floor, { shape: { type: 'box', halfExtents: [2, 0.5, 3] } });
+
+    const slope = (25 * Math.PI) / 180;
+    const ramp = physics.createBody(rampEntity, {
+      type: 'static',
+      position: [2, 2 * Math.sin(slope) - 0.1 * Math.cos(slope), 0],
+      rotation: [0, 0, Math.sin(slope / 2), Math.cos(slope / 2)],
+    });
+    physics.createCollider(ramp, { shape: { type: 'box', halfExtents: [2, 0.1, 3] } });
+
+    const character = physics.createBody(characterEntity, {
+      type: 'kinematic',
+      position: [-0.8, 0.75, 0],
+    });
+    const capsule = physics.createCollider(character, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const controller = physics.createCharacterController(capsule, {
+      offset: 0.01,
+      maxSlopeClimbAngle: (30 * Math.PI) / 180,
+    });
+
+    // Rapier's character query broadphase is valid after the initial world step.
+    physics.step(1 / 60);
+    const movement = physics.moveCharacterController(controller, [4, 0, 0]);
+
+    expect(movement.translation[0]).toBeGreaterThan(2.5);
+    expect(movement.translation[1]).toBeGreaterThan(0.5);
+    expect(movement.collisions.some((collision) => collision.entity === rampEntity)).toBe(true);
+
+    physics.removeCharacterController(controller);
+    physics.dispose();
+  });
+
+  it('blocks a slope above maxSlopeClimbAngle', async () => {
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    const world = new EngineRuntime().world;
+    const floorEntity = world.createEntity();
+    const rampEntity = world.createEntity();
+    const characterEntity = world.createEntity();
+
+    const floor = physics.createBody(floorEntity, {
+      type: 'static',
+      position: [-2, -0.5, 0],
+    });
+    physics.createCollider(floor, { shape: { type: 'box', halfExtents: [2, 0.5, 3] } });
+
+    const slope = (55 * Math.PI) / 180;
+    const ramp = physics.createBody(rampEntity, {
+      type: 'static',
+      position: [2, 2 * Math.sin(slope) - 0.1 * Math.cos(slope), 0],
+      rotation: [0, 0, Math.sin(slope / 2), Math.cos(slope / 2)],
+    });
+    physics.createCollider(ramp, { shape: { type: 'box', halfExtents: [2, 0.1, 3] } });
+
+    const character = physics.createBody(characterEntity, {
+      type: 'kinematic',
+      position: [-0.8, 0.75, 0],
+    });
+    const capsule = physics.createCollider(character, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const controller = physics.createCharacterController(capsule, {
+      offset: 0.01,
+      maxSlopeClimbAngle: (30 * Math.PI) / 180,
+    });
+
+    physics.step(1 / 60);
+    const movement = physics.moveCharacterController(controller, [4, 0, 0]);
+
+    expect(movement.translation[0]).toBeLessThan(2.5);
+    expect(movement.translation[1]).toBeLessThan(0.2);
+    expect(movement.collisions.some((collision) => collision.entity === rampEntity)).toBe(true);
+
+    physics.removeCharacterController(controller);
+    physics.dispose();
+  });
+
   it('raycasts nearest-first and rejects stale handles', async () => {
     const physics = await createTestPhysics({ gravity: [0, 0, 0] });
     const world = new EngineRuntime().world;
