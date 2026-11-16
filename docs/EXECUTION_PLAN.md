@@ -1,6 +1,6 @@
 # Choreon Execution Plan
 
-**Last updated:** 2026-11-15
+**Last updated:** 2026-11-16
 **Repository:** `Startat6am/3d-engine`
 **Current milestone:** M6 — Physics & Input (implementation in progress)
 **Previous milestone:** M5 — Assets & Serialization (complete)
@@ -15,9 +15,7 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 - M5 exit gates are complete: import/serialization/PBR/lifecycle checks, directory-project
   save/reopen, tampered-blob rollback, missing-blob rollback, and exact-head Previews.
 - M5 does not claim a whole-tab/process memory ceiling or a physical GPU-VRAM budget.
-- M6 implementation is in progress on a dedicated feature branch. Initial `@engine/input`
-  and `@engine/physics` packages, fixed-tick metadata, and a focused Editor UX cleanup are
-  under development. No M6 acceptance gate is claimed complete.
+- M6 implementation is in progress on a dedicated feature branch. Initial `@engine/input` and `@engine/physics` packages, fixed-tick integration, the Player Physics Playground, and focused Editor UX cleanup are implemented on the open PR #87 branch. M6 acceptance remains in progress; only individually evidenced checklist items are marked complete.
 - Do not accelerate the AI-authoring milestone or change the agreed milestone order.
 
 ## M5 closeout — 2026-11-15
@@ -91,15 +89,17 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 - The Editor received a bounded visual UX cleanup: truthful renderer/save states, removal of decorative component checkmarks/foundation labels, and actionable empty-scene state. This is not the full Editor MVP and does not reorder M7–M10.
 - Initial `@engine/input` and `@engine/physics` packages are present. Rapier's standard WASM build was loaded in Chromium and exercised with fixed steps and raycast.
 
-## M6 verification snapshot — 2026-11-15
+## M6 verification snapshot — 2026-11-16
 
-- `pnpm check`: formatting, lint, workspace typecheck/build, and 129 unit tests passed.
-- `pnpm e2e`: 22 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
+- PR #87 reported `pnpm check` and `pnpm e2e` passing at its submitted head (129 unit tests, 22 Chromium E2E).
+- Revalidated the updated branch in a clean Node 25 sandbox: `pnpm check` passed (format, lint, typecheck, production builds, and 134 unit tests). The local E2E attempt could not launch Chromium because the Playwright browser binary is not installed in this sandbox; the submitted PR #87 head separately reported 22/22 Chromium E2E passing in CI. The repository's declared supported Node range remains 22.12.x.
+- PR #87 `pnpm e2e`: 22 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
 - Dedicated Rapier browser smoke: WASM loaded, a dynamic body completed 60 fixed steps (Y=0.07456), and raycast returned a hit.
 - Production Vite smoke emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk.
 - Player Physics Playground: five-body gravity/collision scene, keyboard movement, raycast, pause/resume, and single-step; Playwright also checks the 360px layout.
-- Still open: deployment-header/target-browser checks, Rapier maintenance review, physical gamepad E2E, character controller, fake-backend conformance, resource limits, physics performance report, and owner M6 sign-off.
+- Resource limits are now implemented and covered: live body/collider counts, collision events per drain, ray distance, and convex-hull vertex count. Defaults are documented and overridable per world.
+- Still open: deployment-header/target-browser checks, Rapier maintenance review, physical gamepad E2E, character controller, fake-backend conformance, collision-exit/filter edge coverage, physics performance report, and owner M6 sign-off.
 
 ## Next step
 
-Complete deployment-header/target-browser verification, Rapier maintenance review, and fake-backend conformance; then implement the character controller and resource limits before the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
+Next, add a fake PhysicsWorld backend and adapter conformance suite, close collision-exit/filter edge cases, and implement the character controller. In parallel, verify deployment headers and supported browsers, review Rapier maintenance, and add physical gamepad coverage before producing the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.

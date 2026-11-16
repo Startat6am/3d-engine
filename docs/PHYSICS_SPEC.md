@@ -79,8 +79,10 @@ Initial adapter implementation:
 Still required for M6 acceptance:
 
 - Character controller and optional static-only triangle-mesh colliders (opt-in); no dynamic triangle meshes.
-- Explicit backend conformance suite/fake backend and resource limits for bodies, colliders, events, ray length, and mesh cooking.
+- Explicit backend conformance suite/fake backend.
 - Physics Playground performance report and broader browser/device verification.
+
+The Rapier adapter now enforces configurable limits for live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count. Defaults are exported as `DEFAULT_PHYSICS_RESOURCE_LIMITS`; applications may override individual values through `createPhysicsWorld({ limits })`. Collision-event overflow drains the backend queue, retains no more than the configured limit, and throws `physics.resource-limit` so truncation is never silent.
 
 Out of scope: soft bodies, joints, ragdolls, networking/rollback, and cross-platform lockstep determinism. Fixed-step alone does not guarantee bit-identical simulation across browsers or hardware.
 
@@ -127,17 +129,19 @@ Implemented stable error categories include:
 - `physics.body-type-mismatch`
 - `physics.not-paused`
 - `physics.disposed`
+- `physics.resource-limit` — configured body, collider, collision-event, ray-distance, or convex-hull vertex budget exceeded.
+- `physics.invalid-resource-limits` — invalid resource limit configuration.
 
-Resource-limit and backend-unavailable categories are reserved for the remaining M6 work. Validate finite values, positive dimensions, normalized rotations/directions, collision group ranges, and root-body/unit-scale restrictions at the boundary.
+The backend-unavailable category remains reserved for a future adapter-discovery path. Validate finite values, positive dimensions, normalized rotations/directions, collision group ranges, and root-body/unit-scale restrictions at the boundary.
 
 ## 9. Performance, limits and security
 
 Measure body/collider counts, broadphase/narrowphase/solver time, query time, event processing time, allocations, WASM/JS memory, and bundle impact. Record browser, hardware, scene size, and build mode. Avoid allocations in contact/event hot paths where practical.
 
-Hard runtime resource limits and mesh-cooking limits are not implemented yet and remain an M6 gate. Treat imported mesh data and project files as untrusted; mesh cooking must have explicit triangle/vertex limits and cancellation/disposal semantics before it is enabled.
+Runtime limits are implemented for bodies, colliders, collision events per drain, ray distance, and convex-hull vertices. Triangle-mesh cooking is not implemented; any future mesh support must have explicit triangle/vertex limits and cancellation/disposal semantics before it is enabled. Treat imported mesh data and project files as untrusted.
 
 ## 10. Tests and acceptance
 
-Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, and the browser WASM smoke path. The Player Physics Playground now demonstrates gravity, collisions, body types, keyboard movement, raycast, pause, and single-step with browser E2E coverage. Character controller, fake-backend conformance, additional browsers/deployment headers, and performance budgets remain open.
+Current tests cover gravity stepping, pause/single-step, static/dynamic lifecycle, root/scale validation, collider validation, collision enter events, raycast miss/nearest/all/exclusion, stale handles, entity destruction, configured resource limits and explicit collision-event overflow, and the browser WASM smoke path. The Player Physics Playground now demonstrates gravity, collisions, body types, keyboard movement, raycast, pause, and single-step with browser E2E coverage. Character controller, fake-backend conformance, additional browsers/deployment headers, and performance budgets remain open.
 
 The authoritative M6 exit checklist is [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md).

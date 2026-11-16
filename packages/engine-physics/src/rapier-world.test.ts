@@ -3,7 +3,16 @@ import { EngineRuntime } from '@engine/core';
 import { RapierPhysicsWorld, setRapierModuleLoaderForTests } from './rapier-world.js';
 
 async function createTestPhysics(
-  options: { readonly gravity?: readonly [number, number, number] } = {},
+  options: {
+    readonly gravity?: readonly [number, number, number];
+    readonly limits?: {
+      readonly maxBodies?: number;
+      readonly maxColliders?: number;
+      readonly maxCollisionEventsPerDrain?: number;
+      readonly maxRayDistance?: number;
+      readonly maxConvexHullVertices?: number;
+    };
+  } = {},
 ) {
   setRapierModuleLoaderForTests(async () => {
     const rapier = await import('@dimforge/rapier3d-compat');
@@ -84,6 +93,76 @@ describe('RapierPhysicsWorld adapter', () => {
       physics.setStaticPose(body, { position: [0, 0, 0], rotation: [0, 0, 0, 1] }),
     ).toThrow('Static pose update');
     physics.dispose();
+  });
+
+  it('enforces configured body, collider, and ray resource limits', async () => {
+    const physics = await createTestPhysics({
+      limits: { maxBodies: 1, maxColliders: 1, maxRayDistance: 5 },
+    });
+    const world = new EngineRuntime().world;
+    const firstEntity = world.createEntity();
+    const secondEntity = world.createEntity();
+    const firstBody = physics.createBody(firstEntity, {
+      type: 'static',
+      position: [0, 0, 0],
+    });
+    expect(() => physics.createBody(secondEntity, { type: 'static', position: [0, 0, 0] })).toThrow(
+      /maxBodies=1/,
+    );
+    physics.createCollider(firstBody, { shape: { type: 'sphere', radius: 1 } });
+    expect(() =>
+      physics.createCollider(firstBody, { shape: { type: 'sphere', radius: 1 } }),
+    ).toThrow(/maxColliders=1/);
+    expect(() =>
+      physics.raycast({
+        origin: [0, 0, 0],
+        direction: [1, 0, 0],
+        maxDistance: 5.01,
+      }),
+    ).toThrow(/Ray maxDistance exceeds configured limit/);
+    physics.dispose();
+  });
+
+  it('bounds convex-hull vertex input before backend cooking', async () => {
+    const physics = await createTestPhysics({
+      limits: { maxConvexHullVertices: 4 },
+    });
+    const entity = new EngineRuntime().world.createEntity();
+    const body = physics.createBody(entity, { type: 'static', position: [0, 0, 0] });
+    expect(() =>
+      physics.createCollider(body, {
+        shape: {
+          type: 'convex-hull',
+          vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1]),
+        },
+      }),
+    ).toThrow(/maxConvexHullVertices=4/);
+    physics.dispose();
+  });
+
+  it('reports collision event overflow instead of silently truncating the drain', async () => {
+    const physics = await createTestPhysics({
+      gravity: [0, 0, 0],
+      limits: { maxCollisionEventsPerDrain: 1 },
+    });
+    const world = new EngineRuntime().world;
+    const entities = [world.createEntity(), world.createEntity(), world.createEntity()];
+    const bodies = [
+      physics.createBody(entities[0]!, { type: 'dynamic', position: [0, 0, 0] }),
+      physics.createBody(entities[1]!, { type: 'static', position: [0, 0, 0] }),
+      physics.createBody(entities[2]!, { type: 'static', position: [0.5, 0, 0] }),
+    ];
+    for (const body of bodies)
+      physics.createCollider(body, { shape: { type: 'sphere', radius: 1 } });
+    physics.step(1 / 60);
+    expect(() => physics.drainCollisionEvents()).toThrow(/maxCollisionEventsPerDrain=1/);
+    physics.dispose();
+  });
+
+  it('rejects invalid resource limit configuration', async () => {
+    await expect(createTestPhysics({ limits: { maxBodies: 0 } })).rejects.toMatchObject({
+      code: 'physics.invalid-resource-limits',
+    });
   });
 
   it('validates collider dimensions and normalized ray directions', async () => {

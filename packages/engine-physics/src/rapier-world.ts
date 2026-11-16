@@ -7,12 +7,14 @@ import {
   type PhysicsBodyHandle,
   type PhysicsColliderHandle,
   type PhysicsPose,
+  type PhysicsResourceLimits,
   type PhysicsWorld,
   type Ray,
   type RaycastHit,
   type RaycastOptions,
   type RigidBodyDescriptor,
   type Vec3,
+  DEFAULT_PHYSICS_RESOURCE_LIMITS,
 } from './types.js';
 
 type RapierModule = typeof import('@dimforge/rapier3d');
@@ -51,17 +53,26 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   #paused = false;
   #singleStepRequested = false;
   #disposed = false;
+  readonly #limits: PhysicsResourceLimits;
 
-  private constructor(rapier: RapierModule, gravity: Vec3) {
+  private constructor(
+    rapier: RapierModule,
+    gravity: Vec3,
+    limits: Partial<PhysicsResourceLimits> = {},
+  ) {
     this.#rapier = rapier;
+    this.#limits = { ...DEFAULT_PHYSICS_RESOURCE_LIMITS, ...limits };
+    this.#validateLimits(this.#limits);
     this.#world = new rapier.World({ x: gravity[0], y: gravity[1], z: gravity[2] });
     this.#events = new rapier.EventQueue(true);
   }
 
-  static async create(options: { readonly gravity?: Vec3 } = {}): Promise<RapierPhysicsWorld> {
+  static async create(
+    options: { readonly gravity?: Vec3; readonly limits?: Partial<PhysicsResourceLimits> } = {},
+  ): Promise<RapierPhysicsWorld> {
+    let rapier: RapierModule;
     try {
-      const rapier = await rapierLoader();
-      return new RapierPhysicsWorld(rapier, options.gravity ?? [0, -9.81, 0]);
+      rapier = await rapierLoader();
     } catch (cause) {
       throw new PhysicsError(
         'physics.backend-init-failed',
@@ -69,6 +80,7 @@ export class RapierPhysicsWorld implements PhysicsWorld {
         { cause },
       );
     }
+    return new RapierPhysicsWorld(rapier, options.gravity ?? [0, -9.81, 0], options.limits);
   }
 
   get paused(): boolean {
@@ -94,6 +106,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   createBody(entity: EntityId, descriptor: RigidBodyDescriptor): PhysicsBodyHandle {
     this.#assertActive();
     this.#validateBody(descriptor);
+    if (this.#bodies.size >= this.#limits.maxBodies)
+      throw new PhysicsError(
+        'physics.resource-limit',
+        `Rigid body limit exceeded (maxBodies=${this.#limits.maxBodies})`,
+      );
     if (this.#bodyByEntity.has(entity))
       throw new PhysicsError(
         'physics.duplicate-body',
@@ -139,6 +156,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   ): PhysicsColliderHandle {
     this.#assertActive();
     const body = this.#body(bodyHandle);
+    if (this.#colliders.size >= this.#limits.maxColliders)
+      throw new PhysicsError(
+        'physics.resource-limit',
+        `Collider limit exceeded (maxColliders=${this.#limits.maxColliders})`,
+      );
     const colliderDescriptor = this.#colliderDescriptor(descriptor);
     const collider = this.#world.createCollider(colliderDescriptor, body.body);
     const handle = `collider:${this.#nextCollider++}` as PhysicsColliderHandle;
@@ -256,6 +278,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   raycastAll(ray: Ray, options: RaycastOptions = {}): readonly RaycastHit[] {
     this.#assertActive();
     this.#validateRay(ray);
+    if (ray.maxDistance > this.#limits.maxRayDistance)
+      throw new PhysicsError(
+        'physics.resource-limit',
+        `Ray maxDistance exceeds configured limit (${this.#limits.maxRayDistance})`,
+      );
     if (
       options.collisionGroups !== undefined &&
       (!Number.isInteger(options.collisionGroups) ||
@@ -304,6 +331,7 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   drainCollisionEvents(): readonly CollisionEvent[] {
     this.#assertActive();
     const result: CollisionEvent[] = [];
+    let overflow = false;
     this.#events.drainCollisionEvents((handleA, handleB, started) => {
       const colliderA = this.#colliderByRapierHandle.get(handleA);
       const colliderB = this.#colliderByRapierHandle.get(handleB);
@@ -311,8 +339,17 @@ export class RapierPhysicsWorld implements PhysicsWorld {
       const a = this.#colliders.get(colliderA);
       const b = this.#colliders.get(colliderB);
       if (!a || !b) return;
+      if (result.length >= this.#limits.maxCollisionEventsPerDrain) {
+        overflow = true;
+        return;
+      }
       result.push({ entityA: a.entity, entityB: b.entity, colliderA, colliderB, started });
     });
+    if (overflow)
+      throw new PhysicsError(
+        'physics.resource-limit',
+        `Collision event drain exceeded maxCollisionEventsPerDrain=${this.#limits.maxCollisionEventsPerDrain}; excess events were discarded`,
+      );
     return result;
   }
 
@@ -363,6 +400,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
           throw new PhysicsError(
             'physics.invalid-collider-descriptor',
             'Convex hull requires at least four finite 3D points',
+          );
+        if (shape.vertices.length / 3 > this.#limits.maxConvexHullVertices)
+          throw new PhysicsError(
+            'physics.resource-limit',
+            `Convex hull exceeds maxConvexHullVertices=${this.#limits.maxConvexHullVertices}`,
           );
         result = this.#rapier.ColliderDesc.convexHull(shape.vertices);
         break;
@@ -475,6 +517,22 @@ export class RapierPhysicsWorld implements PhysicsWorld {
       throw new PhysicsError(
         'physics.invalid-body-descriptor',
         'Pose quaternion must be normalized',
+      );
+  }
+
+  #validateLimits(limits: PhysicsResourceLimits): void {
+    for (const [name, value] of Object.entries(limits)) {
+      if (name === 'maxRayDistance') continue;
+      if (!Number.isSafeInteger(value) || value <= 0)
+        throw new PhysicsError(
+          'physics.invalid-resource-limits',
+          `${name} must be a positive safe integer`,
+        );
+    }
+    if (!Number.isFinite(limits.maxRayDistance) || limits.maxRayDistance <= 0)
+      throw new PhysicsError(
+        'physics.invalid-resource-limits',
+        'maxRayDistance must be finite and positive',
       );
   }
 

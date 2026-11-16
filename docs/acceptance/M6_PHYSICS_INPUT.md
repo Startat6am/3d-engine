@@ -36,7 +36,8 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 ## M6.3 — Colliders, events and queries
 
-- [x] Box, sphere, capsule, cylinder, and convex-hull descriptors validate dimensions and finite values. Resource-count limits remain open.
+- [x] Box, sphere, capsule, cylinder, and convex-hull descriptors validate dimensions and finite values.
+- [x] Configurable positive limits bound live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count; overflow is surfaced as a typed resource-limit error.
 - [ ] Static triangle-mesh collider support is explicitly scoped and opt-in; unsupported mesh/body combinations fail clearly.
 - [ ] Collision enter/exit events include stable entity and collider identities and obey filtering (enter is tested; exit/filter lifecycle remains open).
 - [x] Raycast and raycast-all return distance, world-space hit point/normal, entity identity, and collider identity.

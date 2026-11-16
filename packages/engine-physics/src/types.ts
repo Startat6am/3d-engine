@@ -67,6 +67,27 @@ export interface CollisionEvent {
   readonly started: boolean;
 }
 
+export interface PhysicsResourceLimits {
+  /** Maximum live rigid bodies in one world. */
+  readonly maxBodies: number;
+  /** Maximum live colliders in one world. */
+  readonly maxColliders: number;
+  /** Maximum collision events returned by one drain operation. */
+  readonly maxCollisionEventsPerDrain: number;
+  /** Maximum ray length in world units. */
+  readonly maxRayDistance: number;
+  /** Maximum vertices accepted by one convex-hull descriptor. */
+  readonly maxConvexHullVertices: number;
+}
+
+export const DEFAULT_PHYSICS_RESOURCE_LIMITS: PhysicsResourceLimits = Object.freeze({
+  maxBodies: 10_000,
+  maxColliders: 20_000,
+  maxCollisionEventsPerDrain: 16_384,
+  maxRayDistance: 10_000,
+  maxConvexHullVertices: 65_536,
+});
+
 export interface PhysicsWorld {
   readonly paused: boolean;
   setPaused(paused: boolean): void;
