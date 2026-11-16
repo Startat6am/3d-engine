@@ -151,6 +151,86 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('emits one exit when an active collider or its body is removed', async () => {
+      const physics = await createWorld();
+      const world = new EngineRuntime().world;
+      const entityA = world.createEntity();
+      const entityB = world.createEntity();
+      const bodyA = physics.createBody(entityA, { type: 'dynamic', position: [0, 0, 0] });
+      const bodyB = physics.createBody(entityB, { type: 'static', position: [0.75, 0, 0] });
+      const colliderA = physics.createCollider(bodyA, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      const colliderB = physics.createCollider(bodyB, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      physics.step(1 / 60);
+      physics.drainCollisionEvents();
+      physics.removeCollider(colliderA);
+      expect(physics.drainCollisionEvents()).toContainEqual({
+        entityA,
+        entityB,
+        colliderA,
+        colliderB,
+        started: false,
+      });
+
+      const entityC = world.createEntity();
+      const entityD = world.createEntity();
+      const bodyC = physics.createBody(entityC, { type: 'dynamic', position: [3, 0, 0] });
+      const bodyD = physics.createBody(entityD, { type: 'static', position: [3.75, 0, 0] });
+      const colliderC = physics.createCollider(bodyC, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      const colliderD = physics.createCollider(bodyD, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      physics.step(1 / 60);
+      physics.drainCollisionEvents();
+      physics.removeBody(bodyC);
+      expect(physics.drainCollisionEvents()).toContainEqual({
+        entityA: entityC,
+        entityB: entityD,
+        colliderA: colliderC,
+        colliderB: colliderD,
+        started: false,
+      });
+      const entityE = world.createEntity();
+      const entityF = world.createEntity();
+      const bodyE = physics.createBody(entityE, { type: 'dynamic', position: [6, 0, 0] });
+      const bodyF = physics.createBody(entityF, { type: 'static', position: [6.75, 0, 0] });
+      const colliderE = physics.createCollider(bodyE, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      const colliderF = physics.createCollider(bodyF, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      physics.step(1 / 60);
+      physics.removeCollider(colliderE);
+      const undrainedEvents = physics.drainCollisionEvents();
+      expect(undrainedEvents).toContainEqual({
+        entityA: entityE,
+        entityB: entityF,
+        colliderA: colliderE,
+        colliderB: colliderF,
+        started: true,
+      });
+      expect(undrainedEvents).toContainEqual({
+        entityA: entityE,
+        entityB: entityF,
+        colliderA: colliderE,
+        colliderB: colliderF,
+        started: false,
+      });
+      physics.dispose();
+    });
+
     it('returns empty query and event collections when the world has no geometry', async () => {
       const physics = await createWorld();
       const ray = { origin: [0, 0, 0] as const, direction: [1, 0, 0] as const, maxDistance: 10 };

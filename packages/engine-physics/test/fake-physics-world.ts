@@ -81,16 +81,21 @@ export class FakePhysicsWorld implements PhysicsWorld {
 
   removeCollider(handle: PhysicsColliderHandle): void {
     this.#assertActive();
-    if (!this.#colliders.delete(handle)) this.#stale('collider');
+    if (!this.#colliders.has(handle)) this.#stale('collider');
+    this.#queueCollisionExits(handle);
+    this.#colliders.delete(handle);
   }
 
   removeBody(handle: PhysicsBodyHandle): void {
     this.#assertActive();
     this.#body(handle);
-    this.#bodies.delete(handle);
     for (const [collider, record] of this.#colliders) {
-      if (record.body === handle) this.#colliders.delete(collider);
+      if (record.body === handle) {
+        this.#queueCollisionExits(collider);
+        this.#colliders.delete(collider);
+      }
     }
+    this.#bodies.delete(handle);
   }
 
   setKinematicTarget(handle: PhysicsBodyHandle, pose: PhysicsPose): void {
@@ -307,6 +312,26 @@ export class FakePhysicsWorld implements PhysicsWorld {
       });
     }
     this.#activePairs = currentPairs;
+  }
+
+  #queueCollisionExits(handle: PhysicsColliderHandle): void {
+    for (const [key, pair] of this.#activePairs) {
+      if (pair.colliderA !== handle && pair.colliderB !== handle) continue;
+      const colliderA = this.#colliders.get(pair.colliderA);
+      const colliderB = this.#colliders.get(pair.colliderB);
+      const bodyA = colliderA ? this.#bodies.get(colliderA.body) : undefined;
+      const bodyB = colliderB ? this.#bodies.get(colliderB.body) : undefined;
+      if (bodyA && bodyB) {
+        this.#events.push({
+          entityA: bodyA.entity,
+          entityB: bodyB.entity,
+          colliderA: pair.colliderA,
+          colliderB: pair.colliderB,
+          started: false,
+        });
+      }
+      this.#activePairs.delete(key);
+    }
   }
 
   #sphereRadius(descriptor: ColliderDescriptor): number | null {

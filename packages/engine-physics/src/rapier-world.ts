@@ -48,6 +48,8 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   readonly #bodyByEntity = new Map<EntityId, PhysicsBodyHandle>();
   readonly #colliders = new Map<PhysicsColliderHandle, ColliderRecord>();
   readonly #colliderByRapierHandle = new Map<number, PhysicsColliderHandle>();
+  readonly #queuedCollisionEvents: CollisionEvent[] = [];
+  readonly #activeCollisionPairs = new Map<string, CollisionEvent>();
   #nextBody = 1;
   #nextCollider = 1;
   #paused = false;
@@ -174,6 +176,8 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     const record = this.#colliders.get(handle);
     if (!record)
       throw new PhysicsError('physics.stale-handle', `Unknown collider handle: ${handle}`);
+    this.#captureCollisionEvents();
+    this.#queueCollisionExits(handle);
     this.#world.removeCollider(record.collider, true);
     this.#colliderByRapierHandle.delete(record.collider.handle);
     this.#colliders.delete(handle);
@@ -182,8 +186,10 @@ export class RapierPhysicsWorld implements PhysicsWorld {
   removeBody(handle: PhysicsBodyHandle): void {
     this.#assertActive();
     const record = this.#body(handle);
+    this.#captureCollisionEvents();
     for (const [colliderHandle, collider] of this.#colliders) {
       if (collider.body === handle) {
+        this.#queueCollisionExits(colliderHandle);
         this.#colliderByRapierHandle.delete(collider.collider.handle);
         this.#colliders.delete(colliderHandle);
       }
@@ -330,8 +336,17 @@ export class RapierPhysicsWorld implements PhysicsWorld {
 
   drainCollisionEvents(): readonly CollisionEvent[] {
     this.#assertActive();
-    const result: CollisionEvent[] = [];
-    let overflow = false;
+    this.#captureCollisionEvents();
+    const result = this.#queuedCollisionEvents.splice(0);
+    if (result.length > this.#limits.maxCollisionEventsPerDrain)
+      throw new PhysicsError(
+        'physics.resource-limit',
+        `Collision event drain exceeded maxCollisionEventsPerDrain=${this.#limits.maxCollisionEventsPerDrain}; excess events were discarded`,
+      );
+    return result;
+  }
+
+  #captureCollisionEvents(): void {
     this.#events.drainCollisionEvents((handleA, handleB, started) => {
       const colliderA = this.#colliderByRapierHandle.get(handleA);
       const colliderB = this.#colliderByRapierHandle.get(handleB);
@@ -339,18 +354,31 @@ export class RapierPhysicsWorld implements PhysicsWorld {
       const a = this.#colliders.get(colliderA);
       const b = this.#colliders.get(colliderB);
       if (!a || !b) return;
-      if (result.length >= this.#limits.maxCollisionEventsPerDrain) {
-        overflow = true;
-        return;
-      }
-      result.push({ entityA: a.entity, entityB: b.entity, colliderA, colliderB, started });
+      const event: CollisionEvent = {
+        entityA: a.entity,
+        entityB: b.entity,
+        colliderA,
+        colliderB,
+        started,
+      };
+      this.#queuedCollisionEvents.push(event);
+      const key = this.#collisionPairKey(event);
+      if (started) this.#activeCollisionPairs.set(key, event);
+      else this.#activeCollisionPairs.delete(key);
     });
-    if (overflow)
-      throw new PhysicsError(
-        'physics.resource-limit',
-        `Collision event drain exceeded maxCollisionEventsPerDrain=${this.#limits.maxCollisionEventsPerDrain}; excess events were discarded`,
-      );
-    return result;
+  }
+
+  /** Removing a collider does not reliably yield Rapier end events; preserve one exit per tracked pair. */
+  #queueCollisionExits(handle: PhysicsColliderHandle): void {
+    for (const [key, event] of this.#activeCollisionPairs) {
+      if (event.colliderA !== handle && event.colliderB !== handle) continue;
+      this.#queuedCollisionEvents.push({ ...event, started: false });
+      this.#activeCollisionPairs.delete(key);
+    }
+  }
+
+  #collisionPairKey(event: CollisionEvent): string {
+    return [event.colliderA, event.colliderB].sort().join('|');
   }
 
   dispose(): void {
@@ -362,6 +390,8 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     this.#bodyByEntity.clear();
     this.#colliders.clear();
     this.#colliderByRapierHandle.clear();
+    this.#queuedCollisionEvents.length = 0;
+    this.#activeCollisionPairs.clear();
   }
 
   #body(handle: PhysicsBodyHandle): BodyRecord {

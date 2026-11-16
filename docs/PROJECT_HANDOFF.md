@@ -34,14 +34,14 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 - Fixed-step integration uses existing `EngineRuntime`/`EngineClock`; no second accumulator.
 - `PhysicsPreUpdateSystem` creates handles before gameplay; `PhysicsSystem` steps and synchronizes dynamic poses.
 - Configurable limits: body count, collider count, collision events per drain, ray distance, convex-hull vertex count. Defaults are `DEFAULT_PHYSICS_RESOURCE_LIMITS`.
-- Collision event overflow is surfaced as `physics.resource-limit`, not silently truncated.
+- Collision event overflow is surfaced as `physics.resource-limit`, not silently truncated. Removing a collider or body with active contacts synthesizes one exit event per active pair before handles are invalidated.
 - Descriptor replacement stages a replacement collider before removing the previous collider.
 
 ### Fake backend and adapter conformance
 
 - Test-only fake: `packages/engine-physics/test/fake-physics-world.ts`.
 - Shared suite: `packages/engine-physics/test/physics-world-conformance.test.ts`.
-- Both `FakePhysicsWorld` and Rapier run the same 7 conformance cases (14 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; nearest-first/all raycasts with collision-group filtering, entity exclusion, and max distance; empty query/event behavior; idempotent disposal and disposed-state rejection.
+- Both `FakePhysicsWorld` and Rapier run the same 8 conformance cases (16 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; exactly-once exit events on collider/body removal; nearest-first/all raycasts with collision-group filtering, entity exclusion, and max distance; empty query/event behavior; idempotent disposal and disposed-state rejection.
 - Fake backend models the `PhysicsWorld` contract with deliberately limited sphere raycasts and sphere/sphere overlap events; it is not a full geometry implementation or production solver. It is not exported from the package root and is not production functionality.
 - Vitest now includes `packages/**/test/**/*.test.ts` in addition to existing source tests.
 
@@ -53,7 +53,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Latest full `pnpm check` passed: formatting, ESLint, all workspace typechecks, production builds, and 149/149 unit tests across 13 test files, including the 14 shared Fake/Rapier conformance tests.
+Latest full `pnpm check` passed: formatting, ESLint, all workspace typechecks, production builds, and 151/151 unit tests across 13 test files, including the 16 shared Fake/Rapier conformance tests.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 
@@ -62,7 +62,7 @@ The repository declares Node `>=22.12.0 <23` and pnpm `12.18.0`. Prefer the decl
 ## 5. Remaining M6 work — recommended order
 
 1. **Expand conformance coverage:** invalid query inputs, stale collider behavior, and resource-limit semantics where applicable. Sphere-sensor enter/exit events and ray query ordering/filtering now pass against both adapters.
-2. **Close collision lifecycle edge cases:** collision event filtering and body/collider removal while contacts are active.
+2. **Close collision lifecycle edge cases:** collision event filtering by collision groups.
 3. **Character Controller:** decide and document the minimal M6 scope before implementation; test slopes/steps/grounding and disposal if included.
 4. **Initialization/lifecycle hardening:** failed WASM init, repeated create/dispose, cleanup on partial failure, actionable errors.
 5. **Input/browser evidence:** focus loss, visibility changes, gamepad disconnect, supported browser matrix, physical gamepad where hardware is available.
