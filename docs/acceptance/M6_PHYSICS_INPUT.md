@@ -19,7 +19,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 - [x] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [x] Rapier is confined to an adapter module; no Rapier types appear in public package-root exports.
-- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (26 shared conformance tests pass).
+- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (30 shared conformance tests pass).
 - [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state.
 - [x] Create/destroy operations are safe; stale body/collider handles are rejected. Descriptor replacement is supported; in-place mutation of descriptor objects is not.
 - [x] Disposal releases backend resources and is idempotent.
@@ -72,7 +72,7 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 
 ## M6.6 — CI and documentation closeout
 
-- [x] Local formatting, lint, typecheck, and 166 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (26 tests).
+- [x] Local formatting, lint, typecheck, and 166 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (30 tests).
 - [ ] Exact-head CI and browser E2E rerun; the previous submitted PR head reported 22/22 Playwright tests passing, but the current sandbox cannot launch Chromium because libglib-2.0.so.0 is missing.
 - [ ] Physics performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
 - [ ] Performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
