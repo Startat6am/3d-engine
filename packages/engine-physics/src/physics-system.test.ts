@@ -47,6 +47,37 @@ describe('PhysicsSystem ECS integration', () => {
     physics.dispose();
   });
 
+  it('keeps the previous collider attached when a replacement descriptor is rejected', async () => {
+    const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
+    const entity = runtime.world.createEntity();
+    runtime.world.add(entity, Transform, createTransform());
+    runtime.world.add(entity, RigidBody, { type: 'dynamic', position: [0, 2, 0] });
+    runtime.world.add(entity, PhysicsCollider, { shape: { type: 'sphere', radius: 1 } });
+    const physics = await createTestPhysics();
+    const system = new PhysicsSystem(physics);
+    runtime.scheduler.add(new PhysicsPreUpdateSystem(system));
+    runtime.scheduler.add(system);
+
+    runtime.advance(1 / 60);
+    const originalHandle = system.getColliderHandle(entity);
+    expect(originalHandle).not.toBeNull();
+
+    runtime.world.add(entity, PhysicsCollider, {
+      shape: { type: 'sphere', radius: -1 },
+    });
+    expect(() => runtime.advance(1 / 60)).toThrow('radius');
+    expect(system.getColliderHandle(entity)).toBe(originalHandle);
+
+    runtime.world.add(entity, PhysicsCollider, {
+      shape: { type: 'sphere', radius: 0.5 },
+    });
+    runtime.advance(1 / 60);
+    expect(system.getColliderHandle(entity)).not.toBe(originalHandle);
+
+    system.dispose();
+    physics.dispose();
+  });
+
   it('creates entity handles before gameplay fixed-update systems apply impulses', async () => {
     const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
     const entity = runtime.world.createEntity();
