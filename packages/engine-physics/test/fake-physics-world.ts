@@ -278,6 +278,13 @@ export class FakePhysicsWorld implements PhysicsWorld {
         const bodyB = this.#bodies.get(colliderB.body);
         const radiusB = this.#sphereRadius(colliderB.descriptor);
         if (!bodyB || radiusB === null) continue;
+        if (
+          !this.#groupsInteract(
+            colliderA.descriptor.collisionGroups ?? 0xffffffff,
+            colliderB.descriptor.collisionGroups ?? 0xffffffff,
+          )
+        )
+          continue;
         const dx = bodyA.pose.position[0] - bodyB.pose.position[0];
         const dy = bodyA.pose.position[1] - bodyB.pose.position[1];
         const dz = bodyA.pose.position[2] - bodyB.pose.position[2];

@@ -151,6 +151,44 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('filters collision events using mutual collider collision groups', async () => {
+      const physics = await createWorld();
+      const world = new EngineRuntime().world;
+      const entityA = world.createEntity();
+      const entityB = world.createEntity();
+      const bodyA = physics.createBody(entityA, { type: 'dynamic', position: [0, 0, 0] });
+      const bodyB = physics.createBody(entityB, { type: 'static', position: [0.75, 0, 0] });
+      physics.createCollider(bodyA, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+        collisionGroups: 0x00010002,
+      });
+      const incompatibleCollider = physics.createCollider(bodyB, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+        collisionGroups: 0x00040008,
+      });
+
+      physics.step(1 / 60);
+      expect(physics.drainCollisionEvents()).toEqual([]);
+
+      physics.removeCollider(incompatibleCollider);
+      const compatibleCollider = physics.createCollider(bodyB, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+        collisionGroups: 0x00020001,
+      });
+      physics.step(1 / 60);
+      expect(physics.drainCollisionEvents()).toContainEqual({
+        entityA,
+        entityB,
+        colliderA: expect.any(String),
+        colliderB: compatibleCollider,
+        started: true,
+      });
+      physics.dispose();
+    });
+
     it('emits one exit when an active collider or its body is removed', async () => {
       const physics = await createWorld();
       const world = new EngineRuntime().world;
