@@ -10,7 +10,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Read and follow `SUBSYSTEM_CONTRACTS.md`.
 - [x] Confirm package names, exports, TypeScript conventions, and runtime phase integration against current source.
 - [x] Verify Rapier 0.21.0 / Apache-2.0, Vite WASM asset emission, lazy loading, and Chromium runtime simulation + raycast smoke; see ADR 0003.
-- [ ] Verify deployment headers and additional target browsers.
+- [ ] Verify deployment headers and additional target browsers. The authorized 2026-11-16 Vercel Preview check confirms the deployed project serves only the Editor bundle; `/physics-playground.html` and the Player WASM asset return 404. HTML/JS headers were observed, but WASM headers and fallback behavior cannot be assessed until a Player deployment target is published (details in `docs/PROJECT_HANDOFF.md`).
 - [ ] Review upstream Rapier maintenance/release cadence and record the supported browser matrix. The upstream maintenance/version snapshot is documented in `docs/PHYSICS_SPEC.md` (JS binding 0.21.0 pinned; Rust changelog v0.35.0/v0.35.1 (2026-08-08); npm JS 0.21.0 is latest); supported-browser verification remains open beyond Chromium.
 - [x] Publish the physics and input contracts, stable error categories, minimal examples, and explicit unsupported capabilities.
 - [x] Keep backend-specific types out of public engine APIs.
