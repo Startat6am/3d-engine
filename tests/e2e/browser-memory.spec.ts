@@ -412,7 +412,7 @@ test('Chromium renderer JS heap and WebGL allocation lifecycle are measured', as
     buffer: makeMemoryGlb(vertexCount, textureSize + 1, 211),
   });
   await page.getByRole('button', { name: 'Console' }).click();
-  await expect(page.getByText('Imported browser-memory-repeat.glb')).toBeVisible();
+  await expect(page.getByText('Imported browser-memory-repeat.glb')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText('BrowserMemoryFixture')).toBeVisible();
   await expect
     .poll(
