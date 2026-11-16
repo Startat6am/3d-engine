@@ -92,15 +92,15 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 ## M6 verification snapshot — 2026-11-16
 
 - PR #87 reported `pnpm check` and `pnpm e2e` passing at its submitted head (129 unit tests, 22 Chromium E2E).
-- Revalidated the updated branch in a clean Node 25 sandbox: pnpm check passed (format, lint, typecheck, production builds, and 147 unit tests). The local E2E attempt enumerated all 22 tests, but Chromium could not start because this sandbox lacks the system shared library libglib-2.0.so.0; no E2E test body ran. The submitted PR #87 head separately reported 22/22 Chromium E2E passing before the latest commits; CI must be rerun on the updated exact head. The repository's declared supported Node range remains 22.12.x.
+- Revalidated the updated branch in a clean Node 25 sandbox: pnpm check passed (format, lint, typecheck, production builds, and 149 unit tests). The local E2E attempt enumerated all 22 tests, but Chromium could not start because this sandbox lacks the system shared library libglib-2.0.so.0; no E2E test body ran. The submitted PR #87 head separately reported 22/22 Chromium E2E passing before the latest commits; CI must be rerun on the updated exact head. The repository's declared supported Node range remains 22.12.x.
 - PR #87 `pnpm e2e`: 22 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
 - Dedicated Rapier browser smoke: WASM loaded, a dynamic body completed 60 fixed steps (Y=0.07456), and raycast returned a hit.
 - Production Vite smoke emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk.
 - Player Physics Playground: five-body gravity/collision scene, keyboard movement, raycast, pause/resume, and single-step; Playwright also checks the 360px layout.
 - Resource limits are now implemented and covered: live body/collider counts, collision events per drain, ray distance, and convex-hull vertex count. Defaults are documented and overridable per world.
-- Shared Fake/Rapier PhysicsWorld conformance suite: 12/12 tests pass across lifecycle, pose operations, stale handles, collider ownership, pause/single-step, sphere-sensor collision enter/exit events, empty query/event behavior, and disposal.
-- Still open: deployment-header/target-browser checks, Rapier maintenance review, physical gamepad E2E, character controller, collision-group filtering and removal-during-contact coverage, physics performance report, and owner M6 sign-off.
+- Shared Fake/Rapier PhysicsWorld conformance suite: 14/14 tests pass across lifecycle, pose operations, stale handles, collider ownership, pause/single-step, sphere-sensor collision enter/exit events, nearest/all ray queries, group filtering, entity exclusion, empty query/event behavior, and disposal.
+- Still open: deployment-header/target-browser checks, Rapier maintenance review, physical gamepad E2E, character controller, collision-event filtering and removal-during-contact coverage, physics performance report, and owner M6 sign-off.
 
 ## Next step
 
-Next, expand adapter conformance to cover collision-group filtering and ray query semantics, close removal-during-contact edge cases, and implement the character controller. In parallel, verify deployment headers and supported browsers, review Rapier maintenance, and add physical gamepad coverage before producing the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
+Next, expand adapter conformance to cover collision-event filtering and removal-during-contact edge cases, and implement the character controller. In parallel, verify deployment headers and supported browsers, review Rapier maintenance, and add physical gamepad coverage before producing the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.

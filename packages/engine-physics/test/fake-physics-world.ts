@@ -154,17 +154,88 @@ export class FakePhysicsWorld implements PhysicsWorld {
   }
 
   raycast(ray: Ray, options?: RaycastOptions): RaycastHit | null {
-    void ray;
-    void options;
-    this.#assertActive();
-    return null;
+    return this.raycastAll(ray, options)[0] ?? null;
   }
 
   raycastAll(ray: Ray, options?: RaycastOptions): readonly RaycastHit[] {
-    void ray;
-    void options;
     this.#assertActive();
-    return [];
+    const directionLength = Math.hypot(...ray.direction);
+    if (
+      !ray.origin.every(Number.isFinite) ||
+      !ray.direction.every(Number.isFinite) ||
+      Math.abs(directionLength - 1) > 1e-3 ||
+      !Number.isFinite(ray.maxDistance) ||
+      ray.maxDistance < 0
+    )
+      throw new PhysicsError(
+        'physics.query-invalid',
+        'Ray must have finite values, normalized direction, and non-negative distance',
+      );
+    const queryGroups = options?.collisionGroups ?? 0xffffffff;
+    if (!Number.isInteger(queryGroups) || queryGroups < 0 || queryGroups > 0xffffffff)
+      throw new PhysicsError(
+        'physics.query-invalid',
+        'Query collision groups must be an unsigned 32-bit integer',
+      );
+    const excluded = new Set(options?.excludeEntities ?? []);
+    const hits: RaycastHit[] = [];
+    for (const [colliderHandle, collider] of this.#colliders) {
+      const body = this.#bodies.get(collider.body);
+      const radius = this.#sphereRadius(collider.descriptor);
+      if (!body || radius === null || excluded.has(body.entity)) continue;
+      if (!this.#groupsInteract(queryGroups, collider.descriptor.collisionGroups ?? 0xffffffff))
+        continue;
+      const offset = [
+        ray.origin[0] - body.pose.position[0],
+        ray.origin[1] - body.pose.position[1],
+        ray.origin[2] - body.pose.position[2],
+      ] as const;
+      const projected = -(
+        offset[0] * ray.direction[0] +
+        offset[1] * ray.direction[1] +
+        offset[2] * ray.direction[2]
+      );
+      const perpendicularSquared =
+        offset[0] * offset[0] +
+        offset[1] * offset[1] +
+        offset[2] * offset[2] -
+        projected * projected;
+      const radiusSquared = radius * radius;
+      if (perpendicularSquared > radiusSquared) continue;
+      const halfChord = Math.sqrt(radiusSquared - perpendicularSquared);
+      const entryDistance = projected - halfChord;
+      const exitDistance = projected + halfChord;
+      const distance =
+        entryDistance >= 0 ? entryDistance : options?.solid === false ? exitDistance : 0;
+      if (distance < 0 || distance > ray.maxDistance) continue;
+      const point = [
+        ray.origin[0] + ray.direction[0] * distance,
+        ray.origin[1] + ray.direction[1] * distance,
+        ray.origin[2] + ray.direction[2] * distance,
+      ] as const;
+      const normalVector = [
+        point[0] - body.pose.position[0],
+        point[1] - body.pose.position[1],
+        point[2] - body.pose.position[2],
+      ] as const;
+      const normalLength = Math.hypot(...normalVector) || 1;
+      hits.push({
+        entity: body.entity,
+        collider: colliderHandle,
+        point,
+        normal: normalVector.map((value) => value / normalLength) as unknown as Vec3,
+        distance,
+      });
+    }
+    return hits.sort((a, b) => a.distance - b.distance);
+  }
+
+  #groupsInteract(groupsA: number, groupsB: number): boolean {
+    const membershipA = (groupsA >>> 16) & 0xffff;
+    const filterA = groupsA & 0xffff;
+    const membershipB = (groupsB >>> 16) & 0xffff;
+    const filterB = groupsB & 0xffff;
+    return (membershipA & filterB) !== 0 && (membershipB & filterA) !== 0;
   }
 
   drainCollisionEvents(): readonly CollisionEvent[] {

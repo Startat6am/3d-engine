@@ -61,6 +61,50 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('raycasts nearest-first, filters groups, and excludes requested entities', async () => {
+      const physics = await createWorld();
+      const world = new EngineRuntime().world;
+      const nearEntity = world.createEntity();
+      const farEntity = world.createEntity();
+      const filteredEntity = world.createEntity();
+      const nearBody = physics.createBody(nearEntity, {
+        type: 'static',
+        position: [0, 0, -2],
+      });
+      const farBody = physics.createBody(farEntity, {
+        type: 'static',
+        position: [0, 0, -4],
+      });
+      const filteredBody = physics.createBody(filteredEntity, {
+        type: 'static',
+        position: [0, 0, -6],
+      });
+      const nearCollider = physics.createCollider(nearBody, {
+        shape: { type: 'sphere', radius: 0.5 },
+      });
+      const farCollider = physics.createCollider(farBody, {
+        shape: { type: 'sphere', radius: 0.5 },
+      });
+      physics.createCollider(filteredBody, {
+        shape: { type: 'sphere', radius: 0.5 },
+        collisionGroups: 0x00040008,
+      });
+      const ray = { origin: [0, 0, 0] as const, direction: [0, 0, -1] as const, maxDistance: 10 };
+      physics.step(1 / 60);
+
+      const hits = physics.raycastAll(ray, { collisionGroups: 0x00010002 });
+      expect(hits.map((hit) => hit.collider)).toEqual([nearCollider, farCollider]);
+      expect(physics.raycast(ray, { collisionGroups: 0x00010002 })?.collider).toBe(nearCollider);
+      expect(
+        physics.raycast(ray, {
+          collisionGroups: 0x00010002,
+          excludeEntities: [nearEntity],
+        })?.collider,
+      ).toBe(farCollider);
+      expect(physics.raycast(ray, { collisionGroups: 0x00010002 })?.distance).toBeCloseTo(1.5);
+      physics.dispose();
+    });
+
     it('emits collision enter and exit events with stable entity/collider identities', async () => {
       const physics = await createWorld();
       const world = new EngineRuntime().world;
