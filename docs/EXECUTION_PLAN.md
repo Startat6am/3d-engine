@@ -28,7 +28,7 @@ Branch: `feat/m6-physics-input-core`
    offset/up, grounded state, and collision results.
 2. Physics lifecycle: entity/body/collider teardown, world disposal,
    reinitialization, and WASM init-failure recovery tests.
-3. FakePhysicsWorld and Rapier share a conformance test contract.
+3. FakePhysicsWorld and Rapier share a conformance test contract. Rapier supports opt-in static-only triangle meshes with bounded vertex/index buffers and rejects non-static bodies.
 4. Input: keyboard, mouse, gamepad, focus/visibility loss, disconnect,
    reconnect, axis/button neutralization, and transition coverage.
 5. Preliminary performance report and reproducible Node benchmark.
@@ -63,8 +63,9 @@ Branch: `feat/m6-physics-input-core`
    these from an unauthenticated SSO response.
 3. **Browser matrix:** verify Firefox and WebKit; Chromium is the current
    automated E2E browser. Test physical gamepads and mobile where available.
-4. **Physics scope:** confirm static/triangle-mesh requirements and add
-   coverage if they are part of M6. Keep fixed-tick semantics under review.
+4. **Physics scope:** static-only triangle meshes are implemented and tested.
+   Dynamic/kinematic meshes and automatic mesh cooking remain deferred; keep
+   fixed-tick semantics under review.
 5. **Performance:** repeat on dedicated hardware and target browsers; add
    controlled WASM-memory and allocation profiling plus dense-contact scenes.
    Obtain owner-approved budgets before checking the performance gate.
