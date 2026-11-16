@@ -41,8 +41,8 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 - Test-only fake: `packages/engine-physics/test/fake-physics-world.ts`.
 - Shared suite: `packages/engine-physics/test/physics-world-conformance.test.ts`.
-- Both `FakePhysicsWorld` and Rapier run the same 5 conformance cases (10 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; empty query/event behavior; idempotent disposal and disposed-state rejection.
-- Fake backend intentionally models the `PhysicsWorld` contract, not collision geometry. It is not exported from the package root and is not production functionality.
+- Both `FakePhysicsWorld` and Rapier run the same 6 conformance cases (12 total passing tests): body create/read/update/remove and stale handles; collider ownership on body removal; pause/single-step; sphere sensor collision enter/exit events with stable identities; empty query/event behavior; idempotent disposal and disposed-state rejection.
+- Fake backend models the `PhysicsWorld` contract with deliberately limited sphere/sphere overlap events; it is not a full geometry implementation or production solver. It is not exported from the package root and is not production functionality.
 - Vitest now includes `packages/**/test/**/*.test.ts` in addition to existing source tests.
 
 ### Input and Player
@@ -53,7 +53,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Latest full `pnpm check` passed: formatting, ESLint, all workspace typechecks, production builds, and 144/144 unit tests across 13 test files, including the 10 shared Fake/Rapier conformance tests.
+Latest full `pnpm check` passed: formatting, ESLint, all workspace typechecks, production builds, and 147/147 unit tests across 13 test files, including the 12 shared Fake/Rapier conformance tests.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 
@@ -61,8 +61,8 @@ The repository declares Node `>=22.12.0 <23` and pnpm `12.18.0`. Prefer the decl
 
 ## 5. Remaining M6 work — recommended order
 
-1. **Expand conformance coverage:** collision enter/exit behavior, collision-group filtering, raycast nearest/all ordering, excluded entities, maximum distance, invalid inputs, stale collider behavior, resource-limit semantics where applicable.
-2. **Close collision lifecycle edge cases:** collision exit events and filtering, including body/collider removal while contacts are active.
+1. **Expand conformance coverage:** collision-group filtering, raycast nearest/all ordering, excluded entities, maximum distance, invalid inputs, stale collider behavior, resource-limit semantics where applicable. Sphere-sensor enter/exit events now pass against both adapters.
+2. **Close collision lifecycle edge cases:** collision-group filtering and body/collider removal while contacts are active.
 3. **Character Controller:** decide and document the minimal M6 scope before implementation; test slopes/steps/grounding and disposal if included.
 4. **Initialization/lifecycle hardening:** failed WASM init, repeated create/dispose, cleanup on partial failure, actionable errors.
 5. **Input/browser evidence:** focus loss, visibility changes, gamepad disconnect, supported browser matrix, physical gamepad where hardware is available.

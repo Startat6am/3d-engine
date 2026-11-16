@@ -140,6 +140,56 @@ describe('RapierPhysicsWorld adapter', () => {
     physics.dispose();
   });
 
+  it('emits stable collision enter and exit events for sensor overlap', async () => {
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    const world = new EngineRuntime().world;
+    const movingEntity = world.createEntity();
+    const fixedEntity = world.createEntity();
+    const movingBody = physics.createBody(movingEntity, {
+      type: 'dynamic',
+      position: [0, 0, 0],
+      canSleep: false,
+    });
+    const fixedBody = physics.createBody(fixedEntity, {
+      type: 'static',
+      position: [0.75, 0, 0],
+    });
+    const movingCollider = physics.createCollider(movingBody, {
+      shape: { type: 'sphere', radius: 0.5 },
+      sensor: true,
+    });
+    const fixedCollider = physics.createCollider(fixedBody, {
+      shape: { type: 'sphere', radius: 0.5 },
+      sensor: true,
+    });
+
+    physics.step(1 / 60);
+    const enter = physics.drainCollisionEvents();
+    expect(enter).toHaveLength(1);
+    expect(enter[0]).toMatchObject({
+      entityA: movingEntity,
+      entityB: fixedEntity,
+      colliderA: movingCollider,
+      colliderB: fixedCollider,
+      started: true,
+    });
+
+    physics.applyImpulse(movingBody, [100, 0, 0]);
+    physics.step(1 / 60);
+    // Rapier reports sensor separation on the following pipeline step.
+    physics.step(1 / 60);
+    const exit = physics.drainCollisionEvents();
+    expect(exit).toHaveLength(1);
+    expect(exit[0]).toMatchObject({
+      entityA: movingEntity,
+      entityB: fixedEntity,
+      colliderA: movingCollider,
+      colliderB: fixedCollider,
+      started: false,
+    });
+    physics.dispose();
+  });
+
   it('reports collision event overflow instead of silently truncating the drain', async () => {
     const physics = await createTestPhysics({
       gravity: [0, 0, 0],

@@ -61,6 +61,52 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('emits collision enter and exit events with stable entity/collider identities', async () => {
+      const physics = await createWorld();
+      const world = new EngineRuntime().world;
+      const movingEntity = world.createEntity();
+      const fixedEntity = world.createEntity();
+      const movingBody = physics.createBody(movingEntity, {
+        type: 'dynamic',
+        position: [0, 0, 0],
+        canSleep: false,
+      });
+      const fixedBody = physics.createBody(fixedEntity, {
+        type: 'static',
+        position: [0.75, 0, 0],
+      });
+      const movingCollider = physics.createCollider(movingBody, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+      const fixedCollider = physics.createCollider(fixedBody, {
+        shape: { type: 'sphere', radius: 0.5 },
+        sensor: true,
+      });
+
+      physics.step(1 / 60);
+      expect(physics.drainCollisionEvents()).toContainEqual({
+        entityA: movingEntity,
+        entityB: fixedEntity,
+        colliderA: movingCollider,
+        colliderB: fixedCollider,
+        started: true,
+      });
+
+      physics.applyImpulse(movingBody, [100, 0, 0]);
+      physics.step(1 / 60);
+      // Rapier reports sensor separation on the following pipeline step.
+      physics.step(1 / 60);
+      expect(physics.drainCollisionEvents()).toContainEqual({
+        entityA: movingEntity,
+        entityB: fixedEntity,
+        colliderA: movingCollider,
+        colliderB: fixedCollider,
+        started: false,
+      });
+      physics.dispose();
+    });
+
     it('returns empty query and event collections when the world has no geometry', async () => {
       const physics = await createWorld();
       const ray = { origin: [0, 0, 0] as const, direction: [1, 0, 0] as const, maxDistance: 10 };

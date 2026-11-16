@@ -19,7 +19,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 
 - [x] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [x] Rapier is confined to an adapter module; no Rapier types appear in public package-root exports.
-- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (10 shared conformance tests pass).
+- [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (12 shared conformance tests pass).
 - [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state.
 - [x] Create/destroy operations are safe; stale body/collider handles are rejected. Descriptor replacement is supported; in-place mutation of descriptor objects is not.
 - [x] Disposal releases backend resources and is idempotent.
@@ -39,7 +39,8 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Box, sphere, capsule, cylinder, and convex-hull descriptors validate dimensions and finite values.
 - [x] Configurable positive limits bound live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count; overflow is surfaced as a typed resource-limit error.
 - [ ] Static triangle-mesh collider support is explicitly scoped and opt-in; unsupported mesh/body combinations fail clearly.
-- [ ] Collision enter/exit events include stable entity and collider identities and obey filtering (enter is tested; exit/filter lifecycle remains open).
+- [x] Collision enter/exit events include stable entity and collider identities; sphere-sensor enter/exit are tested against both Fake and Rapier.
+- [ ] Collision events obey filtering, and body/collider removal during active contact has defined and tested exit semantics.
 - [x] Raycast and raycast-all return distance, world-space hit point/normal, entity identity, and collider identity.
 - [ ] Query filters support collision groups and excluded entities (excluded entities are tested; collision-group query coverage remains open).
 - [x] Tests cover nearest-hit ordering, max distance, excluded entities, stale handles, and collider validation; miss and exit-event edge cases remain open.
