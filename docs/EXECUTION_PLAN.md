@@ -8,7 +8,7 @@ Branch: `feat/m6-physics-input-core`
 ## Verified
 
 - Local Node.js 22.13.0 / pnpm 12.18.0:
-  - `pnpm check` passed (176/176 Vitest tests, format, lint, typecheck, builds).
+  - `pnpm check` passed (178/178 Vitest tests, format, lint, typecheck, builds).
   - `pnpm e2e` passed (22/22 Chromium tests).
 - GitHub Actions #367 passed on code commit `619d4f780129adbfc52b002d98037a7f23381387`.
 - GitHub Actions #369 and #370 passed on subsequent documentation commits.
@@ -17,8 +17,8 @@ Branch: `feat/m6-physics-input-core`
   Playwright strict-mode locator matching two accumulated Console entries in
   the directory-project missing-blob test.
 - Fixed the test to assert that the matching error count increases after the
-  action. Run #374 passed on the code-fix commit; run #377 passed on current
-  HEAD `17a206437202d2455952ece8ca44912a1feae644`, including 176/176 Vitest
+  action. Run #374 passed on the code-fix commit; run #386 passed on latest
+  HEAD `910bc3687ad8c3a99bd1f853407b0987beb5e026`, including 178/178 Vitest
   tests and 22/22 Chromium E2E.
 - Vercel Preview for the code-bearing commit is READY and SSO-protected.
 
@@ -55,9 +55,9 @@ Branch: `feat/m6-physics-input-core`
 
 ## Remaining work
 
-1. **Final CI:** latest exact-head Actions run #377 passed all jobs, including
-   176/176 Vitest tests and 22/22 Chromium E2E. Recheck after any further code
-   or documentation commits.
+1. **Final CI:** exact-head Actions run #386 passed all jobs on
+   `910bc3687ad8c3a99bd1f853407b0987beb5e026`, including 178/178 Vitest
+   tests and 22/22 Chromium E2E. Recheck after any further code or docs commits.
 2. **Deployment:** use an authorized browser session to inspect `.wasm`
    Content-Type, cache headers, CORS, and fallback behavior. Do not infer
    these from an unauthenticated SSO response.

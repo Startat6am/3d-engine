@@ -11,7 +11,7 @@ Branch: `feat/m6-physics-input-core`
 ### Local
 
 - Node.js 22.13.0 and pnpm 12.18.0.
-- `pnpm check`: passed; 176/176 Vitest tests, format, lint, typecheck,
+- `pnpm check`: passed; 178/178 Vitest tests, format, lint, typecheck,
   package builds, and Editor/Player production builds.
 - `pnpm e2e`: passed; 22/22 Chromium tests.
 - The repeat-import E2E assertion allows 20 seconds for the 2049×2049
@@ -30,10 +30,11 @@ Branch: `feat/m6-physics-input-core`
   missing-blob test, not a product failure.
 - Run #374 passed on the code-fix commit `8725c60f789747672ec56f9a21ea2cabce68c2c0`.
 - Run #377 passed on `17a206437202d2455952ece8ca44912a1feae644`; run #378
-  passed on latest HEAD `f9e16974904c99f5e662f3b0eb3430546b1172b7`:
-  format, lint, typecheck, 176/176 Vitest tests, builds, both GLB benchmarks,
-  Playwright Chromium installation, and 22/22 Chromium E2E. The test asserts
-  that the error-entry count increases after the missing-blob open action.
+  passed on `f9e16974904c99f5e662f3b0eb3430546b1172b7`; run #386 passed on
+  latest HEAD `910bc3687ad8c3a99bd1f853407b0987beb5e026`: format, lint,
+  typecheck, 178/178 Vitest tests, builds, both GLB benchmarks, Playwright
+  Chromium installation, and 22/22 Chromium E2E. The test asserts that the
+  error-entry count increases after the missing-blob open action.
 
 ### Vercel deployment inspection — 2026-11-16
 
