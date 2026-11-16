@@ -3,7 +3,7 @@
 **Last updated:** 2026-11-16
 **Repository:** `Startat6am/3d-engine`
 **Active milestone:** M6 — Physics & Input
-**Active branch:** `feat/m6-physics-input-core`
+**Active branch:** `feat/m6-physics-input-core`\n**Latest GitHub commit:** `ef58e6c38b2bd0d1fa6d50a3149e6c468d465d4e` — character-controller API and initial Rapier floor-contact evidence.
 **Active review:** [PR #87](https://github.com/Startat6am/3d-engine/pull/87)
 **Milestone state:** in progress; do not merge or mark M6 complete without owner review.
 
