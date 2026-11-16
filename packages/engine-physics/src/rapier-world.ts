@@ -175,6 +175,11 @@ export class RapierPhysicsWorld implements PhysicsWorld {
         'physics.resource-limit',
         `Collider limit exceeded (maxColliders=${this.#limits.maxColliders})`,
       );
+    if (descriptor.shape.type === 'triangle-mesh' && body.type !== 'static')
+      throw new PhysicsError(
+        'physics.invalid-collider-descriptor',
+        'Triangle-mesh colliders require a static rigid body',
+      );
     const colliderDescriptor = this.#colliderDescriptor(descriptor);
     const collider = this.#world.createCollider(colliderDescriptor, body.body);
     const handle = `collider:${this.#nextCollider++}` as PhysicsColliderHandle;
@@ -590,6 +595,45 @@ export class RapierPhysicsWorld implements PhysicsWorld {
           );
         result = this.#rapier.ColliderDesc.convexHull(shape.vertices);
         break;
+      case 'triangle-mesh': {
+        const vertexCount = shape.vertices.length / 3;
+        if (
+          shape.vertices.length < 9 ||
+          shape.vertices.length % 3 !== 0 ||
+          !Array.from(shape.vertices).every(Number.isFinite)
+        )
+          throw new PhysicsError(
+            'physics.invalid-collider-descriptor',
+            'Triangle mesh requires at least three finite 3D vertices',
+          );
+        if (shape.indices.length < 3 || shape.indices.length % 3 !== 0)
+          throw new PhysicsError(
+            'physics.invalid-collider-descriptor',
+            'Triangle mesh indices must contain complete triangles',
+          );
+        if (vertexCount > this.#limits.maxTriangleMeshVertices)
+          throw new PhysicsError(
+            'physics.resource-limit',
+            `Triangle mesh exceeds maxTriangleMeshVertices=${this.#limits.maxTriangleMeshVertices}`,
+          );
+        if (shape.indices.length > this.#limits.maxTriangleMeshIndices)
+          throw new PhysicsError(
+            'physics.resource-limit',
+            `Triangle mesh exceeds maxTriangleMeshIndices=${this.#limits.maxTriangleMeshIndices}`,
+          );
+        for (let index = 0; index < shape.indices.length; index += 3) {
+          const a = shape.indices[index]!;
+          const b = shape.indices[index + 1]!;
+          const c = shape.indices[index + 2]!;
+          if (a >= vertexCount || b >= vertexCount || c >= vertexCount || a === b || b === c || c === a)
+            throw new PhysicsError(
+              'physics.invalid-collider-descriptor',
+              `Triangle mesh contains invalid triangle indices at offset ${index}`,
+            );
+        }
+        result = this.#rapier.ColliderDesc.trimesh(shape.vertices, shape.indices);
+        break;
+      }
       default:
         throw new PhysicsError(
           'physics.unsupported-shape',
