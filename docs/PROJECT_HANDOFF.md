@@ -24,10 +24,13 @@ Branch: `feat/m6-physics-input-core`
 - Run #367 passed on code-bearing commit `619d4f780129adbfc52b002d98037a7f23381387`.
 - Run #369 passed on docs commit `9ec1ec5a2ae7529bbffea48295dc71fdd009542c`.
 - Run #370 passed on docs commit `ed68fdcc5e257eec4864d2470724616842acf002`.
-- Run #371 failed only at Prettier because the status section added to this
-  document and the execution plan was not formatted. The two documents are
-  being rewritten concisely; do not treat #371 as a code/test failure.
-- Check Actions for the new HEAD after the documentation correction.
+- Run #373 on `39e934f` passed format, lint, typecheck, unit tests, builds, and
+  both GLB benchmarks; E2E had 21/22 pass. The sole failure was a strict-mode
+  locator matching two accumulated Console entries in the directory-project
+  missing-blob test, not a product failure.
+- The test now checks that the error-entry count increases after the action.
+  The targeted test and local `pnpm check && pnpm e2e` pass on the follow-up
+  change. CI for the new HEAD is pending; do not treat local success as CI.
 
 ### Vercel
 
@@ -46,6 +49,8 @@ Branch: `feat/m6-physics-input-core`
 - Blur/visibility releases, transient mouse reset, gamepad disconnect and
   reconnect, and negative-axis neutralization.
 - Regression tests for gamepad focus restoration and physics resource removal.
+- E2E now asserts a newly emitted project-open error without assuming the
+  Console contains only one matching historical entry.
 
 ## Performance evidence
 
