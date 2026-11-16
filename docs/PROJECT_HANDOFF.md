@@ -31,10 +31,11 @@ Branch: `feat/m6-physics-input-core`
 - Run #374 passed on the code-fix commit `8725c60f789747672ec56f9a21ea2cabce68c2c0`.
 - Run #377 passed on `17a206437202d2455952ece8ca44912a1feae644`; run #378
   passed on `f9e16974904c99f5e662f3b0eb3430546b1172b7`; run #386 passed on
-  latest HEAD `910bc3687ad8c3a99bd1f853407b0987beb5e026`: format, lint,
-  typecheck, 178/178 Vitest tests, builds, both GLB benchmarks, Playwright
-  Chromium installation, and 22/22 Chromium E2E. The test asserts that the
-  error-entry count increases after the missing-blob open action.
+  code-bearing commit `910bc3687ad8c3a99bd1f853407b0987beb5e026`; run #387
+  passed on latest HEAD `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`:
+  format, lint, typecheck, 178/178 Vitest tests, builds, both GLB benchmarks,
+  Playwright Chromium installation, and 22/22 Chromium E2E. The test asserts
+  that the error-entry count increases after the missing-blob open action.
 
 ### Vercel deployment inspection — 2026-11-16
 

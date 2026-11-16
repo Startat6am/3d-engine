@@ -17,8 +17,9 @@ Branch: `feat/m6-physics-input-core`
   Playwright strict-mode locator matching two accumulated Console entries in
   the directory-project missing-blob test.
 - Fixed the test to assert that the matching error count increases after the
-  action. Run #374 passed on the code-fix commit; run #386 passed on latest
-  HEAD `910bc3687ad8c3a99bd1f853407b0987beb5e026`, including 178/178 Vitest
+  action. Run #374 passed on the code-fix commit; run #386 passed on the code
+  HEAD `910bc3687ad8c3a99bd1f853407b0987beb5e026`; run #387 passed on latest
+  HEAD `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`, including 178/178 Vitest
   tests and 22/22 Chromium E2E.
 - Vercel Preview for the code-bearing commit is READY and SSO-protected.
 
@@ -55,8 +56,8 @@ Branch: `feat/m6-physics-input-core`
 
 ## Remaining work
 
-1. **Final CI:** exact-head Actions run #386 passed all jobs on
-   `910bc3687ad8c3a99bd1f853407b0987beb5e026`, including 178/178 Vitest
+1. **Final CI:** exact-head Actions run #387 passed all jobs on
+   `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`, including 178/178 Vitest
    tests and 22/22 Chromium E2E. Recheck after any further code or docs commits.
 2. **Deployment:** use an authorized browser session to inspect `.wasm`
    Content-Type, cache headers, CORS, and fallback behavior. Do not infer
