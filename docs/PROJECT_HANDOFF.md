@@ -53,7 +53,7 @@ M6 currently has initial `@engine/physics` and `@engine/input` packages, fixed-t
 
 ## 4. Current verification snapshot
 
-Character-controller API and Rapier floor-contact/snap-to-ground smoke are implemented. Rapier slope-limit tests were added (25° climbable with a 30° limit; 55° blocked by a 30° limit) and passed exact-head CI run #343. Two Rapier autostep tests were added in commit `0c548ae20eefb3c6661de8935f6a99ff82500aea` (0.4-unit step accepted with a 0.45 limit; 0.8-unit step rejected); these are pending exact-head CI. Latest local validation in the Node 25 sandbox: TypeScript project build, Prettier check, ESLint, and 166/166 unit tests across 13 files passed; 30/30 shared Fake/Rapier conformance tests passed. The pinned pnpm 12.18.0 executable is absent, so this is not recorded as `pnpm check`; supported Node 22.12.x validation and remaining production/browser gates remain open.
+Character-controller API and Rapier floor-contact/snap-to-ground smoke are implemented. Rapier slope-limit tests were added (25° climbable with a 30° limit; 55° blocked by a 30° limit) and passed exact-head CI run #343. Two Rapier autostep tests were added in commit `0c548ae20eefb3c6661de8935f6a99ff82500aea` (0.4-unit step accepted with a 0.45 limit; 0.8-unit step rejected), and teardown/recreation plus world-dispose/reinitialization tests were added in commit `625846e9ddaa6245ed3d7e23f4963d093fde1eda`; all are pending exact-head CI. Latest local validation in the Node 25 sandbox: TypeScript project build, Prettier check, ESLint, and 166/166 unit tests across 13 files passed; 30/30 shared Fake/Rapier conformance tests passed. The pinned pnpm 12.18.0 executable is absent, so this is not recorded as `pnpm check`; supported Node 22.12.x validation and remaining production/browser gates remain open.
 
 The submitted PR #87 head previously reported 22/22 Chromium Playwright E2E tests passing. Re-running pnpm e2e attempted all 22 tests, but all 22 failed before test execution because Chromium could not load the host library `libglib-2.0.so.0`. This is an environment limitation; no E2E test body ran and this is not a passing E2E run. Re-run CI on the exact PR head and record its run ID.
 
@@ -61,7 +61,7 @@ The repository declares Node `>=22.12.0 <23` and pnpm `12.18.0`. Prefer the decl
 
 ## 5. Remaining M6 work — recommended order
 
-1. **Character Controller integration evidence:** slope-limit tests passed exact-head CI #343; run the newly added Rapier autostep obstacle tests on the exact branch head, fix any failures, then verify lifecycle/reinitialization; flat-ground contact and snap-to-ground are covered. Fake coverage verifies only contract/lifecycle.
+1. **Character Controller integration evidence:** slope-limit tests passed exact-head CI #343; run the newly added Rapier autostep obstacle tests on the exact branch head, fix any failures, then verify the newly added teardown/reinitialization tests; flat-ground contact and snap-to-ground are covered. Fake coverage verifies only contract/lifecycle.
 2. **Initialization/lifecycle hardening:** failed WASM init, repeated create/dispose, cleanup on partial failure, actionable errors.
 3. **Input/browser evidence:** focus loss, visibility changes, gamepad disconnect, supported browser matrix, physical gamepad where hardware is available.
 4. **Rapier maintenance and deployment review:** release cadence, license/version review, WASM deployment headers, target browsers.
