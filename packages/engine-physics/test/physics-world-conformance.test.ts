@@ -190,6 +190,24 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('rejects single-step requests while running and cancels a queued step on resume', async () => {
+      const physics = await createWorld();
+      const entity = new EngineRuntime().world.createEntity();
+      const body = physics.createBody(entity, { type: 'dynamic', position: [0, 0, 0] });
+
+      expect(() => physics.requestSingleStep()).toThrow(
+        expect.objectContaining({ code: 'physics.not-paused' }),
+      );
+      physics.setPaused(true);
+      physics.requestSingleStep();
+      physics.setPaused(false);
+      expect(physics.step(1 / 60)).toBe(true);
+      physics.setPaused(true);
+      expect(physics.step(1 / 60)).toBe(false);
+      expect(physics.getPose(body).position).toEqual([0, 0, 0]);
+      physics.dispose();
+    });
+
     it('raycasts nearest-first, filters groups, and excludes requested entities', async () => {
       const physics = await createWorld();
       const world = new EngineRuntime().world;
