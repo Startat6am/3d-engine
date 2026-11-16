@@ -92,7 +92,7 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 ## M6 verification snapshot — 2026-11-16
 
 - PR #87 reported `pnpm check` and `pnpm e2e` passing at its submitted head (129 unit tests, 22 Chromium E2E).
-- Revalidated the updated branch in a clean Node 25 sandbox: `pnpm check` passed (format, lint, typecheck, production builds, and 134 unit tests). The local E2E attempt could not launch Chromium because the Playwright browser binary is not installed in this sandbox; the submitted PR #87 head separately reported 22/22 Chromium E2E passing in CI. The repository's declared supported Node range remains 22.12.x.
+- Revalidated the updated branch in a clean Node 25 sandbox: `pnpm check` passed (format, lint, typecheck, production builds, and 134 unit tests). The local E2E attempt could not launch Chromium because this sandbox lacks the system shared library `libglib-2.0.so.0` (the Playwright browser binary was installed); the submitted PR #87 head separately reported 22/22 Chromium E2E passing in CI. The repository's declared supported Node range remains 22.12.x.
 - PR #87 `pnpm e2e`: 22 Playwright Chromium tests passed, including editor/mobile, asset serialization, renderer lifecycle, and memory benchmark coverage.
 - Dedicated Rapier browser smoke: WASM loaded, a dynamic body completed 60 fixed steps (Y=0.07456), and raycast returned a hit.
 - Production Vite smoke emitted a separate ~1.17 MB WASM asset (~0.45 MB gzip) and a ~52 KB gzip lazy JS chunk.
