@@ -12,9 +12,13 @@ Branch: `feat/m6-physics-input-core`
   - `pnpm e2e` passed (22/22 Chromium tests).
 - GitHub Actions #367 passed on code commit `619d4f780129adbfc52b002d98037a7f23381387`.
 - GitHub Actions #369 and #370 passed on subsequent documentation commits.
-- GitHub Actions #371 failed only on Prettier for the long status sections in
-  `PROJECT_HANDOFF.md` and this file. Those sections are being replaced with
-  concise formatted status summaries; check the new HEAD's CI.
+- GitHub Actions #373 passed format, lint, typecheck, unit tests, builds, and
+  both GLB benchmarks, but E2E finished 21/22. The only failure was a
+  Playwright strict-mode locator matching two accumulated Console entries in
+  the directory-project missing-blob test.
+- Fixed the test to assert that the matching error count increases after the
+  action. The targeted test and local `pnpm check && pnpm e2e` pass on the
+  follow-up change. CI for the new HEAD remains pending.
 - Vercel Preview for the code-bearing commit is READY and SSO-protected.
 
 ## Completed M6 implementation
@@ -30,8 +34,9 @@ Branch: `feat/m6-physics-input-core`
 
 ## Remaining work
 
-1. **Final CI:** confirm the workflow on the new documentation HEAD after
-   fixing the Prettier-only failure in run #371.
+1. **Final CI:** confirm the workflow on the latest test-fix/documentation
+   HEAD. Run #373 exposed a Playwright selector ambiguity; local full checks
+   now pass, but the follow-up GitHub Actions result is still pending.
 2. **Deployment:** use an authorized browser session to inspect `.wasm`
    Content-Type, cache headers, CORS, and fallback behavior. Do not infer
    these from an unauthenticated SSO response.
