@@ -39,7 +39,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Box, sphere, capsule, cylinder, and convex-hull descriptors validate dimensions and finite values.
 - [x] Configurable positive limits bound live bodies, live colliders, collision events per drain, ray length, and convex-hull vertex count; overflow is surfaced as a typed resource-limit error.
 - [ ] Static triangle-mesh collider support is explicitly scoped and opt-in; unsupported mesh/body combinations fail clearly.
-- [ ] Kinematic capsule character controller resolves movement against obstacles, reports grounded/collision normals, and is covered for flat ground, slope limits, autostep, snap-to-ground, and lifecycle cleanup. Initial API/lifecycle and flat-ground/snap-to-ground smoke tests exist; slope/autostep coverage remains open.
+- [ ] Kinematic capsule character controller resolves movement against obstacles, reports grounded/collision normals, and is covered for flat ground, slope limits, autostep, snap-to-ground, and lifecycle cleanup. Initial API/lifecycle and flat-ground/snap-to-ground smoke tests exist. Rapier slope-limit integration tests were added (25° climbable with a 30° limit; 55° blocked by a 30° limit), but remain unverified pending exact-head CI/local execution; autostep coverage remains open.
 - [x] Collision enter/exit events include stable entity and collider identities; sphere-sensor enter/exit are tested against both Fake and Rapier.
 - [x] Removing a collider or body during active contact emits exactly one exit event with stable identities; covered by Fake/Rapier conformance tests.
 - [x] Collision events obey mutual collision-group filtering; tested against Fake and Rapier.
