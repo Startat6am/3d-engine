@@ -20,7 +20,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] `@engine/physics` exposes an engine-owned `PhysicsWorld` interface and descriptors for bodies, colliders, filters, queries, and events.
 - [x] Rapier is confined to an adapter module; no Rapier types appear in public package-root exports.
 - [x] Tests can substitute a test-only FakePhysicsWorld and run the same PhysicsWorld conformance suite against Fake and Rapier (30 shared conformance tests pass).
-- [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state.
+- [ ] Initialization failure is actionable and does not corrupt ECS or serialized world state. A Rapier WASM failure/recovery test was added in commit `b41401dd2496c5c974eefe69ede2721125840fda`; it remains pending exact-head CI.
 - [x] Create/destroy operations are safe; stale body/collider handles are rejected. Descriptor replacement is supported; in-place mutation of descriptor objects is not.
 - [x] Disposal releases backend resources and is idempotent.
 
