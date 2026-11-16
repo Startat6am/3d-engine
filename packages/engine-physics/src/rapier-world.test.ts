@@ -248,6 +248,78 @@ describe('RapierPhysicsWorld adapter', () => {
     physics.dispose();
   });
 
+  it('recreates a character controller after collider/body teardown', async () => {
+    const physics = await createTestPhysics({ gravity: [0, 0, 0] });
+    const world = new EngineRuntime().world;
+    const entity = world.createEntity();
+
+    const firstBody = physics.createBody(entity, {
+      type: 'kinematic',
+      position: [0, 1, 0],
+    });
+    const firstCollider = physics.createCollider(firstBody, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const firstController = physics.createCharacterController(firstCollider);
+    physics.removeBody(firstBody);
+
+    expect(() => physics.moveCharacterController(firstController, [1, 0, 0])).toThrow(
+      expect.objectContaining({ code: 'physics.stale-handle' }),
+    );
+
+    const secondBody = physics.createBody(entity, {
+      type: 'kinematic',
+      position: [2, 1, 0],
+    });
+    const secondCollider = physics.createCollider(secondBody, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const secondController = physics.createCharacterController(secondCollider);
+    physics.step(1 / 60);
+
+    const movement = physics.moveCharacterController(secondController, [0.5, 0, 0]);
+    expect(movement.translation).toEqual([0.5, 0, 0]);
+    expect(() => physics.moveCharacterController(firstController, [0, 0, 1])).toThrow(
+      expect.objectContaining({ code: 'physics.stale-handle' }),
+    );
+
+    physics.dispose();
+  });
+
+  it('reinitializes the Rapier world after disposing a world with a live controller', async () => {
+    const firstWorld = await createTestPhysics({ gravity: [0, 0, 0] });
+    const firstEntity = new EngineRuntime().world.createEntity();
+    const firstBody = firstWorld.createBody(firstEntity, {
+      type: 'kinematic',
+      position: [0, 1, 0],
+    });
+    const firstCollider = firstWorld.createCollider(firstBody, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const firstController = firstWorld.createCharacterController(firstCollider);
+    firstWorld.dispose();
+    expect(() => firstWorld.moveCharacterController(firstController, [1, 0, 0])).toThrow(
+      expect.objectContaining({ code: 'physics.disposed' }),
+    );
+
+    const secondWorld = await createTestPhysics({ gravity: [0, 0, 0] });
+    const secondEntity = new EngineRuntime().world.createEntity();
+    const secondBody = secondWorld.createBody(secondEntity, {
+      type: 'kinematic',
+      position: [0, 1, 0],
+    });
+    const secondCollider = secondWorld.createCollider(secondBody, {
+      shape: { type: 'capsule', halfHeight: 0.5, radius: 0.25 },
+    });
+    const secondController = secondWorld.createCharacterController(secondCollider);
+    secondWorld.step(1 / 60);
+
+    expect(secondWorld.moveCharacterController(secondController, [0.25, 0, 0]).translation).toEqual([
+      0.25, 0, 0,
+    ]);
+    secondWorld.dispose();
+  });
+
   it('raycasts nearest-first and rejects stale handles', async () => {
     const physics = await createTestPhysics({ gravity: [0, 0, 0] });
     const world = new EngineRuntime().world;
