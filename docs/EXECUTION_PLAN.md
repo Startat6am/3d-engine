@@ -17,8 +17,9 @@ Branch: `feat/m6-physics-input-core`
   Playwright strict-mode locator matching two accumulated Console entries in
   the directory-project missing-blob test.
 - Fixed the test to assert that the matching error count increases after the
-  action. The targeted test and local `pnpm check && pnpm e2e` pass on the
-  follow-up change. CI for the new HEAD remains pending.
+  action. Run #374 passed on the code-fix commit; run #377 passed on current
+  HEAD `17a206437202d2455952ece8ca44912a1feae644`, including 176/176 Vitest
+  tests and 22/22 Chromium E2E.
 - Vercel Preview for the code-bearing commit is READY and SSO-protected.
 
 ## Completed M6 implementation
@@ -54,9 +55,9 @@ Branch: `feat/m6-physics-input-core`
 
 ## Remaining work
 
-1. **Final CI:** confirm the workflow on the latest test-fix/documentation
-   HEAD. Run #373 exposed a Playwright selector ambiguity; local full checks
-   now pass, but the follow-up GitHub Actions result is still pending.
+1. **Final CI:** latest exact-head Actions run #377 passed all jobs, including
+   176/176 Vitest tests and 22/22 Chromium E2E. Recheck after any further code
+   or documentation commits.
 2. **Deployment:** use an authorized browser session to inspect `.wasm`
    Content-Type, cache headers, CORS, and fallback behavior. Do not infer
    these from an unauthenticated SSO response.
