@@ -20,7 +20,11 @@ export type ColliderShape =
   | { readonly type: 'capsule'; readonly halfHeight: number; readonly radius: number }
   | { readonly type: 'cylinder'; readonly halfHeight: number; readonly radius: number }
   | { readonly type: 'convex-hull'; readonly vertices: Float32Array }
-  | { readonly type: 'triangle-mesh'; readonly vertices: Float32Array; readonly indices: Uint32Array };
+  | {
+      readonly type: 'triangle-mesh';
+      readonly vertices: Float32Array;
+      readonly indices: Uint32Array;
+    };
 
 export interface ColliderDescriptor {
   readonly shape: ColliderShape;
