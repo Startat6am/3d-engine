@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EngineRuntime, Transform, createTransform } from '@engine/core';
 import {
   PhysicsCollider,
@@ -180,7 +180,7 @@ describe('PhysicsSystem ECS integration', () => {
     physics.dispose();
   });
 
-  it('releases backend resources when ECS entities are destroyed', async () => {
+  it('removes colliders and bodies when their ECS components or entities are removed', async () => {
     const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
     const entity = runtime.world.createEntity();
     runtime.world.add(entity, Transform, createTransform());
@@ -191,8 +191,24 @@ describe('PhysicsSystem ECS integration', () => {
     runtime.scheduler.add(new PhysicsPreUpdateSystem(system));
     runtime.scheduler.add(system);
     runtime.advance(1 / 60);
+
+    const bodyHandle = system.getBodyHandle(entity);
+    const colliderHandle = system.getColliderHandle(entity);
+    const removeBody = vi.spyOn(physics, 'removeBody');
+    const removeCollider = vi.spyOn(physics, 'removeCollider');
+    expect(bodyHandle).not.toBeNull();
+    expect(colliderHandle).not.toBeNull();
+
+    runtime.world.remove(entity, PhysicsCollider);
+    runtime.advance(1 / 60);
+    expect(removeCollider).toHaveBeenCalledWith(colliderHandle);
+    expect(system.getBodyHandle(entity)).toBe(bodyHandle);
+    expect(system.getColliderHandle(entity)).toBeNull();
+
     runtime.world.destroyEntity(entity);
     runtime.advance(1 / 60);
+    expect(removeBody).toHaveBeenCalledWith(bodyHandle);
+    expect(system.getBodyHandle(entity)).toBeNull();
     system.dispose();
     physics.dispose();
   });
