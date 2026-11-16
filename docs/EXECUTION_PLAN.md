@@ -32,6 +32,26 @@ Branch: `feat/m6-physics-input-core`
    reconnect, axis/button neutralization, and transition coverage.
 5. Preliminary performance report and reproducible Node benchmark.
 
+### Vercel deployment inspection — 2026-11-16
+
+- Preview deployment for commit `55e5a2e5b0f5a5245d8d8f1af99cc508b38e35c1`
+  is READY: [deployment](https://3d-engine-aoxftxuz0-callback5.vercel.app/).
+- Authorized deployment fetch returned the editor root as HTTP 200 with
+  `Content-Type: text/html; charset=utf-8`,
+  `Cache-Control: public, max-age=0, must-revalidate`, and
+  `Access-Control-Allow-Origin: *`.
+- Its JS entry returned HTTP 200 with
+  `Content-Type: application/javascript; charset=utf-8`,
+  the same cache policy, and `Access-Control-Allow-Origin: *`.
+- The deployed build log lists only the Editor bundle (177 modules); the
+  Player Physics Playground route and the expected Player WASM asset both
+  return HTTP 404. Thus this Preview does not currently publish the Player
+  artifact. WASM MIME/cache/CORS and WASM fallback behavior remain unverified;
+  do not infer them from the HTML/JS headers.
+- The Vercel project needs a Player deployment target (or an intentionally
+  combined deployment) before deployed Rapier WASM headers can be tested.
+  No Vercel project/build settings were changed as part of this check.
+
 ## Remaining work
 
 1. **Final CI:** confirm the workflow on the latest test-fix/documentation
