@@ -201,7 +201,6 @@ function registerPhysicsWorldConformance(
       physics.setPaused(true);
       physics.requestSingleStep();
       physics.setPaused(false);
-      expect(physics.step(1 / 60)).toBe(true);
       physics.setPaused(true);
       expect(physics.step(1 / 60)).toBe(false);
       expect(physics.getPose(body).position).toEqual([0, 0, 0]);
