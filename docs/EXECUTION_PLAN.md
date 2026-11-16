@@ -105,4 +105,4 @@ PRs and `ASSETS_SERIALIZATION_STATUS.md`.
 
 ## Next step
 
-The minimal M6 character-controller scope is documented and its engine-owned API is implemented; next add Rapier obstacle integration evidence for grounding, slopes, autostep, and snap-to-ground. In parallel, verify deployment headers and supported browsers, review Rapier maintenance, and add physical gamepad coverage before producing the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
+The minimal M6 character-controller scope is documented and its engine-owned API is implemented; next verify the newly added Rapier slope-limit tests, then add autostep obstacle integration evidence. In parallel, verify deployment headers and supported browsers, review Rapier maintenance, and add physical gamepad coverage before producing the M6 performance report. Do not begin M7 or M10 work, reorder milestones, or mark gates complete without evidence and owner approval.
