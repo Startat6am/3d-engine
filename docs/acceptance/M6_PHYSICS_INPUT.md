@@ -72,7 +72,7 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 
 ## M6.6 — CI and documentation closeout
 
-- [x] Local formatting, lint, typecheck, production builds, and 162 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (26 tests).
+- [x] Local formatting, lint, typecheck, and 166 unit tests pass in the sandbox (Node 25; the repository-supported Node 22.12.x run remains to be repeated). Shared adapter conformance tests pass for Fake and Rapier (26 tests).
 - [ ] Exact-head CI and browser E2E rerun; the previous submitted PR head reported 22/22 Playwright tests passing, but the current sandbox cannot launch Chromium because libglib-2.0.so.0 is missing.
 - [ ] Physics performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
 - [ ] Performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context.
