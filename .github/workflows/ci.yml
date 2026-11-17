@@ -19,6 +19,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
+      - name: Temporary Prettier diagnostics
+        if: always()
+        run: |
+          pnpm exec prettier --write apps/player/physics-playground.html apps/player/src/physics-playground.css apps/player/src/physics-playground.ts
+          git --no-pager diff --no-ext-diff -- apps/player/physics-playground.html apps/player/src/physics-playground.css apps/player/src/physics-playground.ts
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
