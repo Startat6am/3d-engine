@@ -84,7 +84,11 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
         if (this.#pressed.has(event.pointerId)) return;
         this.#pressed.set(event.pointerId, control);
         this.#pending.push({ source: 'keyboard', control, pressed: true });
-        button.setPointerCapture?.(event.pointerId);
+        try {
+          button.setPointerCapture(event.pointerId);
+        } catch {
+          // Synthetic pointer events in automated tests have no active pointer to capture.
+        }
         button.dataset.pressed = 'true';
       };
       const up = (event: PointerEvent) => {
