@@ -2,13 +2,17 @@
 
 Updated: 2026-11-17
 
+## Browser target for M6
+
+Chrome/Chromium is the sole required browser target for this milestone; Playwright Chromium is the only mandatory browser E2E project. Firefox, Safari/WebKit, and mobile-browser compatibility are deferred and are not M6 acceptance blockers. Chromium mobile-viewport checks remain responsive-layout coverage only. Production Player/WASM delivery and actual WASM MIME/cache/CORS/fallback verification in Chrome remain required and unverified until the Player artifact is deployed.
+
 PR: [#87](https://github.com/Startat6am/3d-engine/pull/87)
 Branch: `feat/m6-physics-input-core`
 
 ## Verified
 
 - Local Node.js 22.13.0 / pnpm 12.18.0:
-  - `pnpm check` passed (178/178 Vitest tests, format, lint, typecheck, builds).
+  - `pnpm check` passed (180/180 Vitest tests, format, lint, typecheck, builds).
   - `pnpm e2e` passed (22/22 Chromium tests).
 - GitHub Actions #367 passed on code commit `619d4f780129adbfc52b002d98037a7f23381387`.
 - GitHub Actions #369 and #370 passed on subsequent documentation commits.
@@ -25,7 +29,8 @@ Branch: `feat/m6-physics-input-core`
   180/180 Vitest tests, format, lint, typecheck, builds, both GLB benchmarks,
   Chromium installation, and 22/22 Chromium E2E. The added conformance test
   checks Fake/Rapier parity for single-step rejection and resume cancellation.
-- Vercel Preview for the code-bearing commit is READY and SSO-protected.
+- Vercel Preview for the latest documentation HEAD `74209111a0a23a01c74a9c1e9082f588a0604170` is READY. The Player artifact/WASM delivery remains unverified; see deployment inspection below.
+- GitHub Actions run #394 passed on exact documentation HEAD `74209111a0a23a01c74a9c1e9082f588a0604170`, including the full verify job and Chromium E2E.
 
 ## Completed M6 implementation
 
@@ -60,14 +65,16 @@ Branch: `feat/m6-physics-input-core`
 
 ## Remaining work
 
-1. **Final CI:** exact-head Actions run #387 passed all jobs on
-   `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`, including 178/178 Vitest
-   tests and 22/22 Chromium E2E. Recheck after any further code or docs commits.
+1. **Final CI:** exact-head Actions run #394 passed on
+   `74209111a0a23a01c74a9c1e9082f588a0604170`, including the full verify job
+   and Chromium E2E. Recheck after any further code or docs commits.
 2. **Deployment:** use an authorized browser session to inspect `.wasm`
    Content-Type, cache headers, CORS, and fallback behavior. Do not infer
    these from an unauthenticated SSO response.
-3. **Browser matrix:** verify Firefox and WebKit; Chromium is the current
-   automated E2E browser. Test physical gamepads and mobile where available.
+3. **Browser target:** Chrome/Chromium only; Playwright Chromium is the sole
+   mandatory browser E2E target. Firefox/WebKit and mobile-browser support are
+   deferred, not M6 blockers. Test physical gamepads only when hardware is available;
+   simulated adapter tests do not count as physical-device evidence.
 4. **Physics scope:** static-only triangle meshes are implemented and tested.
    Dynamic/kinematic meshes and automatic mesh cooking remain deferred; keep
    fixed-tick semantics under review.
