@@ -14,7 +14,7 @@ Updated: 2026-11-17
 
 - Last fully verified PR head: `c515f99f0cbfb3be05a4a8001cf5891b1e4ee431`.
 - GitHub Actions run [#400](https://github.com/Startat6am/3d-engine/actions/runs/44038555177) passed on that exact head: format, lint, typecheck, 180/180 Vitest tests, package and app builds, both GLB benchmarks, and 22/22 Playwright Chromium E2E tests.
-- Follow-up code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds a mouse-button jump binding to the Player Physics Playground, displays player Y, and extends Chromium E2E to verify that a left click produces a physical jump. GitHub Actions run #403 is the verification run for this change; do not treat it as passed until its conclusion is successful.
+- Code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds a mouse-button jump binding to the Player Physics Playground, displays player Y, and extends Chromium E2E to verify that a left click produces a physical jump. GitHub Actions [run #403](https://github.com/Startat6am/3d-engine/actions/runs/44145410947) passed on this exact head: format, lint, typecheck, unit tests, builds, both GLB benchmarks, Chromium installation and the full Playwright E2E suite.
 
 ## Implemented M6 scope
 
@@ -22,7 +22,7 @@ Updated: 2026-11-17
 - Character controller: grounded state, slope limits, autostep, snap-to-ground and collision results, with integration/lifecycle coverage.
 - `@engine/input`: semantic actions, prioritized contexts, immutable fixed-tick snapshots, keyboard/mouse/gamepad adapters, transient mouse input, and focus/visibility/disconnect neutralization.
 - Editor UX cleanup: truthful renderer/save status, real empty-scene state, removal of decorative component placeholders.
-- Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard movement, pause/resume and single-step. Mouse jump is the newest unverified addition.
+- Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard movement, pause/resume and single-step. Mouse jump is verified by the exact-head Chromium E2E in run #403.
 
 ## Player staging deployment
 
