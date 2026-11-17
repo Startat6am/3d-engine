@@ -75,6 +75,20 @@ Branch: `feat/m6-physics-input-core`
 - GitHub Actions run #394 passed on documentation HEAD `74209111a0a23a01c74a9c1e9082f588a0604170`; the `verify` job completed successfully, including format, lint, typecheck, tests, builds, both GLB benchmarks, Playwright Chromium installation, and Chromium E2E.
 - Vercel deployment for the same HEAD is READY: [Preview](https://3d-engine-pmdxrrm6q-callback5.vercel.app/). This does not change the separate finding below that the configured Preview currently publishes only the Editor bundle.
 
+
+### Player deployment verification — 2026-11-17
+
+- Created a separate Vercel project, `3d-engine-player`, linked to this repository with Root Directory `apps/player`. The project uses Node.js 22.x and allows workspace source files outside the app root; the existing Editor project was not changed.
+- Deployed the exact PR HEAD `f641e47f48928085e0215116ae884f15a5571deb` to a non-production Vercel staging deployment: [Player deployment](https://3d-engine-player-b8a06t4ge-callback5.vercel.app/). Build completed successfully; output contains both `index.html` and `physics-playground.html`, plus the Rapier WASM and JS assets.
+- Authorized HTTP fetches returned HTTP 200 for `/`, `/physics-playground.html`, the Rapier JS module, and `/assets/rapier_wasm3d_bg-C6GCbKVJ.wasm`.
+- The WASM response was observed with `Content-Type: application/wasm` and `Access-Control-Allow-Origin: *`. Cache policy is `public, max-age=0, must-revalidate`; the first fetch was `x-vercel-cache: MISS`, and a repeated fetch was `HIT` with the same ETag and last-modified timestamp.
+- This verifies asset publication and HTTP headers, not browser execution. Actual Chrome WASM initialization, runtime fallback/error behavior, and interactive Playground behavior against this deployment still need a real browser run.
+- An initial deployment request was mistakenly inferred as Production by the API; it was canceled before completion. The successful deployment is explicitly targeted to `staging`; no production deployment or domain promotion was performed.
+
+### Latest exact-head verification — 2026-11-17
+
+- GitHub Actions run #397 passed on exact HEAD `f641e47f48928085e0215116ae884f15a5571deb`, including format, lint, typecheck, unit tests, builds, both GLB benchmarks, Playwright Chromium installation, and Chromium E2E.
+
 ### Vercel
 
 - Preview for code commit `619d4f780129adbfc52b002d98037a7f23381387` is READY.
@@ -113,9 +127,7 @@ Branch: `feat/m6-physics-input-core`
 
 ## Remaining gates
 
-- Verify deployed `.wasm` MIME, cache, CORS, and fallback headers through
-  an authorized Vercel browser session.
-- Verify the deployed Player/WASM artifact in Chrome only (MIME, cache, CORS, initialization and fallback behavior). Firefox/WebKit and mobile-browser compatibility are explicitly deferred; physical gamepad testing is optional evidence, not a browser-matrix gate.
+- Verify actual deployed Player/WASM initialization, runtime fallback/error behavior, and interactive Playground behavior in Chrome only. HTTP MIME, cache, and CORS headers are now verified. Firefox/WebKit and mobile-browser compatibility are explicitly deferred; physical gamepad testing is optional evidence, not a browser-matrix gate.
 - Confirm the M6 owner accepts the static-only triangle-mesh scope; dynamic/kinematic meshes and mesh cooking remain deferred.
 - Complete browser/device performance and memory/allocation profiling.
 - Obtain owner review and M6 sign-off.
