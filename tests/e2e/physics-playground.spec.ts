@@ -51,9 +51,17 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const beforeTouchMove = await page.locator('#player-position').textContent();
   const beforeTouchZ = Number(beforeTouchMove?.match(/Z (-?\d+\.\d+)/)?.[1]);
   const forwardButton = page.getByRole('button', { name: 'Move forward' });
-  await forwardButton.dispatchEvent('pointerdown', { pointerId: 7, pointerType: 'touch', isPrimary: true });
+  await forwardButton.dispatchEvent('pointerdown', {
+    pointerId: 7,
+    pointerType: 'touch',
+    isPrimary: true,
+  });
   await page.waitForTimeout(400);
-  await forwardButton.dispatchEvent('pointerup', { pointerId: 7, pointerType: 'touch', isPrimary: true });
+  await forwardButton.dispatchEvent('pointerup', {
+    pointerId: 7,
+    pointerType: 'touch',
+    isPrimary: true,
+  });
   await expect
     .poll(async () => {
       const current = await page.locator('#player-position').textContent();
@@ -64,8 +72,16 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const beforeTouchJump = await page.locator('#player-position').textContent();
   const beforeTouchY = Number(beforeTouchJump?.match(/Y (-?\d+\.\d+)/)?.[1]);
   const jumpButton = page.getByRole('button', { name: 'Jump' });
-  await jumpButton.dispatchEvent('pointerdown', { pointerId: 8, pointerType: 'touch', isPrimary: true });
-  await jumpButton.dispatchEvent('pointerup', { pointerId: 8, pointerType: 'touch', isPrimary: true });
+  await jumpButton.dispatchEvent('pointerdown', {
+    pointerId: 8,
+    pointerType: 'touch',
+    isPrimary: true,
+  });
+  await jumpButton.dispatchEvent('pointerup', {
+    pointerId: 8,
+    pointerType: 'touch',
+    isPrimary: true,
+  });
   await expect
     .poll(async () => {
       const current = await page.locator('#player-position').textContent();
