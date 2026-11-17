@@ -2,6 +2,13 @@
 
 Updated: 2026-11-17
 
+## M6 browser target
+
+- Required browser for M6 acceptance: **Chrome/Chromium only**. Playwright Chromium is the sole mandatory browser E2E target.
+- Firefox, Safari/WebKit, and mobile browsers are outside this milestone's browser-compatibility acceptance scope; do not schedule them as M6 blockers or imply they passed. Chromium mobile-viewport layout tests remain useful responsive-UI checks, not mobile-browser support evidence.
+- Chrome-only scope does not waive deployment verification: publish the Player artifact and verify actual WASM response MIME (`application/wasm`), cache behavior, CORS, and initialization/fallback errors in Chrome. This remains open until observed against the deployed Player asset.
+- Gamepad unit/simulated-adapter coverage is not proof of physical gamepad testing. Record any real-device test separately if hardware becomes available.
+
 Repository: `Startat6am/3d-engine`
 PR: [#87](https://github.com/Startat6am/3d-engine/pull/87)
 Branch: `feat/m6-physics-input-core`
@@ -11,7 +18,7 @@ Branch: `feat/m6-physics-input-core`
 ### Local
 
 - Node.js 22.13.0 and pnpm 12.18.0.
-- `pnpm check`: passed; 178/178 Vitest tests, format, lint, typecheck,
+- `pnpm check`: passed; 180/180 Vitest tests, format, lint, typecheck,
   package builds, and Editor/Player production builds.
 - `pnpm e2e`: passed; 22/22 Chromium tests.
 - The repeat-import E2E assertion allows 20 seconds for the 2049×2049
@@ -33,11 +40,11 @@ Branch: `feat/m6-physics-input-core`
   passed on `f9e16974904c99f5e662f3b0eb3430546b1172b7`; run #386 passed on
   code-bearing commit `910bc3687ad8c3a99bd1f853407b0987beb5e026`; run #387
   passed on latest HEAD `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`:
-  format, lint, typecheck, 178/178 Vitest tests, builds, both GLB benchmarks,
+  format, lint, typecheck, 180/180 Vitest tests, builds, both GLB benchmarks,
   Playwright Chromium installation, and 22/22 Chromium E2E. The test asserts
   that the error-entry count increases after the missing-blob open action.
 - Run #390 passed on commit `222ffbbdfc8bd67bb7eebfb1d47ba9888fece2ee`.
-- Run #392 passed on current code HEAD `35e71ab15532b7800a32ffd04a7b688c30cb63d1`:
+- Run #392 passed on code HEAD `35e71ab15532b7800a32ffd04a7b688c30cb63d1`:
   format, lint, typecheck, 180/180 Vitest tests, builds, both GLB benchmarks,
   Playwright Chromium installation, and 22/22 Chromium E2E. The added shared
   conformance case verifies that single-step requests are rejected while
@@ -62,6 +69,11 @@ Branch: `feat/m6-physics-input-core`
 - The Vercel project needs a Player deployment target (or an intentionally
   combined deployment) before deployed Rapier WASM headers can be tested.
   No Vercel project/build settings were changed as part of this check.
+
+### Latest exact-head verification — 2026-11-17
+
+- GitHub Actions run #394 passed on documentation HEAD `74209111a0a23a01c74a9c1e9082f588a0604170`; the `verify` job completed successfully, including format, lint, typecheck, tests, builds, both GLB benchmarks, Playwright Chromium installation, and Chromium E2E.
+- Vercel deployment for the same HEAD is READY: [Preview](https://3d-engine-pmdxrrm6q-callback5.vercel.app/). This does not change the separate finding below that the configured Preview currently publishes only the Editor bundle.
 
 ### Vercel
 
@@ -103,7 +115,7 @@ Branch: `feat/m6-physics-input-core`
 
 - Verify deployed `.wasm` MIME, cache, CORS, and fallback headers through
   an authorized Vercel browser session.
-- Verify Firefox/WebKit and physical gamepad/mobile behavior.
+- Verify the deployed Player/WASM artifact in Chrome only (MIME, cache, CORS, initialization and fallback behavior). Firefox/WebKit and mobile-browser compatibility are explicitly deferred; physical gamepad testing is optional evidence, not a browser-matrix gate.
 - Confirm the M6 owner accepts the static-only triangle-mesh scope; dynamic/kinematic meshes and mesh cooking remain deferred.
 - Complete browser/device performance and memory/allocation profiling.
 - Obtain owner review and M6 sign-off.
