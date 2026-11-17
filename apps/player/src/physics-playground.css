@@ -172,3 +172,97 @@ body {
     font-size: 8px;
   }
 }
+
+
+/* Touch HUD is available on touch-first and narrow-screen devices. */
+.touch-hud {
+  display: none;
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  .touch-hud {
+    position: absolute;
+    z-index: 5;
+    inset: auto 18px 22px 18px;
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .touch-dpad {
+    display: grid;
+    justify-items: center;
+    gap: 7px;
+    pointer-events: auto;
+  }
+
+  .touch-dpad-row {
+    display: flex;
+    gap: 7px;
+  }
+
+  .touch-hud button {
+    display: grid;
+    place-items: center;
+    width: 54px;
+    height: 54px;
+    padding: 0;
+    border: 1px solid rgba(185, 207, 235, 0.48);
+    border-radius: 13px;
+    background: rgba(31, 45, 64, 0.82);
+    color: #f1f6ff;
+    font: 700 17px ui-monospace, SFMono-Regular, Menlo, monospace;
+    box-shadow: 0 5px 16px rgba(0, 0, 0, 0.3);
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .touch-hud button[data-pressed='true'] {
+    background: rgba(77, 127, 184, 0.95);
+    border-color: #a8d1ff;
+    transform: scale(0.96);
+  }
+
+  .touch-hud .touch-jump {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    background: rgba(170, 111, 43, 0.9);
+    border-color: rgba(255, 211, 151, 0.8);
+    font-size: 13px;
+    pointer-events: auto;
+  }
+
+  .help-panel {
+    top: 14px;
+    bottom: auto;
+    left: 12px;
+    width: min(240px, calc(100% - 24px));
+    padding: 9px 11px;
+    opacity: 0.82;
+  }
+
+  .help-panel span:nth-of-type(2) {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .touch-hud {
+    inset-inline: 12px;
+    bottom: 16px;
+  }
+
+  .touch-hud .touch-dpad button {
+    width: 48px;
+    height: 48px;
+  }
+
+  .touch-hud .touch-jump {
+    width: 68px;
+    height: 68px;
+  }
+}
