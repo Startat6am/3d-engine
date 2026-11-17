@@ -173,7 +173,6 @@ body {
   }
 }
 
-
 /* Touch HUD is available on touch-first and narrow-screen devices. */
 .touch-hud {
   display: none;
