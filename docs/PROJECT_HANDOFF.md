@@ -18,7 +18,7 @@ Branch: `feat/m6-physics-input-core`
 ### Local
 
 - Node.js 22.13.0 and pnpm 12.18.0.
-- `pnpm check`: passed; 180/180 Vitest tests, format, lint, typecheck,
+- `pnpm check`: passed; 178/178 Vitest tests, format, lint, typecheck,
   package builds, and Editor/Player production builds.
 - `pnpm e2e`: passed; 22/22 Chromium tests.
 - The repeat-import E2E assertion allows 20 seconds for the 2049×2049
