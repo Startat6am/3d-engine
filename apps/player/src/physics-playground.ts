@@ -68,7 +68,6 @@ let simulationReady = false;
 let pendingSingleStep = false;
 let lastObservedStepCount = 0;
 let disposed = false;
-
 /** Converts held HUD pointers into the same semantic keyboard controls as WASD/Space. */
 class TouchHudInputAdapter implements InputDeviceAdapter {
   readonly #pressed = new Map<number, string>();
