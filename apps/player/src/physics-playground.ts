@@ -14,6 +14,7 @@ import {
   createPhysicsWorld,
   type PhysicsWorld,
 } from '@engine/physics';
+import type { InputDeviceAdapter, InputDeviceSample } from '@engine/input';
 import {
   createDefaultCamera,
   createDefaultMaterial,
@@ -33,6 +34,7 @@ const pauseButton = document.querySelector<HTMLButtonElement>('#pause');
 const stepButton = document.querySelector<HTMLButtonElement>('#step');
 const raycastButton = document.querySelector<HTMLButtonElement>('#raycast');
 const raycastResult = document.querySelector<HTMLOutputElement>('#raycast-result');
+const touchHud = document.querySelector<HTMLElement>('#touch-hud');
 
 if (
   !canvas ||
@@ -43,7 +45,8 @@ if (
   !pauseButton ||
   !stepButton ||
   !raycastButton ||
-  !raycastResult
+  !raycastResult ||
+  !touchHud
 ) {
   throw new Error('Physics Playground UI is incomplete');
 }
@@ -58,12 +61,78 @@ let physics: PhysicsWorld | null = null;
 let physicsSystem: PhysicsSystem | null = null;
 let playerEntity: EntityId | null = null;
 let inputSystem: InputSystem | null = null;
+let touchInput: TouchHudInputAdapter | null = null;
 let animationFrame = 0;
 let previousFrame = 0;
 let simulationReady = false;
 let pendingSingleStep = false;
 let lastObservedStepCount = 0;
 let disposed = false;
+
+
+/** Converts held HUD pointers into the same semantic keyboard controls as WASD/Space. */
+class TouchHudInputAdapter implements InputDeviceAdapter {
+  readonly #pressed = new Map<number, string>();
+  readonly #pending: Array<{ source: 'keyboard'; control: string; pressed: boolean }> = [];
+  readonly #listeners: Array<() => void> = [];
+
+  constructor(root: HTMLElement) {
+    root.querySelectorAll<HTMLButtonElement>('[data-control]').forEach((button) => {
+      const control = button.dataset.control!;
+      const down = (event: PointerEvent) => {
+        event.preventDefault();
+        if (this.#pressed.has(event.pointerId)) return;
+        this.#pressed.set(event.pointerId, control);
+        this.#pending.push({ source: 'keyboard', control, pressed: true });
+        button.setPointerCapture?.(event.pointerId);
+        button.dataset.pressed = 'true';
+      };
+      const up = (event: PointerEvent) => {
+        const active = this.#pressed.get(event.pointerId);
+        if (!active) return;
+        this.#pressed.delete(event.pointerId);
+        this.#pending.push({ source: 'keyboard', control: active, pressed: false });
+        button.dataset.pressed = 'false';
+      };
+      button.addEventListener('pointerdown', down);
+      button.addEventListener('pointerup', up);
+      button.addEventListener('pointercancel', up);
+      button.addEventListener('lostpointercapture', up);
+      this.#listeners.push(() => {
+        button.removeEventListener('pointerdown', down);
+        button.removeEventListener('pointerup', up);
+        button.removeEventListener('pointercancel', up);
+        button.removeEventListener('lostpointercapture', up);
+      });
+    });
+    const releaseAll = () => {
+      for (const [pointerId, control] of this.#pressed) {
+        this.#pressed.delete(pointerId);
+        this.#pending.push({ source: 'keyboard', control, pressed: false });
+      }
+      root.querySelectorAll<HTMLElement>('[data-control]').forEach((button) => {
+        button.dataset.pressed = 'false';
+      });
+    };
+    window.addEventListener('blur', releaseAll);
+    document.addEventListener('visibilitychange', releaseAll);
+    this.#listeners.push(() => window.removeEventListener('blur', releaseAll));
+    this.#listeners.push(() => document.removeEventListener('visibilitychange', releaseAll));
+  }
+
+  sample(): readonly InputDeviceSample[] {
+    const transitions = this.#pending.splice(0);
+    const values = new Map<string, number>();
+    for (const control of this.#pressed.values()) values.set(control, 1);
+    return [{ source: 'keyboard', values, transitions }];
+  }
+
+  dispose(): void {
+    for (const remove of this.#listeners.splice(0)) remove();
+    this.#pressed.clear();
+    this.#pending.length = 0;
+  }
+}
 
 const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
 const camera = createDefaultCamera();
@@ -171,6 +240,8 @@ async function start() {
 
     inputSystem = new InputSystem();
     inputSystem.addAdapter(new BrowserInputAdapter(window));
+    touchInput = new TouchHudInputAdapter(touchHud);
+    inputSystem.addAdapter(touchInput);
     inputSystem.addContext({
       id: 'gameplay',
       priority: 0,
@@ -220,6 +291,7 @@ async function start() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     inputSystem?.dispose();
+    touchInput = null;
     physicsSystem?.dispose();
     physics?.dispose();
     void engine.dispose();
