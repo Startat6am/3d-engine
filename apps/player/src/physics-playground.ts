@@ -74,11 +74,7 @@ let disposed = false;
 /** Converts held HUD pointers into the same semantic keyboard controls as WASD/Space. */
 class TouchHudInputAdapter implements InputDeviceAdapter {
   readonly #pressed = new Map<number, string>();
-  readonly #pending: Array<{
-    source: 'keyboard';
-    control: string;
-    pressed: boolean;
-  }> = [];
+  readonly #pending: Array<{ source: 'keyboard'; control: string; pressed: boolean }> = [];
   readonly #listeners: Array<() => void> = [];
 
   constructor(root: HTMLElement) {
@@ -126,9 +122,7 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
     window.addEventListener('blur', releaseAll);
     document.addEventListener('visibilitychange', releaseAll);
     this.#listeners.push(() => window.removeEventListener('blur', releaseAll));
-    this.#listeners.push(() =>
-      document.removeEventListener('visibilitychange', releaseAll),
-    );
+    this.#listeners.push(() => document.removeEventListener('visibilitychange', releaseAll));
   }
 
   sample(): readonly InputDeviceSample[] {
