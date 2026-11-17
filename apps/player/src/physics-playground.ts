@@ -8,7 +8,6 @@ import {
   type InputDeviceAdapter,
   type InputDeviceSample,
 } from '@engine/input';
-s=s.replace("import type { InputDeviceAdapter, InputDeviceSample } from '@engine/input';\n","");
 import {
   PhysicsCollider,
   PhysicsPreUpdateSystem,
@@ -17,7 +16,6 @@ import {
   createPhysicsWorld,
   type PhysicsWorld,
 } from '@engine/physics';
-import type { InputDeviceAdapter, InputDeviceSample } from '@engine/input';
 import {
   createDefaultCamera,
   createDefaultMaterial,
