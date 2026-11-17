@@ -6,8 +6,8 @@
 ## Browser target and acceptance boundary
 
 - **Chrome/Chromium only** is the M6 browser target. Playwright Chromium is the sole required browser E2E target.
-- Firefox, Safari/WebKit, and mobile-browser compatibility are deferred and are not M6 blockers. Existing mobile-sized Playwright viewport checks run in Chromium and verify responsive layout only; they do not claim mobile-browser support.
-- A separate non-production Vercel project now publishes the Player artifact. The Player root, Playground HTML, JS module and Rapier WASM asset returned HTTP 200; WASM MIME (`application/wasm`), CORS and cache behavior were verified. Actual Chrome initialization, fallback/error behavior and interactive Playground behavior remain open pending an authorized browser session.
+- Firefox, Safari/WebKit, and mobile-browser compatibility are deferred and are not M6 blockers. Chromium E2E verifies the touch HUD at a mobile-sized viewport, including touch-pointer movement and jump, but does not claim mobile-browser compatibility.
+- A separate non-production Vercel project publishes the Player artifact at the public staging alias `https://3d-engine-player-callback5.vercel.app/`; the Playground is `/physics-playground.html`. Vercel SSO protection is disabled for this Player project only. The Player root, Playground HTML, JS module and Rapier WASM asset returned HTTP 200; WASM MIME (`application/wasm`), CORS and cache behavior were verified. CI Chromium E2E verifies local runtime initialization and interaction; real-device review of the public deployment remains open.
 - Physical gamepad behavior is not inferred from simulated adapter tests; record a real-device result only if hardware is actually tested.
 
 This document is the M6 exit checklist. A gate passes only with implementation, automated evidence, documented limitations, and a verified browser example where specified.
@@ -17,7 +17,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 - [x] Read and follow `SUBSYSTEM_CONTRACTS.md`.
 - [x] Confirm package names, exports, TypeScript conventions, and runtime phase integration against current source.
 - [x] Verify Rapier 0.21.0 / Apache-2.0, Vite WASM asset emission, lazy loading, and Chromium runtime simulation + raycast smoke; see ADR 0003.
-- [ ] Verify deployed Player/WASM initialization, fallback behavior and interactive Playground behavior in Chrome. HTTP publication and headers are now verified on the separate Player staging deployment: HTTP 200, `Content-Type: application/wasm`, CORS enabled, and cache MISS-to-HIT behavior. The isolated headless-browser attempt reached Vercel SSO, so no browser-runtime pass is claimed; see `docs/PROJECT_HANDOFF.md`.
+- [ ] Review the public Player deployment in a real Chrome session, including WASM initialization, fallback/error behavior and interactive Playground behavior. HTTP publication and headers are verified; CI Chromium E2E verifies local runtime behavior. This real-deployment review is still an owner acceptance item; see `docs/PROJECT_HANDOFF.md`.
 - [ ] Review upstream Rapier maintenance/release cadence and record the supported browser matrix. The upstream maintenance/version snapshot is documented in `docs/PHYSICS_SPEC.md` (JS binding 0.21.0 pinned; Rust changelog v0.35.0/v0.35.1 (2026-08-08); npm JS 0.21.0 is latest); Chrome/Chromium is the sole M6 target; Firefox/WebKit compatibility is deferred.
 - [x] Publish the physics and input contracts, stable error categories, minimal examples, and explicit unsupported capabilities.
 - [x] Keep backend-specific types out of public engine APIs.
@@ -57,7 +57,8 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 ## M6.4 — Input mapping
 
 - [x] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots.
-- [x] Keyboard/mouse action mapping is verified in Chromium through the Player Playground. Keyboard movement and left-mouse-button jump are covered; the E2E asserts the player Y coordinate rises after a mouse click. Exact-head GitHub Actions run #403 passed on `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d`, including the full Chromium E2E suite.
+- [x] Keyboard/mouse action mapping is verified in Chromium through the Player Playground. Keyboard movement and left-mouse-button jump are covered; the E2E asserts the player Y coordinate rises after a mouse click (run #403).
+- [x] Mobile touch HUD exposes holdable W/A/S/D movement and JUMP buttons, routed through the same semantic actions as keyboard input. Chromium E2E checks HUD visibility, forward movement and jump at a mobile-sized viewport; exact-head full CI run #423 passed.
 - [x] Edge transitions survive frames with no fixed tick and are consumed once across multiple fixed ticks.
 - [ ] Focus loss, document visibility changes, and gamepad disconnect neutralize state. Simulated browser-adapter unit tests cover blur/visibility release, clearing accumulated mouse delta/wheel values, neutralizing positive and negative gamepad axes, and gamepad disconnect/reconnect transitions. Gamepad polling is suspended while blurred/hidden. Physical gamepad verification is optional separate evidence; Chrome browser-adapter behavior is the M6 target. Pointer lock is not acquired by this adapter.
 - [x] Context priority, dead zones, map validation, queue bounds, and listener disposal are unit-tested.
@@ -70,7 +71,8 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 - [x] Replace preview/foundation labels with truthful application and runtime status; no fake “READY” when renderer/runtime failed. Initial renderer and scene-save states are now derived from actual state.
 - [x] Remove or hide non-functional component rows, dead controls, empty placeholder sections, and decorative status indicators until they have real behavior. Static Inspector component checkmarks and foundation/READY labels have been removed.
 - [x] Keep working scene hierarchy, viewport, transform inspector, import, save/open, undo/redo, and diagnostics discoverable (existing Editor E2E remains green).
-- [x] Add a focused Player Physics Playground demonstrating gravity, collision, body types, raycast, and keyboard-driven movement; Playwright exercises the browser route.
+- [x] Add a focused Player Physics Playground demonstrating gravity, collision, body types, raycast, keyboard-driven movement and mouse jump; Playwright exercises the browser route.
+- [x] Add mobile touch HUD buttons for W/A/S/D and JUMP; Playwright verifies mobile-sized HUD visibility and touch-pointer movement/jump.
 - [x] Expose real simulation pause/resume and single-step controls in the Player Physics Playground.
 - [ ] Add physics debug visualization when implemented.
 - [x] Show actionable loading/error/empty states; errors must not be hidden in console-only output.
@@ -81,6 +83,7 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 
 - [x] Historical sandbox verification (Node 25; 166 tests) is superseded by exact-head GitHub Actions run #394 on `74209111a0a23a01c74a9c1e9082f588a0604170`; the full verify job passed. Run #392 on code HEAD `35e71ab15532b7800a32ffd04a7b688c30cb63d1` recorded 180/180 Vitest and 22/22 Chromium E2E.
 - [x] Exact-head CI and browser E2E: GitHub Actions run #392 passed on commit `35e71ab15532b7800a32ffd04a7b688c30cb63d1`, including 180/180 Vitest tests and 22/22 Chromium Playwright tests. The browser-memory repeat-import assertion timeout was increased from 5 to 20 seconds after CI exposed a slow 2049×2049 texture import on the hosted runner. Local `pnpm e2e` also passes 22/22.
+- [x] Mobile touch HUD follow-up: exact-head GitHub Actions run #423 passed on `19095ea8e35c9eb71f2702cc5c798652f3afa676`, including format, lint, typecheck, unit tests, builds, both GLB benchmarks and Playwright Chromium E2E for touch-HUD movement/jump.
 - [ ] Physics performance report records body/collider counts, step/query timings, event allocations, memory, browser/runtime, and hardware context. A preliminary Node/Rapier report and reproducible benchmark exist (`docs/PHYSICS_PERFORMANCE_REPORT.md`), but browser/device profiling, controlled memory/WASM and allocation measurements, dense-contact workloads, and owner-approved budgets are still missing.
 - [x] Known limitations and backend compatibility are recorded in the specs and ADRs.
 - [ ] README, Roadmap, Execution Plan, subsystem specs, and ADRs receive final owner review for status consistency.
