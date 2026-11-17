@@ -31,12 +31,12 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
 
   await page.getByRole('button', { name: 'Resume' }).click();
   const beforeMouseJump = await page.locator('#player-position').textContent();
-  const initialY = Number(beforeMouseJump?.match(/Y (-?\\d+\\.\\d+)/)?.[1]);
+  const initialY = Number(beforeMouseJump?.match(/Y (-?\d+\.\d+)/)?.[1]);
   await page.locator('#playground-canvas').click();
   await expect
     .poll(async () => {
       const current = await page.locator('#player-position').textContent();
-      return Number(current?.match(/Y (-?\\d+\\.\\d+)/)?.[1]);
+      return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
     })
     .toBeGreaterThan(initialY + 0.1);
 
