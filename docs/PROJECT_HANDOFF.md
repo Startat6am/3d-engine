@@ -12,9 +12,11 @@ Updated: 2026-11-17
 
 ## Latest code and verification
 
-- Last fully verified PR head: `c515f99f0cbfb3be05a4a8001cf5891b1e4ee431`.
+- Latest fully verified PR head: `19095ea8e35c9eb71f2702cc5c798652f3afa676` (the Player code in this head is `ea2f82918b1acedd061715af237f00dd8f26216c`; the final commit only restores the standard CI workflow).
 - GitHub Actions run [#400](https://github.com/Startat6am/3d-engine/actions/runs/44038555177) passed on that exact head: format, lint, typecheck, 180/180 Vitest tests, package and app builds, both GLB benchmarks, and 22/22 Playwright Chromium E2E tests.
-- Code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds a mouse-button jump binding to the Player Physics Playground, displays player Y, and extends Chromium E2E to verify that a left click produces a physical jump. GitHub Actions [run #403](https://github.com/Startat6am/3d-engine/actions/runs/44145410947) passed on this exact head: format, lint, typecheck, unit tests, builds, both GLB benchmarks, Chromium installation and the full Playwright E2E suite.
+- Code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds mouse-button jump and was verified by run #403.
+- The mobile follow-up adds a touch HUD with holdable W/A/S/D and JUMP buttons. It uses pointer events through the existing semantic keyboard controls, releases held keys on pointer cancellation/blur/visibility loss, and has Chromium E2E coverage for mobile HUD visibility, forward movement and jump.
+- GitHub Actions [run #423](https://github.com/Startat6am/3d-engine/actions/runs/44154047897) passed on exact PR head `19095ea8e35c9eb71f2702cc5c798652f3afa676`: format, lint, typecheck, Vitest, builds, both GLB benchmarks and the full Playwright Chromium E2E suite.
 
 ## Implemented M6 scope
 
@@ -22,15 +24,15 @@ Updated: 2026-11-17
 - Character controller: grounded state, slope limits, autostep, snap-to-ground and collision results, with integration/lifecycle coverage.
 - `@engine/input`: semantic actions, prioritized contexts, immutable fixed-tick snapshots, keyboard/mouse/gamepad adapters, transient mouse input, and focus/visibility/disconnect neutralization.
 - Editor UX cleanup: truthful renderer/save status, real empty-scene state, removal of decorative component placeholders.
-- Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard movement, pause/resume and single-step. Mouse jump is verified by the exact-head Chromium E2E in run #403.
+- Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard and touch-HUD movement/jump, pause/resume and single-step. Mouse jump and touch-HUD movement/jump are verified by Chromium E2E.
 
 ## Player staging deployment
 
 - A separate Vercel project, `3d-engine-player`, builds from `apps/player`; the existing Editor project is unchanged.
-- Staging deployment: [Player Physics Playground](https://3d-engine-player-b8a06t4ge-callback5.vercel.app/).
+- Public non-production staging alias: [Player](https://3d-engine-player-callback5.vercel.app/) · [Physics Playground](https://3d-engine-player-callback5.vercel.app/physics-playground.html). Vercel SSO protection is disabled for the Player project only; the Editor project is unchanged.
 - The deployed root, `/physics-playground.html`, JS module and Rapier WASM asset were observed returning HTTP 200.
 - WASM headers were verified: `Content-Type: application/wasm`, `Access-Control-Allow-Origin: *`, and `Cache-Control: public, max-age=0, must-revalidate`. A repeated request changed from Vercel cache MISS to HIT with the same ETag/last-modified timestamp.
-- This is HTTP publication/header evidence only. Actual Chrome initialization, fallback/error behavior and interactive Playground behavior against the deployed Player remain open: the isolated headless-browser attempt reached Vercel SSO, so no deployed-browser pass is claimed.
+- HTTP publication/header evidence is separate from interactive browser evidence. CI Chromium E2E verifies local Player initialization, physics, keyboard/mouse input and mobile-sized touch-HUD behavior. A real-device browser review of the public staging URL remains an owner acceptance item; no mobile-browser compatibility claim is made.
 - The deployment is staging, not Production; no production domain promotion was performed.
 
 ## Remaining M6 gates
