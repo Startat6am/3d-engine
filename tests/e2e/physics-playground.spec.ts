@@ -41,6 +41,38 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     .toBeGreaterThan(initialY + 0.1);
 
   await page.setViewportSize({ width: 360, height: 780 });
+
+  await expect(page.getByRole('button', { name: 'Move forward' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move left' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move backward' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move right' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Jump' })).toBeVisible();
+
+  const beforeTouchMove = await page.locator('#player-position').textContent();
+  const beforeTouchZ = Number(beforeTouchMove?.match(/Z (-?\\d+\\.\\d+)/)?.[1]);
+  const forwardButton = page.getByRole('button', { name: 'Move forward' });
+  await forwardButton.dispatchEvent('pointerdown', { pointerId: 7, pointerType: 'touch', isPrimary: true });
+  await page.waitForTimeout(400);
+  await forwardButton.dispatchEvent('pointerup', { pointerId: 7, pointerType: 'touch', isPrimary: true });
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Z (-?\\d+\\.\\d+)/)?.[1]);
+    })
+    .toBeLessThan(beforeTouchZ - 0.03);
+
+  const beforeTouchJump = await page.locator('#player-position').textContent();
+  const beforeTouchY = Number(beforeTouchJump?.match(/Y (-?\\d+\\.\\d+)/)?.[1]);
+  const jumpButton = page.getByRole('button', { name: 'Jump' });
+  await jumpButton.dispatchEvent('pointerdown', { pointerId: 8, pointerType: 'touch', isPrimary: true });
+  await jumpButton.dispatchEvent('pointerup', { pointerId: 8, pointerType: 'touch', isPrimary: true });
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Y (-?\\d+\\.\\d+)/)?.[1]);
+    })
+    .toBeGreaterThan(beforeTouchY + 0.1);
+
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
     .toBe(true);
