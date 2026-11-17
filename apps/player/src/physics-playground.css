@@ -213,7 +213,11 @@ body {
     border-radius: 13px;
     background: rgba(31, 45, 64, 0.82);
     color: #f1f6ff;
-    font: 700 17px ui-monospace, SFMono-Regular, Menlo, monospace;
+    font:
+      700 17px ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
     box-shadow: 0 5px 16px rgba(0, 0, 0, 0.3);
     touch-action: none;
     -webkit-tap-highlight-color: transparent;
