@@ -275,7 +275,8 @@ async function start() {
         const handle = physicsSystem!.getBodyHandle(playerEntity!);
         if (!handle) return;
         const [x, z] = snapshot.getAxis2D('Move');
-        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 10, 0, -z * 10]);
+        // Keep directional acceleration gentle for precise keyboard and touch-HUD control.
+        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 2, 0, -z * 2]);
         if (snapshot.wasPressed('Jump')) physics!.applyImpulse(handle, [0, 4.5, 0]);
       },
     });
