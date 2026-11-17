@@ -77,7 +77,7 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 - [ ] Add physics debug visualization when implemented.
 - [x] Show actionable loading/error/empty states; errors must not be hidden in console-only output.
 - [x] Ensure the workspace remains usable at desktop and narrow mobile widths; no horizontal overflow or inaccessible critical controls (Playwright mobile viewport checks pass).
-- [x] Browser smoke/E2E evidence is recorded for the Player Physics Playground and Editor in Chromium at desktop and mobile-sized viewports; the latter is responsive-layout emulation, not mobile-browser compatibility. Screenshot review remains a final owner UX check.
+- [x] Browser smoke/E2E evidence is recorded for the Player Physics Playground and Editor in Chromium at desktop and mobile-sized viewports. The mobile-sized Playground test also drives the touch HUD to verify movement and jump; this is Chromium emulation, not real mobile-browser compatibility. Screenshot review remains a final owner UX check.
 
 ## M6.6 — CI and documentation closeout
 
