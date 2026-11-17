@@ -2,134 +2,49 @@
 
 Updated: 2026-11-17
 
-## M6 browser target
+## Current state
 
-- Required browser for M6 acceptance: **Chrome/Chromium only**. Playwright Chromium is the sole mandatory browser E2E target.
-- Firefox, Safari/WebKit, and mobile browsers are outside this milestone's browser-compatibility acceptance scope; do not schedule them as M6 blockers or imply they passed. Chromium mobile-viewport layout tests remain useful responsive-UI checks, not mobile-browser support evidence.
-- Chrome-only scope does not waive deployment verification: publish the Player artifact and verify actual WASM response MIME (`application/wasm`), cache behavior, CORS, and initialization/fallback errors in Chrome. This remains open until observed against the deployed Player asset.
-- Gamepad unit/simulated-adapter coverage is not proof of physical gamepad testing. Record any real-device test separately if hardware becomes available.
+- Repository: `Startat6am/3d-engine`
+- PR: [#87 — feat: start M6 physics, input, and editor UX](https://github.com/Startat6am/3d-engine/pull/87)
+- Branch: `feat/m6-physics-input-core`
+- PR remains **open and Draft**. M6 is in progress; no exit gate or owner sign-off is claimed complete.
+- M2–M5 remain complete. Do not reorder milestones or start M7/M10 work.
 
-Repository: `Startat6am/3d-engine`
-PR: [#87](https://github.com/Startat6am/3d-engine/pull/87)
-Branch: `feat/m6-physics-input-core`
+## Latest code and verification
 
-## Current verification
+- Last fully verified PR head: `c515f99f0cbfb3be05a4a8001cf5891b1e4ee431`.
+- GitHub Actions run [#400](https://github.com/Startat6am/3d-engine/actions/runs/44038555177) passed on that exact head: format, lint, typecheck, 180/180 Vitest tests, package and app builds, both GLB benchmarks, and 22/22 Playwright Chromium E2E tests.
+- Follow-up code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds a mouse-button jump binding to the Player Physics Playground, displays player Y, and extends Chromium E2E to verify that a left click produces a physical jump. GitHub Actions run #403 is the verification run for this change; do not treat it as passed until its conclusion is successful.
 
-### Local
+## Implemented M6 scope
 
-- Node.js 22.13.0 and pnpm 12.18.0.
-- `pnpm check`: passed; 178/178 Vitest tests, format, lint, typecheck,
-  package builds, and Editor/Player production builds.
-- `pnpm e2e`: passed; 22/22 Chromium tests.
-- The repeat-import E2E assertion allows 20 seconds for the 2049×2049
-  texture fixture; the hosted runner needed longer than the original 5-second wait.
-- Physics teardown coverage asserts collider removal on component removal
-  and body removal on entity destruction.
+- `@engine/physics`: engine-owned `PhysicsWorld` contract and Rapier 0.21.0 adapter; fixed-tick integration; body/collider lifecycle; events, raycasts, force/impulse; pause and single-step; resource limits; opt-in bounded static-only triangle meshes.
+- Character controller: grounded state, slope limits, autostep, snap-to-ground and collision results, with integration/lifecycle coverage.
+- `@engine/input`: semantic actions, prioritized contexts, immutable fixed-tick snapshots, keyboard/mouse/gamepad adapters, transient mouse input, and focus/visibility/disconnect neutralization.
+- Editor UX cleanup: truthful renderer/save status, real empty-scene state, removal of decorative component placeholders.
+- Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard movement, pause/resume and single-step. Mouse jump is the newest unverified addition.
 
-### GitHub Actions
+## Player staging deployment
 
-- Run #367 passed on code-bearing commit `619d4f780129adbfc52b002d98037a7f23381387`.
-- Run #369 passed on docs commit `9ec1ec5a2ae7529bbffea48295dc71fdd009542c`.
-- Run #370 passed on docs commit `ed68fdcc5e257eec4864d2470724616842acf002`.
-- Run #373 on `39e934f` passed format, lint, typecheck, unit tests, builds, and
-  both GLB benchmarks; E2E had 21/22 pass. The sole failure was a strict-mode
-  locator matching two accumulated Console entries in the directory-project
-  missing-blob test, not a product failure.
-- Run #374 passed on the code-fix commit `8725c60f789747672ec56f9a21ea2cabce68c2c0`.
-- Run #377 passed on `17a206437202d2455952ece8ca44912a1feae644`; run #378
-  passed on `f9e16974904c99f5e662f3b0eb3430546b1172b7`; run #386 passed on
-  code-bearing commit `910bc3687ad8c3a99bd1f853407b0987beb5e026`; run #387
-  passed on latest HEAD `9b1d2445b7cbcc3625250a2e73b8c13ccf487df7`:
-  format, lint, typecheck, 180/180 Vitest tests, builds, both GLB benchmarks,
-  Playwright Chromium installation, and 22/22 Chromium E2E. The test asserts
-  that the error-entry count increases after the missing-blob open action.
-- Run #390 passed on commit `222ffbbdfc8bd67bb7eebfb1d47ba9888fece2ee`.
-- Run #392 passed on code HEAD `35e71ab15532b7800a32ffd04a7b688c30cb63d1`:
-  format, lint, typecheck, 180/180 Vitest tests, builds, both GLB benchmarks,
-  Playwright Chromium installation, and 22/22 Chromium E2E. The added shared
-  conformance case verifies that single-step requests are rejected while
-  running and that resuming cancels a queued single-step.
+- A separate Vercel project, `3d-engine-player`, builds from `apps/player`; the existing Editor project is unchanged.
+- Staging deployment: [Player Physics Playground](https://3d-engine-player-b8a06t4ge-callback5.vercel.app/).
+- The deployed root, `/physics-playground.html`, JS module and Rapier WASM asset were observed returning HTTP 200.
+- WASM headers were verified: `Content-Type: application/wasm`, `Access-Control-Allow-Origin: *`, and `Cache-Control: public, max-age=0, must-revalidate`. A repeated request changed from Vercel cache MISS to HIT with the same ETag/last-modified timestamp.
+- This is HTTP publication/header evidence only. Actual Chrome initialization, fallback/error behavior and interactive Playground behavior against the deployed Player remain open: the isolated headless-browser attempt reached Vercel SSO, so no deployed-browser pass is claimed.
+- The deployment is staging, not Production; no production domain promotion was performed.
 
-### Vercel deployment inspection — 2026-11-16
+## Remaining M6 gates
 
-- Preview deployment for commit `55e5a2e5b0f5a5245d8d8f1af99cc508b38e35c1`
-  is READY: [deployment](https://3d-engine-aoxftxuz0-callback5.vercel.app/).
-- Authorized deployment fetch returned the editor root as HTTP 200 with
-  `Content-Type: text/html; charset=utf-8`,
-  `Cache-Control: public, max-age=0, must-revalidate`, and
-  `Access-Control-Allow-Origin: *`.
-- Its JS entry returned HTTP 200 with
-  `Content-Type: application/javascript; charset=utf-8`,
-  the same cache policy, and `Access-Control-Allow-Origin: *`.
-- The deployed build log lists only the Editor bundle (177 modules); the
-  Player Physics Playground route and the expected Player WASM asset both
-  return HTTP 404. Thus this Preview does not currently publish the Player
-  artifact. WASM MIME/cache/CORS and WASM fallback behavior remain unverified;
-  do not infer them from the HTML/JS headers.
-- The Vercel project needs a Player deployment target (or an intentionally
-  combined deployment) before deployed Rapier WASM headers can be tested.
-  No Vercel project/build settings were changed as part of this check.
+1. Verify deployed Player WASM initialization, failure/fallback behavior and interactive Playground behavior in an authorized Chrome session. HTTP status, MIME, CORS and cache headers are already verified.
+2. Complete browser/device physics profiling: representative dense-contact and query workloads, controlled WASM-memory and allocation measurements, named hardware/browser context, and owner-approved budgets.
+3. Complete the remaining Chromium input/browser evidence. Physical gamepad testing is optional separate evidence; simulated adapter tests do not prove physical hardware behavior.
+4. Complete final visual review, confirm owner acceptance of the static-only triangle-mesh scope, and obtain explicit M6 owner sign-off.
+5. Re-run full CI on the final PR head and update the acceptance checklist with exact evidence.
 
-### Latest exact-head verification — 2026-11-17
+## Constraints
 
-- GitHub Actions run #394 passed on documentation HEAD `74209111a0a23a01c74a9c1e9082f588a0604170`; the `verify` job completed successfully, including format, lint, typecheck, tests, builds, both GLB benchmarks, Playwright Chromium installation, and Chromium E2E.
-- Vercel deployment for the same HEAD is READY: [Preview](https://3d-engine-pmdxrrm6q-callback5.vercel.app/). This does not change the separate finding below that the configured Preview currently publishes only the Editor bundle.
-
-### Player deployment verification — 2026-11-17
-
-- Created a separate Vercel project, `3d-engine-player`, linked to this repository with Root Directory `apps/player`. The project uses Node.js 22.x and allows workspace source files outside the app root; the existing Editor project was not changed.
-- Deployed the exact PR HEAD `f641e47f48928085e0215116ae884f15a5571deb` to a non-production Vercel staging deployment: [Player deployment](https://3d-engine-player-b8a06t4ge-callback5.vercel.app/). Build completed successfully; output contains both `index.html` and `physics-playground.html`, plus the Rapier WASM and JS assets.
-- Authorized HTTP fetches returned HTTP 200 for `/`, `/physics-playground.html`, the Rapier JS module, and `/assets/rapier_wasm3d_bg-C6GCbKVJ.wasm`.
-- The WASM response was observed with `Content-Type: application/wasm` and `Access-Control-Allow-Origin: *`. Cache policy is `public, max-age=0, must-revalidate`; the first fetch was `x-vercel-cache: MISS`, and a repeated fetch was `HIT` with the same ETag and last-modified timestamp.
-- This verifies asset publication and HTTP headers, not browser execution. A headless Chromium attempt from an isolated sandbox was redirected to Vercel's SSO login page, so no runtime pass is claimed. Actual Chrome WASM initialization, runtime fallback/error behavior, and interactive Playground behavior against this deployment remain open until tested from an authorized browser session.
-- An initial deployment request was mistakenly inferred as Production by the API; it was canceled before completion. The successful deployment is explicitly targeted to `staging`; no production deployment or domain promotion was performed.
-
-### Latest exact-head verification — 2026-11-17
-
-- GitHub Actions run #397 passed on app/code HEAD `f641e47f48928085e0215116ae884f15a5571deb`, including all checks and Chromium E2E.
-- Run #398 failed only at `pnpm format:check` because of an extra blank line in this handoff update; that spacing was corrected, and run #399 passed on exact PR HEAD `0bb35b2a39e62a3ab46cc46465b2a3790c634c60`.
-
-### Vercel
-
-- Preview for code commit `619d4f780129adbfc52b002d98037a7f23381387` is READY.
-- Preview requires Vercel SSO. No authorized browser inspection of the
-  deployed `.wasm` response headers has been completed.
-
-## Implemented
-
-- Rapier-backed character controller with slope limits, autostep,
-  snap-to-ground, offset/up configuration, grounded state, and collisions.
-- Physics lifecycle integration with entity/body/collider teardown and
-  world disposal/reinitialization coverage.
-- Shared Fake/Rapier conformance contract, including matching pause/single-step rejection and resume-cancellation semantics. Rapier also supports opt-in static-only triangle meshes with bounded vertex/index buffers and explicit rejection on dynamic/kinematic bodies.
-- Keyboard, mouse, and gamepad input.
-- Blur/visibility releases, transient mouse reset, gamepad disconnect and
-  reconnect, and negative-axis neutralization.
-- Regression tests for gamepad focus restoration and physics resource removal.
-- E2E now asserts a newly emitted project-open error without assuming the
-  Console contains only one matching historical entry.
-
-## Performance evidence
-
-- Preliminary Node/Rapier results and reproduction instructions are in
-  `docs/PHYSICS_PERFORMANCE_REPORT.md`.
-- Script: `packages/engine-physics/bench/physics-performance.mjs`.
-- This is a shared-VM microbenchmark, not browser/device sign-off.
-- Browser timings, controlled WASM memory, allocation profiling, dense-contact
-  workloads, and approved performance budgets remain open.
-
-## Upstream Rapier review
-
-- JavaScript binding `@dimforge/rapier3d` is pinned at 0.21.0.
-- Upstream JS package and Rust engine versions are independent.
-- The release snapshot and build-variant decision are in `docs/PHYSICS_SPEC.md`.
-- Keep the standard non-SIMD production build; no SIMD variant was added.
-
-## Remaining gates
-
-- Verify actual deployed Player/WASM initialization, runtime fallback/error behavior, and interactive Playground behavior in Chrome only. HTTP MIME, cache, and CORS headers are now verified. Firefox/WebKit and mobile-browser compatibility are explicitly deferred; physical gamepad testing is optional evidence, not a browser-matrix gate.
-- Confirm the M6 owner accepts the static-only triangle-mesh scope; dynamic/kinematic meshes and mesh cooking remain deferred.
-- Complete browser/device performance and memory/allocation profiling.
-- Obtain owner review and M6 sign-off.
-
-Do not close PR #87, merge, or mark M6 complete while any required gate is open.
+- M6 browser acceptance targets Chrome/Chromium only. Firefox/WebKit and mobile-browser compatibility are deferred; Chromium mobile viewport checks are responsive-layout tests only.
+- Dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred.
+- Keep the standard non-SIMD Rapier browser build.
+- Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
+- Do not merge/close PR #87, mark M6 complete, or start M7/M10 while required gates remain open.
