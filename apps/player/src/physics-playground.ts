@@ -101,7 +101,7 @@ function renderFrame(now: number) {
   if (playerEntity) {
     const transform = runtime.world.get(playerEntity, Transform);
     if (transform)
-      playerPosition!.textContent = `PLAYER X ${transform.position[0].toFixed(2)} · Z ${transform.position[2].toFixed(2)}`;
+      playerPosition!.textContent = `PLAYER X ${transform.position[0].toFixed(2)} · Y ${transform.position[1].toFixed(2)} · Z ${transform.position[2].toFixed(2)}`;
   }
   const currentStepCount = physicsSystem?.stepCount ?? 0;
   if (!simulationReady && currentStepCount > 0) {
@@ -186,6 +186,7 @@ async function start() {
           { action: 'Move', source: 'keyboard', control: 'KeyW', component: 'y' },
           { action: 'Move', source: 'keyboard', control: 'KeyS', component: 'y', scale: -1 },
           { action: 'Jump', source: 'keyboard', control: 'Space' },
+          { action: 'Jump', source: 'mouse', control: 'Button0' },
         ],
       },
     });
