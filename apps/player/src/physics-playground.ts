@@ -62,7 +62,6 @@ let physics: PhysicsWorld | null = null;
 let physicsSystem: PhysicsSystem | null = null;
 let playerEntity: EntityId | null = null;
 let inputSystem: InputSystem | null = null;
-let touchInput: TouchHudInputAdapter | null = null;
 let animationFrame = 0;
 let previousFrame = 0;
 let simulationReady = false;
@@ -245,8 +244,7 @@ async function start() {
 
     inputSystem = new InputSystem();
     inputSystem.addAdapter(new BrowserInputAdapter(window));
-    touchInput = new TouchHudInputAdapter(touchHud);
-    inputSystem.addAdapter(touchInput);
+    inputSystem.addAdapter(new TouchHudInputAdapter(touchHud!));
     inputSystem.addContext({
       id: 'gameplay',
       priority: 0,
@@ -296,7 +294,6 @@ async function start() {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     inputSystem?.dispose();
-    touchInput = null;
     physicsSystem?.dispose();
     physics?.dispose();
     void engine.dispose();
