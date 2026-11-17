@@ -75,7 +75,6 @@ Branch: `feat/m6-physics-input-core`
 - GitHub Actions run #394 passed on documentation HEAD `74209111a0a23a01c74a9c1e9082f588a0604170`; the `verify` job completed successfully, including format, lint, typecheck, tests, builds, both GLB benchmarks, Playwright Chromium installation, and Chromium E2E.
 - Vercel deployment for the same HEAD is READY: [Preview](https://3d-engine-pmdxrrm6q-callback5.vercel.app/). This does not change the separate finding below that the configured Preview currently publishes only the Editor bundle.
 
-
 ### Player deployment verification — 2026-11-17
 
 - Created a separate Vercel project, `3d-engine-player`, linked to this repository with Root Directory `apps/player`. The project uses Node.js 22.x and allows workspace source files outside the app root; the existing Editor project was not changed.
