@@ -81,12 +81,13 @@ Branch: `feat/m6-physics-input-core`
 - Deployed the exact PR HEAD `f641e47f48928085e0215116ae884f15a5571deb` to a non-production Vercel staging deployment: [Player deployment](https://3d-engine-player-b8a06t4ge-callback5.vercel.app/). Build completed successfully; output contains both `index.html` and `physics-playground.html`, plus the Rapier WASM and JS assets.
 - Authorized HTTP fetches returned HTTP 200 for `/`, `/physics-playground.html`, the Rapier JS module, and `/assets/rapier_wasm3d_bg-C6GCbKVJ.wasm`.
 - The WASM response was observed with `Content-Type: application/wasm` and `Access-Control-Allow-Origin: *`. Cache policy is `public, max-age=0, must-revalidate`; the first fetch was `x-vercel-cache: MISS`, and a repeated fetch was `HIT` with the same ETag and last-modified timestamp.
-- This verifies asset publication and HTTP headers, not browser execution. Actual Chrome WASM initialization, runtime fallback/error behavior, and interactive Playground behavior against this deployment still need a real browser run.
+- This verifies asset publication and HTTP headers, not browser execution. A headless Chromium attempt from an isolated sandbox was redirected to Vercel's SSO login page, so no runtime pass is claimed. Actual Chrome WASM initialization, runtime fallback/error behavior, and interactive Playground behavior against this deployment remain open until tested from an authorized browser session.
 - An initial deployment request was mistakenly inferred as Production by the API; it was canceled before completion. The successful deployment is explicitly targeted to `staging`; no production deployment or domain promotion was performed.
 
 ### Latest exact-head verification — 2026-11-17
 
-- GitHub Actions run #397 passed on exact HEAD `f641e47f48928085e0215116ae884f15a5571deb`, including format, lint, typecheck, unit tests, builds, both GLB benchmarks, Playwright Chromium installation, and Chromium E2E.
+- GitHub Actions run #397 passed on app/code HEAD `f641e47f48928085e0215116ae884f15a5571deb`, including all checks and Chromium E2E.
+- Run #398 failed only at `pnpm format:check` because of an extra blank line in this handoff update; that spacing was corrected, and run #399 passed on exact PR HEAD `0bb35b2a39e62a3ab46cc46465b2a3790c634c60`.
 
 ### Vercel
 
