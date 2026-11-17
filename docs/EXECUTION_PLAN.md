@@ -17,13 +17,13 @@ Branch: `feat/m6-physics-input-core`
 4. Kinematic capsule character controller with slope limits, autostep, snap-to-ground and lifecycle cleanup coverage.
 5. `@engine/input` semantic action maps, contexts, fixed-tick snapshots, keyboard/mouse/gamepad adapters and focus/disconnect neutralization.
 6. Editor UX cleanup and a Player Physics Playground with Rapier WASM, gravity, collisions, keyboard movement, raycast, pause/resume and single-step.
-7. A follow-up change adds mouse-button jump and a Chromium E2E assertion for the physical result; that change is pending CI verification.
+7. The Player Playground also maps left mouse button to Jump; Chromium E2E verifies the physical jump result.
 
 ## Verification
 
 - Last fully verified PR head: `c515f99f0cbfb3be05a4a8001cf5891b1e4ee431`.
 - GitHub Actions [run #400](https://github.com/Startat6am/3d-engine/actions/runs/44038555177) passed on that exact head: format, lint, typecheck, 180/180 Vitest tests, package/app builds, both GLB benchmarks and 22/22 Playwright Chromium E2E tests.
-- Current follow-up code head: `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d`; Actions run #403 is the pending verification for the mouse-input E2E addition.
+- Follow-up code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` passed GitHub Actions [run #403](https://github.com/Startat6am/3d-engine/actions/runs/44145410947), including format, lint, typecheck, unit tests, builds, both GLB benchmarks and the full Playwright Chromium E2E suite.
 - Local evidence recorded in the PR uses Node.js 22.13.0 and pnpm 12.18.0.
 
 ## Player deployment
