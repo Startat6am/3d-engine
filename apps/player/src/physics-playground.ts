@@ -5,7 +5,10 @@ import {
   InputFixedUpdateSystem,
   InputPreUpdateSystem,
   InputSystem,
+  type InputDeviceAdapter,
+  type InputDeviceSample,
 } from '@engine/input';
+s=s.replace("import type { InputDeviceAdapter, InputDeviceSample } from '@engine/input';\n","");
 import {
   PhysicsCollider,
   PhysicsPreUpdateSystem,
