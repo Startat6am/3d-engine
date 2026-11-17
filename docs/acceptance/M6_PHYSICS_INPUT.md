@@ -57,7 +57,7 @@ This document is the M6 exit checklist. A gate passes only with implementation, 
 ## M6.4 — Input mapping
 
 - [x] `@engine/input` exposes device-independent actions, maps, contexts, and immutable fixed-tick snapshots.
-- [ ] Keyboard/mouse action mapping is verified in Chromium through the Player Playground. Keyboard movement is already covered; a new left-mouse-button jump binding and physical-result E2E assertion are pending CI verification on the current follow-up commit.
+- [x] Keyboard/mouse action mapping is verified in Chromium through the Player Playground. Keyboard movement and left-mouse-button jump are covered; the E2E asserts the player Y coordinate rises after a mouse click. Exact-head GitHub Actions run #403 passed on `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d`, including the full Chromium E2E suite.
 - [x] Edge transitions survive frames with no fixed tick and are consumed once across multiple fixed ticks.
 - [ ] Focus loss, document visibility changes, and gamepad disconnect neutralize state. Simulated browser-adapter unit tests cover blur/visibility release, clearing accumulated mouse delta/wheel values, neutralizing positive and negative gamepad axes, and gamepad disconnect/reconnect transitions. Gamepad polling is suspended while blurred/hidden. Physical gamepad verification is optional separate evidence; Chrome browser-adapter behavior is the M6 target. Pointer lock is not acquired by this adapter.
 - [x] Context priority, dead zones, map validation, queue bounds, and listener disposal are unit-tested.
