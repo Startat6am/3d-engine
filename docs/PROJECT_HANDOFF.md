@@ -12,7 +12,7 @@ Updated: 2026-11-17
 
 ## Latest code and verification
 
-- Latest fully verified PR head: `19095ea8e35c9eb71f2702cc5c798652f3afa676` (the Player code in this head is `ea2f82918b1acedd061715af237f00dd8f26216c`; the final commit only restores the standard CI workflow).
+- Latest fully verified app/code head: `19095ea8e35c9eb71f2702cc5c798652f3afa676` (the Player code is `ea2f82918b1acedd061715af237f00dd8f26216c`). Subsequent commits update only handoff/acceptance documentation.
 - GitHub Actions run [#400](https://github.com/Startat6am/3d-engine/actions/runs/44038555177) passed on that exact head: format, lint, typecheck, 180/180 Vitest tests, package and app builds, both GLB benchmarks, and 22/22 Playwright Chromium E2E tests.
 - Code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds mouse-button jump and was verified by run #403.
 - The mobile follow-up adds a touch HUD with holdable W/A/S/D and JUMP buttons. It uses pointer events through the existing semantic keyboard controls, releases held keys on pointer cancellation/blur/visibility loss, and has Chromium E2E coverage for mobile HUD visibility, forward movement and jump.
