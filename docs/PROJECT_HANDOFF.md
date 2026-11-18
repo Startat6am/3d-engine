@@ -12,11 +12,11 @@ Updated: 2026-11-18
 
 ## Latest code and verification
 
-- Latest fully verified app/code head: `19095ea8e35c9eb71f2702cc5c798652f3afa676` (the Player code is `ea2f82918b1acedd061715af237f00dd8f26216c`). Subsequent commits update only handoff/acceptance documentation.
-- GitHub Actions run [#400](https://github.com/Startat6am/3d-engine/actions/runs/44038555177) passed on that exact head: format, lint, typecheck, 180/180 Vitest tests, package and app builds, both GLB benchmarks, and 22/22 Playwright Chromium E2E tests.
-- Code head `6dd26d23e7a61d4bfac580f3c60f68ed9dc0ec8d` adds mouse-button jump and was verified by run #403.
-- The mobile follow-up adds a touch HUD with holdable W/A/S/D and JUMP buttons. It uses pointer events through the existing semantic keyboard controls, releases held keys on pointer cancellation/blur/visibility loss, and has Chromium E2E coverage for mobile HUD visibility, forward movement and jump.
-- GitHub Actions [run #423](https://github.com/Startat6am/3d-engine/actions/runs/44154047897) passed on exact PR head `19095ea8e35c9eb71f2702cc5c798652f3afa676`: format, lint, typecheck, Vitest, builds, both GLB benchmarks and the full Playwright Chromium E2E suite.
+- Current PR #87 head: `0bd6a6ed9889c60a1d4865283b03f66850e73084` (`docs(physics): require exact-head browser benchmark CI`).
+- GitHub Actions run [#439](https://github.com/Startat6am/3d-engine/actions/runs/44321353518) passed on this exact head. It completed frozen install, format, lint, typecheck, 180/180 Vitest tests, package/app builds, both GLB stress benchmarks, Chromium installation, and **23/23 Playwright Chromium E2E tests**.
+- The 23-test CI suite includes the production Rapier-WASM browser benchmark, Physics Playground controls, Editor mobile behavior, browser JS/WebGL resource lifecycle measurement, GLB asset lifecycle, and Player shutdown/resource cleanup.
+- Independent Node.js 22.23.5 / pnpm 12.18.0 verification also passed `pnpm check` (180/180 Vitest, formatting, lint, typecheck, package and Editor/Player production builds); the complete local Playwright Chromium suite passed 23/23.
+- PR remains open and Draft; passing exact-head CI does not replace the outstanding real-device/performance and owner acceptance gates.
 
 ## Implemented M6 scope
 
@@ -28,20 +28,23 @@ Updated: 2026-11-18
 
 ## Player staging deployment
 
-- A separate Vercel project, `3d-engine-player`, builds from `apps/player`; the existing Editor project is unchanged.
-- Public non-production staging alias: [Player](https://3d-engine-player-callback5.vercel.app/) · [Physics Playground](https://3d-engine-player-callback5.vercel.app/physics-playground.html). Vercel SSO protection is disabled for the Player project only; the Editor project is unchanged.
-- The deployed root, `/physics-playground.html`, JS module and Rapier WASM asset were observed returning HTTP 200.
-- WASM headers were verified: `Content-Type: application/wasm`, `Access-Control-Allow-Origin: *`, and `Cache-Control: public, max-age=0, must-revalidate`. A repeated request changed from Vercel cache MISS to HIT with the same ETag/last-modified timestamp.
-- HTTP publication/header evidence is separate from interactive browser evidence. CI Chromium E2E verifies local Player initialization, physics, keyboard/mouse input and mobile-sized touch-HUD behavior. A real-device browser review of the public staging URL remains an owner acceptance item; no mobile-browser compatibility claim is made.
-- The deployment is staging, not Production; no production domain promotion was performed.
+- Separate Vercel project `3d-engine-player` builds from `apps/player`; the existing Editor project is unchanged.
+- Current branch deployment alias: [Player](https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/) · [Physics Playground](https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/physics-playground.html).
+- Exact deployment inspected: [`3d-engine-player-28gv19fj3-callback5.vercel.app`](https://3d-engine-player-28gv19fj3-callback5.vercel.app/physics-playground.html), Vercel deployment `dpl_HzcPXyNrZZGkNhchJbgGr88xfdAa`, state READY, built from exact PR head `0bd6a6ed9889c60a1d4865283b03f66850e73084`.
+- **Important alias correction:** the older generic `3d-engine-player-callback5.vercel.app` alias still resolves to the earlier `0260d980269b39ad673b2e8c1f33a56bd401546a` deployment. Do not use it as evidence for the latest branch head; use the branch alias or exact deployment URL above.
+- Automated headless Chromium 158 / SwiftShader smoke against the exact latest deployment confirmed root and Playground HTTP 200, `WEBGL2 READY`, `WASM READY`, five bodies, and no page/console errors. The Rapier WASM request returned HTTP 200 with `Content-Type: application/wasm` and `Access-Control-Allow-Origin: *`.
+- Desktop interaction verified: keyboard movement, raycast hit, pause stability, exactly one requested single-step (the player's Y position changed from 2.679 to 2.686 after reset/pause/step), and scene reset.
+- Mobile-sized 360×780 interaction verified with real CDP touch events: touch-HUD forward movement, pointer release (`data-pressed=false`), jump response (Y 0.500 to 0.663 at approximately 50 ms), visible touch controls, and no horizontal overflow.
+- This is automated headless/software-renderer evidence, not a real physical GPU/device benchmark or an interactive owner visual review. It does not close the real-device performance, physical gamepad, or owner sign-off gates.
+- Deployment is staging, not Production; no production domain promotion was performed.
 
 ## Remaining M6 gates
 
-1. Verify deployed Player WASM initialization, failure/fallback behavior and interactive Playground behavior in an authorized Chrome session. HTTP status, MIME, CORS and cache headers are already verified.
+1. Complete interactive owner review of the current deployed Player/Playground in a normal Chrome session, including visual appearance and runtime fallback/error behavior. Automated exact-head headless Chromium smoke is now complete; this does not count as owner visual sign-off.
 2. Complete browser/device physics profiling: representative dense-contact and query workloads, controlled WASM-memory and allocation measurements, named hardware/browser context, and owner-approved budgets.
 3. Complete the remaining Chromium input/browser evidence. Physical gamepad testing is optional separate evidence; simulated adapter tests do not prove physical hardware behavior.
 4. Complete final visual review, confirm owner acceptance of the static-only triangle-mesh scope, and obtain explicit M6 owner sign-off.
-5. Re-run full CI on the final PR head and update the acceptance checklist with exact evidence.
+5. Re-run full CI on any subsequent code changes; exact-head run #439 currently passes all 23 Chromium E2E tests.
 
 ## Constraints
 
