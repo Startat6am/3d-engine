@@ -16,7 +16,11 @@ type BrowserMemorySnapshot = {
     bytes: number;
     breakdown: Array<{ bytes: number; attribution: string[]; types: string[] }>;
   } | null;
-  userAgentSpecificMemoryStatus: 'available' | 'unsupported' | 'not-cross-origin-isolated' | 'unavailable';
+  userAgentSpecificMemoryStatus:
+    | 'available'
+    | 'unsupported'
+    | 'not-cross-origin-isolated'
+    | 'unavailable';
 };
 
 function readJsHeap(): BrowserMemorySnapshot['jsHeap'] {
@@ -243,7 +247,7 @@ async function main() {
     memoryDiagnostics: {
       wasmLinearMemoryBytes: null,
       wasmLinearMemoryStatus: 'not-exposed-by-public-rapier-api',
-      note: 'The Rapier adapter does not expose its WebAssembly.Memory instance. User-agent-specific memory is a whole-page estimate and is not attributed to Rapier WASM.',
+      note: 'The Rapier adapter does not expose WebAssembly.Memory. Whole-page estimate; not attributable to Rapier WASM.',
       snapshots: {
         beforeRapierInit: memoryBeforeRapierInit,
         afterRapierInitAndDispose: memoryAfterRapierInitAndDispose,
@@ -254,7 +258,7 @@ async function main() {
     denseContact,
     limitations: [
       'Headless or foreground browser microbenchmark; not a full rendered frame-time benchmark.',
-      'JS heap counters exclude WASM linear memory; user-agent-specific memory is whole-page and cannot be attributed to Rapier or GPU memory.',
+      'JS heap excludes WASM memory; whole-page memory is not Rapier WASM or GPU memory.',
       'Shared CI/sandbox hardware and browser scheduling are not dedicated benchmark conditions.',
       'Synthetic sphere workloads do not represent every game scene or mesh-collider workload.',
     ],
