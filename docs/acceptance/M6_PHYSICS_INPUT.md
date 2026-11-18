@@ -1,5 +1,6 @@
 Checking formatting...
 All matched files use Prettier code style!
+
 # M6 — Physics & Input Acceptance
 
 **Status:** implementation in progress; no M6 acceptance gate is claimed complete.  
