@@ -31,6 +31,19 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
 
   await page.getByRole('button', { name: 'Resume' }).click();
   await expect(page.getByRole('button', { name: 'Reset scene' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Reset scene' }).click();
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Z (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeCloseTo(0, 1);
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeCloseTo(0.5, 1);
 
   await page.setViewportSize({ width: 360, height: 780 });
 
@@ -60,6 +73,9 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
       return Number(current?.match(/Z (-?\d+\.\d+)/)?.[1]);
     })
     .toBeLessThan(beforeTouchZ - 0.03);
+  const afterTouchMove = await page.locator('#player-position').textContent();
+  const touchTravel = beforeTouchZ - Number(afterTouchMove?.match(/Z (-?\d+\.\d+)/)?.[1]);
+  expect(touchTravel).toBeLessThan(0.4);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect
