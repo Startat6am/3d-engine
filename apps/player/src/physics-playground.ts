@@ -169,7 +169,12 @@ function addBody(
   });
   runtime.world.add(entity, Renderable, { geometry, material: createDefaultMaterial(color) });
   const rotation = [0, 0, 0, 1] as const;
-  runtime.world.add(entity, RigidBody, { type: bodyType, position, rotation });
+  runtime.world.add(entity, RigidBody, {
+    type: bodyType,
+    position,
+    rotation,
+    linearDamping: bodyType === 'dynamic' ? 3 : 0,
+  });
   if (bodyType === 'dynamic') initialDynamicPoses.set(entity, { position, rotation });
   runtime.world.add(entity, PhysicsCollider, { shape, friction: 0.8, restitution: 0.08 });
   return entity;
@@ -288,7 +293,7 @@ async function start() {
         if (!handle) return;
         const [x, z] = snapshot.getAxis2D('Move');
         // Keep directional acceleration gentle for precise keyboard and touch-HUD control.
-        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 0.8, 0, -z * 0.8]);
+        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 0.15, 0, -z * 0.15]);
         if (snapshot.wasPressed('Jump')) physics!.applyImpulse(handle, [0, 1.2, 0]);
       },
     });
