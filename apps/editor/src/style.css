@@ -158,7 +158,7 @@ body {
 .viewport-fps {
   position: absolute;
   z-index: 2;
-  top: 10px;
+  top: 56px;
   right: 12px;
   padding: 3px 6px;
   border: 1px solid rgb(145 165 190 / 28%);
