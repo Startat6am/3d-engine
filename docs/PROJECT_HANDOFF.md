@@ -77,6 +77,12 @@ Updated: 2026-11-18
 - Zoom in/out behavior is explicitly deferred for a later design discussion.
 - Do not change camera-follow, free-look, orbit-target, or zoom logic until the behavior is designed and agreed. The 2026-11-19 change is strictly button sizing/positioning.
 
+### Owner visual acceptance — 2026-11-19
+
+- Owner completed the interactive review of the current deployed Physics Playground in Chrome and reported: "Все проверил, все ок." (checked everything; all OK).
+- Record this as owner visual acceptance of the current staging build, including the camera-button UI follow-up. No visual/runtime issues were reported.
+- This acceptance does not substitute for named-hardware physics profiling, performance-budget agreement, static-only triangle-mesh scope confirmation, or final M6 sign-off.
+
 ### Next execution order
 
 1. Continue M6 in the documented order; do not start M7 or M10 while M6 gates remain open.
