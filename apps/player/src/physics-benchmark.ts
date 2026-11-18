@@ -17,10 +17,7 @@ type BrowserMemorySnapshot = {
     breakdown: Array<{ bytes: number; attribution: string[]; types: string[] }>;
   } | null;
   userAgentSpecificMemoryStatus:
-    | 'available'
-    | 'unsupported'
-    | 'not-cross-origin-isolated'
-    | 'unavailable';
+    'available' | 'unsupported' | 'not-cross-origin-isolated' | 'unavailable';
 };
 
 function readJsHeap(): BrowserMemorySnapshot['jsHeap'] {
