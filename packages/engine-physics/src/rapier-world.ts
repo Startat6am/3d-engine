@@ -378,6 +378,27 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     );
   }
 
+  setDynamicPose(handle: PhysicsBodyHandle, pose: PhysicsPose): void {
+    this.#assertActive();
+    const record = this.#body(handle);
+    if (record.type !== 'dynamic')
+      throw new PhysicsError(
+        'physics.body-type-mismatch',
+        'Dynamic pose update requires a dynamic rigid body',
+      );
+    this.#validatePose(pose);
+    const body = record.body;
+    body.setTranslation({ x: pose.position[0], y: pose.position[1], z: pose.position[2] }, true);
+    body.setRotation(
+      { x: pose.rotation[0], y: pose.rotation[1], z: pose.rotation[2], w: pose.rotation[3] },
+      true,
+    );
+    body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+    body.resetForces(true);
+    body.resetTorques(true);
+  }
+
   getPose(handle: PhysicsBodyHandle): PhysicsPose {
     this.#assertActive();
     const body = this.#body(handle).body;
