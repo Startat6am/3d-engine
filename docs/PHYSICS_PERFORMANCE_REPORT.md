@@ -67,3 +67,45 @@ The script uses the compatibility Rapier package for Node and the adapter's test
 - Add an allocation profiler or adapter instrumentation before claiming collision-event allocation cost.
 - Include dense-contact and query-heavy scenes representative of the Player Playground and intended user workloads.
 - Obtain owner-approved performance budgets before marking the acceptance item complete.
+
+## Repeatable dense-contact profile — 2026-11-18
+
+The benchmark now includes a deterministic dense-contact scenario in addition to the original sparse 100/500/1,000-body cases and collision-event drain stress case. The new scenario creates 216 dynamic spheres in a 6×6×6 pile (radius 0.25, 0.49-unit spacing) above a static floor, runs 120 warm-up ticks and 600 measured 1/60-second ticks, drains collision events every tick, and issues 3,000 `raycastAll` queries. It records per-step latency, event counts, point-in-time process memory, and adapter disposal time.
+
+### Environment and repeatability
+
+- Runtime: Node.js 22.23.5; V8 12.4.254.21-node.57 (within the repository's supported Node 22 range).
+- Platform: Linux arm64 in the shared Vercel sandbox; 48 CPUs reported by Node, CPU model unavailable. This is not dedicated benchmark hardware.
+- Three independent full-script runs were performed in the same environment. Values below show the observed range across runs, not a cross-machine guarantee.
+
+### Results across three runs
+
+| Scenario      | Bodies / colliders | Fixed-step median | Fixed-step p95 |                Ray query p95 |
+| ------------- | -----------------: | ----------------: | -------------: | ---------------------------: |
+| Sparse        |          100 / 101 |    0.190–0.192 ms | 0.218–0.232 ms |    raycast: 0.0068–0.0070 ms |
+| Sparse        |          500 / 501 |    0.926–0.928 ms | 1.045–1.061 ms |    raycast: 0.0040–0.0042 ms |
+| Sparse        |      1,000 / 1,001 |    1.567–1.581 ms | 1.692–1.710 ms |    raycast: 0.0035–0.0037 ms |
+| Dense contact |          216 / 217 |    0.474–0.476 ms | 0.722–0.726 ms | raycastAll: 0.0039–0.0043 ms |
+
+The dense-contact scenario drained exactly 1,708 collision events in each run, across 340 of 600 measured steps, with a maximum of 36 events in one step. Adapter disposal took 0.453–0.478 ms. These are measured adapter timings; they do not include ECS synchronization, browser scheduling, rendering, GPU work, or a complete game frame.
+
+### Interpretation
+
+- In this synthetic workload and shared ARM64 sandbox, measured p95 fixed-step time remained below 1.71 ms for the 1,000-body sparse case and below 0.73 ms for the 216-body dense-contact case.
+- The dense-contact test now provides repeatable event-heavy coverage that the earlier settled sparse workload lacked. The separate 50-body event burst remains a one-step event-queue/drain microbenchmark.
+- Do not compare these figures directly with the 2026-11-16 Linux x64 results: architecture, host scheduling, and runtime patch versions differ.
+- Process memory values are point-in-time snapshots only. The script does not attribute Rapier WASM linear memory, profile allocations, measure GC pressure, or prove memory reclamation after disposal.
+
+### Reproduction
+
+```sh
+npx --yes -p node@22 node packages/engine-physics/bench/physics-performance.mjs
+```
+
+This extends the Node/Rapier adapter evidence only. Browser/device profiling, controlled WASM/JS memory and allocation measurements, dedicated-hardware repeats, and owner-approved budgets remain open acceptance requirements.
+
+### Verification of the benchmark extension — 2026-11-18
+
+- Full repository `pnpm check` passed under Node.js 22.23.5 / pnpm 12.18.0: formatting, lint, typecheck, 180/180 Vitest tests, package builds, and Editor/Player production builds.
+- The focused Chromium Physics Playground E2E passed (1/1) on this checkout. The full 22-test Playwright suite was attempted but did not complete successfully in this shared sandbox; do not infer a new full-suite pass from the earlier exact-head CI evidence.
+- `git diff --check` and Prettier checks passed for the changed benchmark and documentation.
