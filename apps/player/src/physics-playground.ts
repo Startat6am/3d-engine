@@ -270,6 +270,7 @@ function setCameraOrbitEnabled(enabled: boolean) {
 function beginCameraOrbit(event: PointerEvent) {
   if (event.button !== 0 || cameraOrbitPointerId !== null) return;
   event.preventDefault();
+  event.stopPropagation();
   cameraOrbitPointerId = event.pointerId;
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
