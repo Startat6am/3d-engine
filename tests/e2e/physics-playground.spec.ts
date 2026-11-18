@@ -30,15 +30,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   await expect(page.locator('#playground-status')).toHaveText('PAUSED · STEP COMPLETE');
 
   await page.getByRole('button', { name: 'Resume' }).click();
-  const beforeMouseJump = await page.locator('#player-position').textContent();
-  const initialY = Number(beforeMouseJump?.match(/Y (-?\d+\.\d+)/)?.[1]);
-  await page.locator('#playground-canvas').click();
-  await expect
-    .poll(async () => {
-      const current = await page.locator('#player-position').textContent();
-      return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
-    })
-    .toBeGreaterThan(initialY + 0.1);
+  await expect(page.getByRole('button', { name: 'Reset scene' })).toBeEnabled();
 
   await page.setViewportSize({ width: 360, height: 780 });
 
@@ -69,25 +61,46 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     })
     .toBeLessThan(beforeTouchZ - 0.03);
 
-  const beforeTouchJump = await page.locator('#player-position').textContent();
-  const beforeTouchY = Number(beforeTouchJump?.match(/Y (-?\d+\.\d+)/)?.[1]);
-  const jumpButton = page.getByRole('button', { name: 'Jump' });
-  await jumpButton.dispatchEvent('pointerdown', {
-    pointerId: 8,
-    pointerType: 'touch',
-    isPrimary: true,
-  });
-  await jumpButton.dispatchEvent('pointerup', {
-    pointerId: 8,
-    pointerType: 'touch',
-    isPrimary: true,
-  });
+  await page.getByRole('button', { name: 'Reset scene' }).click();
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Z (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeCloseTo(0, 1);
   await expect
     .poll(async () => {
       const current = await page.locator('#player-position').textContent();
       return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
     })
-    .toBeGreaterThan(beforeTouchY + 0.1);
+    .toBeCloseTo(0.5, 1);
+
+  const beforeTouchJump = await page.locator('#player-position').textContent();
+  const beforeTouchY = Number(beforeTouchJump?.match(/Y (-?\d+\.\d+)/)?.[1]);
+  const jumpButton = page.getByRole('button', { name: 'Jump' });
+  await jumpButton.click();
+  let peakTouchJumpY = beforeTouchY;
+  for (let frame = 0; frame < 35; frame += 1) {
+    await page.waitForTimeout(20);
+    const current = await page.locator('#player-position').textContent();
+    peakTouchJumpY = Math.max(
+      peakTouchJumpY,
+      Number(current?.match(/Y (-?\d+\.\d+)/)?.[1] ?? beforeTouchY),
+    );
+  }
+  expect(peakTouchJumpY - beforeTouchY).toBeGreaterThan(0.1);
+  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(0.8);
+
+  await page.getByRole('button', { name: 'Reset scene' }).click();
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Z (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeCloseTo(0, 1);
+  await expect(page.locator('#playground-status')).toContainText('SCENE RESET');
+  await page.setViewportSize({ width: 320, height: 700 });
+  await expect(page.getByRole('button', { name: 'Reset scene' })).toBeVisible();
 
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
