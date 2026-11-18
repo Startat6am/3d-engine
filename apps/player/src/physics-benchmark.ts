@@ -10,6 +10,74 @@ const WARMUP_STEPS = 120;
 const MEASURED_STEPS = 300;
 const QUERY_COUNT = 1_200;
 
+type BrowserMemorySnapshot = {
+  jsHeap: { usedBytes: number; totalBytes: number; limitBytes: number } | null;
+  userAgentSpecificMemory: {
+    bytes: number;
+    breakdown: Array<{ bytes: number; attribution: string[]; types: string[] }>;
+  } | null;
+  userAgentSpecificMemoryStatus: 'available' | 'unsupported' | 'not-cross-origin-isolated' | 'unavailable';
+};
+
+function readJsHeap(): BrowserMemorySnapshot['jsHeap'] {
+  const memory = (
+    performance as Performance & {
+      memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
+    }
+  ).memory;
+  return memory
+    ? {
+        usedBytes: memory.usedJSHeapSize,
+        totalBytes: memory.totalJSHeapSize,
+        limitBytes: memory.jsHeapSizeLimit,
+      }
+    : null;
+}
+
+async function captureBrowserMemory(): Promise<BrowserMemorySnapshot> {
+  const perf = performance as Performance & {
+    measureUserAgentSpecificMemory?: () => Promise<{
+      bytes: number;
+      breakdown: Array<{ bytes: number; attribution: string[]; types: string[] }>;
+    }>;
+  };
+  if (!perf.measureUserAgentSpecificMemory) {
+    return {
+      jsHeap: readJsHeap(),
+      userAgentSpecificMemory: null,
+      userAgentSpecificMemoryStatus: 'unsupported',
+    };
+  }
+  if (!globalThis.crossOriginIsolated) {
+    return {
+      jsHeap: readJsHeap(),
+      userAgentSpecificMemory: null,
+      userAgentSpecificMemoryStatus: 'not-cross-origin-isolated',
+    };
+  }
+  try {
+    const measured = await perf.measureUserAgentSpecificMemory();
+    return {
+      jsHeap: readJsHeap(),
+      userAgentSpecificMemory: {
+        bytes: measured.bytes,
+        breakdown: measured.breakdown.map((entry) => ({
+          bytes: entry.bytes,
+          attribution: [...entry.attribution],
+          types: [...entry.types],
+        })),
+      },
+      userAgentSpecificMemoryStatus: 'available',
+    };
+  } catch {
+    return {
+      jsHeap: readJsHeap(),
+      userAgentSpecificMemory: null,
+      userAgentSpecificMemoryStatus: 'unavailable',
+    };
+  }
+}
+
 type TimingSummary = {
   meanMs: number;
   medianMs: number;
@@ -152,18 +220,16 @@ async function runDenseContactScenario() {
 }
 
 async function main() {
+  const memoryBeforeRapierInit = await captureBrowserMemory();
   const initStart = performance.now();
   const probe = await createPhysicsWorld({ gravity: [0, -9.81, 0] });
   const wasmInitializationMs = Number((performance.now() - initStart).toFixed(2));
   probe.dispose();
+  const memoryAfterRapierInitAndDispose = await captureBrowserMemory();
   const results = [];
   for (const count of [100, 500, 1_000]) results.push(await runSparseScenario(count));
   const denseContact = await runDenseContactScenario();
-  const memory = (
-    performance as Performance & {
-      memory?: { usedJSHeapSize: number; totalJSHeapSize: number; jsHeapSizeLimit: number };
-    }
-  ).memory;
+  const memoryAfterScenarios = await captureBrowserMemory();
   const report = {
     runtime: 'Rapier WASM via @engine/physics',
     userAgent: navigator.userAgent,
@@ -174,18 +240,21 @@ async function main() {
     warmupSteps: WARMUP_STEPS,
     measuredSteps: MEASURED_STEPS,
     queryCountPerScenario: QUERY_COUNT,
-    jsHeap: memory
-      ? {
-          usedBytes: memory.usedJSHeapSize,
-          totalBytes: memory.totalJSHeapSize,
-          limitBytes: memory.jsHeapSizeLimit,
-        }
-      : null,
+    memoryDiagnostics: {
+      wasmLinearMemoryBytes: null,
+      wasmLinearMemoryStatus: 'not-exposed-by-public-rapier-api',
+      note: 'The Rapier adapter does not expose its WebAssembly.Memory instance. User-agent-specific memory is a whole-page estimate and is not attributed to Rapier WASM.',
+      snapshots: {
+        beforeRapierInit: memoryBeforeRapierInit,
+        afterRapierInitAndDispose: memoryAfterRapierInitAndDispose,
+        afterScenariosAndDispose: memoryAfterScenarios,
+      },
+    },
     sparseScenarios: results,
     denseContact,
     limitations: [
       'Headless or foreground browser microbenchmark; not a full rendered frame-time benchmark.',
-      'Browser JS heap counters are optional and do not include WASM linear memory or GPU memory.',
+      'JS heap counters exclude WASM linear memory; user-agent-specific memory is whole-page and cannot be attributed to Rapier or GPU memory.',
       'Shared CI/sandbox hardware and browser scheduling are not dedicated benchmark conditions.',
       'Synthetic sphere workloads do not represent every game scene or mesh-collider workload.',
     ],
