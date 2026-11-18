@@ -163,6 +163,7 @@ body {
 @media (max-width: 620px) {
   .playground-bar strong,
   #renderer-state,
+  #physics-wasm,
   .bar-divider,
   .playground-footer span:nth-child(2) {
     display: none;
