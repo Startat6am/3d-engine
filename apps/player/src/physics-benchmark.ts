@@ -247,7 +247,7 @@ async function main() {
     memoryDiagnostics: {
       wasmLinearMemoryBytes: null,
       wasmLinearMemoryStatus: 'not-exposed-by-public-rapier-api',
-      note: 'The Rapier adapter does not expose WebAssembly.Memory. Whole-page estimate; not attributable to Rapier WASM.',
+      note: 'Exact WASM memory unavailable via public Rapier API; whole-page only.',
       snapshots: {
         beforeRapierInit: memoryBeforeRapierInit,
         afterRapierInitAndDispose: memoryAfterRapierInitAndDispose,
