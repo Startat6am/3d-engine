@@ -248,6 +248,7 @@ function decodeBase64(source: string): ArrayBuffer {
 
 export function EditorApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fpsRef = useRef<HTMLOutputElement>(null);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
   const [entities, setEntities] = useState<SceneEntity[]>([initialEntity()]);
   const [isDirty, setIsDirty] = useState(false);
@@ -385,6 +386,22 @@ export function EditorApp() {
     let disposed = false;
     let observer: ResizeObserver | null = null;
     let renderer: ThreeWebGLRendererAdapter | null = null;
+    let animationFrame = 0;
+    let frameCount = 0;
+    let lastFpsSample = 0;
+    const renderFrame = (now: number) => {
+      if (!renderer || disposed) return;
+      renderer.render(renderSceneRef.current);
+      frameCount += 1;
+      if (lastFpsSample === 0) lastFpsSample = now;
+      else if (now - lastFpsSample >= 500) {
+        const elapsed = now - lastFpsSample;
+        if (fpsRef.current) fpsRef.current.textContent = `FPS ${Math.round((frameCount * 1000) / elapsed)}`;
+        frameCount = 0;
+        lastFpsSample = now;
+      }
+      animationFrame = window.requestAnimationFrame(renderFrame);
+    };
     void import('@engine/renderer')
       .then(({ ThreeWebGLRendererAdapter: Renderer }) => {
         if (disposed) return;
@@ -395,11 +412,11 @@ export function EditorApp() {
           if (!renderer) return;
           const bounds = canvas.getBoundingClientRect();
           renderer.resize(bounds.width, bounds.height);
-          renderer.render(renderSceneRef.current);
         };
         observer = new ResizeObserver(resize);
         observer.observe(canvas);
         resize();
+        animationFrame = window.requestAnimationFrame(renderFrame);
         setRendererStatus('ready');
       })
       .catch((error: unknown) => {
@@ -418,21 +435,13 @@ export function EditorApp() {
       });
     return () => {
       disposed = true;
+      window.cancelAnimationFrame(animationFrame);
       observer?.disconnect();
       renderer?.dispose();
       rendererRef.current = null;
     };
     // Renderer lifetime is tied to the canvas; scene updates are handled below.
   }, [pushDiagnostic]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const renderer = rendererRef.current;
-    if (!canvas || !renderer) return;
-    const bounds = canvas.getBoundingClientRect();
-    renderer.resize(bounds.width, bounds.height);
-    renderer.render(renderScene);
-  }, [renderScene]);
 
   const addEntity = useCallback(
     (primitive: Primitive) => {
@@ -1599,6 +1608,9 @@ export function EditorApp() {
             }}
             onWheel={onWheel}
           />
+          <output ref={fpsRef} className="viewport-fps" aria-label="Frames per second">
+            FPS --
+          </output>
           {entities.length === 0 ? (
             <div className="viewport-empty-state">
               <strong>Empty scene</strong>
