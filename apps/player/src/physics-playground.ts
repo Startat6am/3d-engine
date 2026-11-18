@@ -24,6 +24,7 @@ import {
   type RenderObject,
 } from '@engine/renderer';
 import './physics-playground.css';
+import { attachFpsCounter } from './fps-counter.js';
 
 const canvas = document.querySelector<HTMLCanvasElement>('#playground-canvas');
 const rendererState = document.querySelector<HTMLElement>('#renderer-state');
@@ -139,6 +140,7 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
 }
 
 const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
+const updateFps = attachFpsCounter(canvas);
 const camera = createDefaultCamera();
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
   'Renderable',
@@ -181,6 +183,7 @@ function addBody(
 }
 
 function renderFrame(now: number) {
+  updateFps(now);
   if (disposed || !renderer) return;
   const delta = previousFrame === 0 ? 0 : Math.min(0.25, Math.max(0, (now - previousFrame) / 1000));
   previousFrame = now;
