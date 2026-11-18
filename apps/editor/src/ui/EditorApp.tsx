@@ -249,6 +249,7 @@ function decodeBase64(source: string): ArrayBuffer {
 export function EditorApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fpsRef = useRef<HTMLOutputElement>(null);
+  const renderedFrameCountRef = useRef(0);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
   const [entities, setEntities] = useState<SceneEntity[]>([initialEntity()]);
   const [isDirty, setIsDirty] = useState(false);
@@ -386,23 +387,7 @@ export function EditorApp() {
     let disposed = false;
     let observer: ResizeObserver | null = null;
     let renderer: ThreeWebGLRendererAdapter | null = null;
-    let animationFrame = 0;
-    let frameCount = 0;
-    let lastFpsSample = 0;
-    const renderFrame = (now: number) => {
-      if (!renderer || disposed) return;
-      renderer.render(renderSceneRef.current);
-      frameCount += 1;
-      if (lastFpsSample === 0) lastFpsSample = now;
-      else if (now - lastFpsSample >= 500) {
-        const elapsed = now - lastFpsSample;
-        if (fpsRef.current)
-          fpsRef.current.textContent = `FPS ${Math.round((frameCount * 1000) / elapsed)}`;
-        frameCount = 0;
-        lastFpsSample = now;
-      }
-      animationFrame = window.requestAnimationFrame(renderFrame);
-    };
+    let fpsTimer: number | null = null;
     void import('@engine/renderer')
       .then(({ ThreeWebGLRendererAdapter: Renderer }) => {
         if (disposed) return;
@@ -413,11 +398,21 @@ export function EditorApp() {
           if (!renderer) return;
           const bounds = canvas.getBoundingClientRect();
           renderer.resize(bounds.width, bounds.height);
+          renderer.render(renderSceneRef.current);
+          renderedFrameCountRef.current += 1;
         };
         observer = new ResizeObserver(resize);
         observer.observe(canvas);
         resize();
-        animationFrame = window.requestAnimationFrame(renderFrame);
+        let lastFpsSample = performance.now();
+        fpsTimer = window.setInterval(() => {
+          const now = performance.now();
+          const elapsed = now - lastFpsSample;
+          if (fpsRef.current)
+            fpsRef.current.textContent = `FPS ${Math.round((renderedFrameCountRef.current * 1000) / elapsed)}`;
+          renderedFrameCountRef.current = 0;
+          lastFpsSample = now;
+        }, 500);
         setRendererStatus('ready');
       })
       .catch((error: unknown) => {
@@ -436,13 +431,23 @@ export function EditorApp() {
       });
     return () => {
       disposed = true;
-      window.cancelAnimationFrame(animationFrame);
+      if (fpsTimer !== null) window.clearInterval(fpsTimer);
       observer?.disconnect();
       renderer?.dispose();
       rendererRef.current = null;
     };
     // Renderer lifetime is tied to the canvas; scene updates are handled below.
   }, [pushDiagnostic]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const renderer = rendererRef.current;
+    if (!canvas || !renderer) return;
+    const bounds = canvas.getBoundingClientRect();
+    renderer.resize(bounds.width, bounds.height);
+    renderer.render(renderScene);
+    renderedFrameCountRef.current += 1;
+  }, [renderScene]);
 
   const addEntity = useCallback(
     (primitive: Primitive) => {
