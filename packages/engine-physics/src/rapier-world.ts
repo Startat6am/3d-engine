@@ -407,6 +407,24 @@ export class RapierPhysicsWorld implements PhysicsWorld {
     return { position: [p.x, p.y, p.z], rotation: [r.x, r.y, r.z, r.w] };
   }
 
+  getLinearVelocity(handle: PhysicsBodyHandle): Vec3 {
+    this.#assertActive();
+    const velocity = this.#body(handle).body.linvel();
+    return [velocity.x, velocity.y, velocity.z];
+  }
+
+  setLinearVelocity(handle: PhysicsBodyHandle, velocity: Vec3, wakeUp = true): void {
+    this.#assertActive();
+    const record = this.#body(handle);
+    if (record.type !== 'dynamic')
+      throw new PhysicsError(
+        'physics.body-type-mismatch',
+        'Velocity requires a dynamic rigid body',
+      );
+    this.#finite(velocity, 'Velocity');
+    record.body.setLinvel({ x: velocity[0], y: velocity[1], z: velocity[2] }, wakeUp);
+  }
+
   applyImpulse(handle: PhysicsBodyHandle, impulse: Vec3, wakeUp = true): void {
     this.#assertActive();
     const record = this.#body(handle);
