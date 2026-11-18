@@ -146,6 +146,8 @@ export interface PhysicsWorld {
   removeBody(handle: PhysicsBodyHandle): void;
   setKinematicTarget(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
   setStaticPose(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
+  /** Teleports a dynamic body and clears its linear/angular velocity and accumulated forces. */
+  setDynamicPose(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
   getPose(handle: PhysicsBodyHandle): PhysicsPose;
   applyImpulse(handle: PhysicsBodyHandle, impulse: Vec3, wakeUp?: boolean): void;
   applyForce(handle: PhysicsBodyHandle, force: Vec3, wakeUp?: boolean): void;
