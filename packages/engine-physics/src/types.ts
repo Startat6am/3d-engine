@@ -149,6 +149,8 @@ export interface PhysicsWorld {
   /** Teleports a dynamic body and clears its linear/angular velocity and accumulated forces. */
   setDynamicPose(handle: PhysicsBodyHandle, pose: PhysicsPose): void;
   getPose(handle: PhysicsBodyHandle): PhysicsPose;
+  getLinearVelocity(handle: PhysicsBodyHandle): Vec3;
+  setLinearVelocity(handle: PhysicsBodyHandle, velocity: Vec3, wakeUp?: boolean): void;
   applyImpulse(handle: PhysicsBodyHandle, impulse: Vec3, wakeUp?: boolean): void;
   applyForce(handle: PhysicsBodyHandle, force: Vec3, wakeUp?: boolean): void;
   /** Returns true when a simulation tick was actually executed. */
