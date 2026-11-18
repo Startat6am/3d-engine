@@ -28,6 +28,7 @@ Updated: 2026-11-18
 - `@engine/input`: semantic actions, prioritized contexts, immutable fixed-tick snapshots, keyboard/mouse/gamepad adapters, transient mouse input, and focus/visibility/disconnect neutralization.
 - Editor UX cleanup: truthful renderer/save status, real empty-scene state, removal of decorative component placeholders.
 - Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard and touch-HUD movement/jump, pause/resume and single-step. Mouse jump and touch-HUD movement/jump are verified by Chromium E2E.
+- Player Physics Playground mobile controls follow-up (2026-11-18): replace the four-button touch D-pad with a circular analog virtual joystick (radial clamp, pointer capture/cancel, release on blur/visibility loss) while retaining the separate jump button. The joystick feeds the existing semantic Move action through the touch adapter. Movement speed is now `1.0` (previously `0.75`, +`0.25`); jump impulse is now `3.0` (previously `1.2`, ×`2.5`). The updated Physics Playground Chromium E2E passes, the full Playwright E2E suite passes, and `pnpm check` passes in the continuation sandbox (Node.js 25.9.0; project CI remains the canonical Node.js 22 verification). Exact-head GitHub Actions for this follow-up are pending.
 
 ## Player staging deployment
 

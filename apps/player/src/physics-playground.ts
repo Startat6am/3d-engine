@@ -76,6 +76,8 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
   readonly #pressed = new Map<number, string>();
   readonly #pending: Array<{ source: 'keyboard'; control: string; pressed: boolean }> = [];
   readonly #listeners: Array<() => void> = [];
+  #stickPointerId: number | null = null;
+  #stickAxes: [number, number] = [0, 0];
 
   constructor(root: HTMLElement) {
     root.querySelectorAll<HTMLButtonElement>('[data-control]').forEach((button) => {
@@ -110,6 +112,65 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
         button.removeEventListener('lostpointercapture', up);
       });
     });
+    const joystick = root.querySelector<HTMLElement>('#move-joystick');
+    const joystickKnob = root.querySelector<HTMLElement>('.touch-joystick-knob');
+    if (joystick && joystickKnob) {
+      const resetStick = () => {
+        this.#stickPointerId = null;
+        this.#stickAxes = [0, 0];
+        joystickKnob.style.setProperty('--stick-x', '0px');
+        joystickKnob.style.setProperty('--stick-y', '0px');
+        joystick.dataset.active = 'false';
+      };
+      const moveStick = (event: PointerEvent) => {
+        if (this.#stickPointerId !== event.pointerId) return;
+        event.preventDefault();
+        const bounds = joystick.getBoundingClientRect();
+        const travel = Math.max(
+          1,
+          bounds.width / 2 - joystickKnob.getBoundingClientRect().width / 2,
+        );
+        let x = (event.clientX - (bounds.left + bounds.width / 2)) / travel;
+        let y = (event.clientY - (bounds.top + bounds.height / 2)) / travel;
+        const magnitude = Math.hypot(x, y);
+        if (magnitude > 1) {
+          x /= magnitude;
+          y /= magnitude;
+        }
+        this.#stickAxes = [x, -y];
+        joystickKnob.style.setProperty('--stick-x', `${x * travel}px`);
+        joystickKnob.style.setProperty('--stick-y', `${y * travel}px`);
+      };
+      const down = (event: PointerEvent) => {
+        event.preventDefault();
+        if (this.#stickPointerId !== null) return;
+        this.#stickPointerId = event.pointerId;
+        joystick.dataset.active = 'true';
+        try {
+          joystick.setPointerCapture(event.pointerId);
+        } catch {
+          // Synthetic pointer events in automated tests have no active pointer to capture.
+        }
+        moveStick(event);
+      };
+      const up = (event: PointerEvent) => {
+        if (this.#stickPointerId !== event.pointerId) return;
+        resetStick();
+      };
+      joystick.addEventListener('pointerdown', down);
+      joystick.addEventListener('pointermove', moveStick);
+      joystick.addEventListener('pointerup', up);
+      joystick.addEventListener('pointercancel', up);
+      joystick.addEventListener('lostpointercapture', up);
+      this.#listeners.push(() => {
+        joystick.removeEventListener('pointerdown', down);
+        joystick.removeEventListener('pointermove', moveStick);
+        joystick.removeEventListener('pointerup', up);
+        joystick.removeEventListener('pointercancel', up);
+        joystick.removeEventListener('lostpointercapture', up);
+      });
+      this.#listeners.push(resetStick);
+    }
     const releaseAll = () => {
       for (const [pointerId, control] of this.#pressed) {
         this.#pressed.delete(pointerId);
@@ -118,6 +179,13 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
       root.querySelectorAll<HTMLElement>('[data-control]').forEach((button) => {
         button.dataset.pressed = 'false';
       });
+      this.#stickPointerId = null;
+      this.#stickAxes = [0, 0];
+      if (joystick && joystickKnob) {
+        joystick.dataset.active = 'false';
+        joystickKnob.style.setProperty('--stick-x', '0px');
+        joystickKnob.style.setProperty('--stick-y', '0px');
+      }
     };
     window.addEventListener('blur', releaseAll);
     document.addEventListener('visibilitychange', releaseAll);
@@ -129,6 +197,11 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
     const transitions = this.#pending.splice(0);
     const values = new Map<string, number>();
     for (const control of this.#pressed.values()) values.set(control, 1);
+    const [x, y] = this.#stickAxes;
+    if (x > 0) values.set('KeyD', Math.max(values.get('KeyD') ?? 0, x));
+    if (x < 0) values.set('KeyA', Math.max(values.get('KeyA') ?? 0, -x));
+    if (y > 0) values.set('KeyW', Math.max(values.get('KeyW') ?? 0, y));
+    if (y < 0) values.set('KeyS', Math.max(values.get('KeyS') ?? 0, -y));
     return [{ source: 'keyboard', values, transitions }];
   }
 
@@ -298,7 +371,7 @@ async function start() {
         // Set horizontal speed from input directly: no acceleration buildup or residual drift.
         const magnitude = Math.hypot(x, z);
         const velocity = physics!.getLinearVelocity(handle);
-        const speed = 0.75;
+        const speed = 1.0;
         physics!.setLinearVelocity(
           handle,
           magnitude > 0
@@ -315,7 +388,7 @@ async function start() {
             { origin: pose.position, direction: [0, -1, 0], maxDistance: 0.56 },
             { excludeEntities: [playerEntity!] },
           );
-          if (ground && ground.normal[1] > 0.5) physics!.applyImpulse(handle, [0, 1.2, 0]);
+          if (ground && ground.normal[1] > 0.5) physics!.applyImpulse(handle, [0, 3.0, 0]);
         }
       },
     });

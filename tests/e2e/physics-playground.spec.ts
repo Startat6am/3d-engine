@@ -58,25 +58,39 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
 
   await page.setViewportSize({ width: 360, height: 780 });
 
-  await expect(page.getByRole('button', { name: 'Move forward' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Move left' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Move backward' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Move right' })).toBeVisible();
+  const joystick = page.getByRole('group', { name: 'Movement joystick' });
+  await expect(joystick).toBeVisible();
   await expect(page.getByRole('button', { name: 'Jump' })).toBeVisible();
 
   const beforeTouchMove = await page.locator('#player-position').textContent();
   const beforeTouchZ = Number(beforeTouchMove?.match(/Z (-?\d+\.\d+)/)?.[1]);
-  const forwardButton = page.getByRole('button', { name: 'Move forward' });
-  await forwardButton.dispatchEvent('pointerdown', {
+  const joystickBounds = await joystick.boundingBox();
+  if (!joystickBounds) throw new Error('Movement joystick has no layout box');
+  const joystickCenter = {
+    x: joystickBounds.x + joystickBounds.width / 2,
+    y: joystickBounds.y + joystickBounds.height / 2,
+  };
+  await joystick.dispatchEvent('pointerdown', {
     pointerId: 7,
     pointerType: 'touch',
     isPrimary: true,
+    clientX: joystickCenter.x,
+    clientY: joystickCenter.y,
+  });
+  await joystick.dispatchEvent('pointermove', {
+    pointerId: 7,
+    pointerType: 'touch',
+    isPrimary: true,
+    clientX: joystickCenter.x,
+    clientY: joystickCenter.y - 45,
   });
   await page.waitForTimeout(400);
-  await forwardButton.dispatchEvent('pointerup', {
+  await joystick.dispatchEvent('pointerup', {
     pointerId: 7,
     pointerType: 'touch',
     isPrimary: true,
+    clientX: joystickCenter.x,
+    clientY: joystickCenter.y - 45,
   });
   await expect
     .poll(async () => {
@@ -86,8 +100,9 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     .toBeLessThan(beforeTouchZ - 0.03);
   const afterTouchMove = await page.locator('#player-position').textContent();
   const touchTravel = beforeTouchZ - Number(afterTouchMove?.match(/Z (-?\d+\.\d+)/)?.[1]);
-  await expect(forwardButton).toHaveAttribute('data-pressed', 'false');
-  expect(touchTravel).toBeLessThanOrEqual(0.4);
+  await expect(joystick).toHaveAttribute('data-active', 'false');
+  expect(touchTravel).toBeGreaterThan(0.3);
+  expect(touchTravel).toBeLessThan(0.55);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect
@@ -117,8 +132,8 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
       Number(current?.match(/Y (-?\d+\.\d+)/)?.[1] ?? beforeTouchY),
     );
   }
-  expect(peakTouchJumpY - beforeTouchY).toBeGreaterThan(0.1);
-  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(0.8);
+  expect(peakTouchJumpY - beforeTouchY).toBeGreaterThan(0.25);
+  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(1.5);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect
