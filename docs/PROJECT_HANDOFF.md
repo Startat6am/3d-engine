@@ -58,3 +58,12 @@ Updated: 2026-11-18
 - Keep the standard non-SIMD Rapier browser build.
 - Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
 - Do not merge/close PR #87, mark M6 complete, or start M7/M10 while required gates remain open.
+
+
+## Owner review and real-device profiling handoff — 2026-11-19
+
+- Owner completed an interactive review of the current deployed Player/Physics Playground in normal Chrome and reported all checks OK. Record the visual/runtime review gate as complete for the reviewed staging build. This does not claim physical-device performance, memory/allocation acceptance, static-only triangle-mesh scope acceptance, or final M6 sign-off.
+- The review included the camera-toggle CSS follow-up deployed from branch `fix/m6-desktop-camera-controls`, commit `1e079b68002c1c7a8f46c188a8ad52dfe00203f4`, Vercel deployment `dpl_DqCD2PhsFQ1ZMezBXHoXusm1hVvP` (READY). The camera logic/zoom remains intentionally unchanged and deferred.
+- Added [M6 Real-Device Physics Profile Worksheet](PHYSICS_DEVICE_PROFILE_TEMPLATE.md), commit `adece673ecc710fc7ca2d50b83537c270e1fc4a0`. It documents reproducible commands, environment capture, three runs per device, raw browser JSON, full-Playground observation, and sign-off.
+- Updated [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md), commit `86d20de5a5b7b30b6f2fdfd9864b1b9fef88da8a`, and [physics performance report](PHYSICS_PERFORMANCE_REPORT.md), commit `40a2e3ec2ad248433fe86e178604a2638b09e7fb`. No physical-device numbers or performance budgets are fabricated; those gates remain open.
+- Next: collect three benchmark runs on a named desktop and three on at least one named target device at the same code commit, preserve raw JSON and browser/hardware metadata, then review full-Playground frame behavior. Only after reviewing those results should performance budgets be proposed for owner approval.
