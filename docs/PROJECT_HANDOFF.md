@@ -1,3 +1,5 @@
+Checking formatting...
+All matched files use Prettier code style!
 # Project Handoff — M6 Physics/Input
 
 Updated: 2026-11-18
@@ -12,7 +14,7 @@ Updated: 2026-11-18
 
 ## Latest code and verification
 
-- Current PR #87 head: `0bd6a6ed9889c60a1d4865283b03f66850e73084` (`docs(physics): require exact-head browser benchmark CI`).
+- Latest application/code head covered by full CI: `0bd6a6ed9889c60a1d4865283b03f66850e73084` (subsequent branch commits are documentation-only) (`docs(physics): require exact-head browser benchmark CI`).
 - GitHub Actions run [#439](https://github.com/Startat6am/3d-engine/actions/runs/44321353518) passed on this exact head. It completed frozen install, format, lint, typecheck, 180/180 Vitest tests, package/app builds, both GLB stress benchmarks, Chromium installation, and **23/23 Playwright Chromium E2E tests**.
 - The 23-test CI suite includes the production Rapier-WASM browser benchmark, Physics Playground controls, Editor mobile behavior, browser JS/WebGL resource lifecycle measurement, GLB asset lifecycle, and Player shutdown/resource cleanup.
 - Independent Node.js 22.23.5 / pnpm 12.18.0 verification also passed `pnpm check` (180/180 Vitest, formatting, lint, typecheck, package and Editor/Player production builds); the complete local Playwright Chromium suite passed 23/23.
@@ -41,8 +43,8 @@ Updated: 2026-11-18
 ## Remaining M6 gates
 
 1. Complete interactive owner review of the current deployed Player/Playground in a normal Chrome session, including visual appearance and runtime fallback/error behavior. Automated exact-head headless Chromium smoke is now complete; this does not count as owner visual sign-off.
-2. Complete browser/device physics profiling: representative dense-contact and query workloads, controlled WASM-memory and allocation measurements, named hardware/browser context, and owner-approved budgets.
-3. Complete the remaining Chromium input/browser evidence. Physical gamepad testing is optional separate evidence; simulated adapter tests do not prove physical hardware behavior.
+2. Repeat the browser physics profile on named desktop hardware and at least one target device; complete controlled WASM-memory/allocation measurements and agree performance budgets. The current headless SwiftShader profile is supplemental only.
+3. Automated exact-head Chromium input/browser evidence is complete (run #439, 23/23); physical gamepad testing is optional separate evidence and is not claimed by the simulated adapter tests.
 4. Complete final visual review, confirm owner acceptance of the static-only triangle-mesh scope, and obtain explicit M6 owner sign-off.
 5. Re-run full CI on any subsequent code changes; exact-head run #439 currently passes all 23 Chromium E2E tests.
 
@@ -53,12 +55,3 @@ Updated: 2026-11-18
 - Keep the standard non-SIMD Rapier browser build.
 - Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
 - Do not merge/close PR #87, mark M6 complete, or start M7/M10 while required gates remain open.
-
-## Independent verification — 2026-11-18 (not owner sign-off)
-
-- Reviewed the current PR #87 head `0260d980269b39ad673b2e8c1f33a56bd401546a` (`Tune Physics Playground movement damping`).
-- GitHub Actions run [#431](https://github.com/Startat6am/3d-engine/actions/runs/44275520265) completed successfully on this exact head. The verify job passed frozen install, format, lint, typecheck, unit tests, package/app builds, both GLB stress benchmarks, Chromium installation, and Playwright E2E.
-- An independent clean checkout also passed `pnpm check`: 180/180 Vitest tests, typecheck, lint, formatting, and Editor/Player builds. This supplemental run used Node.js 25.9.0, outside the repository's supported Node 22 range; GitHub Actions remains the supported-runtime evidence.
-- The independent Playwright run passed 22/22 Chromium E2E tests after installing the pinned Playwright browser.
-- A separate headless Chromium 158.0.8127.18 smoke test against the deployed public staging Playground used SwiftShader. It observed `WEBGL2 READY`, `WASM READY`, five physics bodies, keyboard movement, a raycast hit, pause/single-step/resume/reset, mobile-sized (360×780) touch HUD controls, touch movement (0.144 m in the sample), and jump response. No page errors or console errors were observed; the 360 px layout had no horizontal overflow.
-- The headless staging smoke is automated software-renderer evidence, not a real interactive owner Chrome session, physical GPU/device benchmark, physical gamepad test, or visual sign-off. It does not close any owner acceptance gate.
