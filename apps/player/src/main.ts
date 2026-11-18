@@ -1,4 +1,5 @@
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
+import { attachFpsCounter } from './fps-counter.js';
 import {
   createBoxGeometry,
   createCylinderGeometry,
@@ -57,9 +58,11 @@ addRenderable([0, 0, 0], createUvSphereGeometry(0.5, 24, 16), 0xf59e0b, [0.9, 0.
 addRenderable([1.25, 0, 0], createCylinderGeometry(), 0x34d399, [0.8, 0.9, 0.8]);
 
 const camera = createDefaultCamera();
+const updateFps = attachFpsCounter(canvas);
 let previousFrame = 0;
 let animationFrame = 0;
 const renderFrame = (now: number) => {
+  updateFps(now);
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
   runtime.advance(delta);
