@@ -127,10 +127,96 @@ async function runCollisionEventScenario() {
   };
 }
 
+async function runDenseContactScenario() {
+  const bodyCount = 216;
+  const side = 6;
+  const physics = await RapierPhysicsWorld.create({ gravity: [0, -9.81, 0] });
+  const runtime = new EngineRuntime();
+  const world = runtime.world;
+  const floorEntity = world.createEntity();
+  const floor = physics.createBody(floorEntity, { type: 'static', position: [0, -0.5, 0] });
+  physics.createCollider(floor, { shape: { type: 'box', halfExtents: [8, 0.5, 8] } });
+
+  const createStart = performance.now();
+  for (let index = 0; index < bodyCount; index += 1) {
+    const entity = world.createEntity();
+    const xIndex = index % side;
+    const zIndex = Math.floor(index / side) % side;
+    const yIndex = Math.floor(index / (side * side));
+    const body = physics.createBody(entity, {
+      type: 'dynamic',
+      position: [
+        (xIndex - (side - 1) / 2) * 0.49,
+        0.55 + yIndex * 0.49,
+        (zIndex - (side - 1) / 2) * 0.49,
+      ],
+      canSleep: false,
+    });
+    physics.createCollider(body, {
+      shape: { type: 'sphere', radius: 0.25 },
+      friction: 0.8,
+      restitution: 0.05,
+    });
+  }
+  const createMs = performance.now() - createStart;
+
+  for (let index = 0; index < WARMUP_STEPS; index += 1) {
+    physics.step(FIXED_DT);
+    physics.drainCollisionEvents();
+  }
+
+  const stepTimes = [];
+  let collisionEvents = 0;
+  let maxEventsPerStep = 0;
+  let stepsWithEvents = 0;
+  for (let index = 0; index < MEASURED_STEPS; index += 1) {
+    const start = performance.now();
+    physics.step(FIXED_DT);
+    stepTimes.push(performance.now() - start);
+    const events = physics.drainCollisionEvents();
+    collisionEvents += events.length;
+    maxEventsPerStep = Math.max(maxEventsPerStep, events.length);
+    if (events.length > 0) stepsWithEvents += 1;
+  }
+
+  const queryTimes = [];
+  let totalQueryHits = 0;
+  const ray = { origin: [0, 12, 0], direction: [0, -1, 0], maxDistance: 24 };
+  for (let index = 0; index < QUERY_COUNT; index += 1) {
+    const start = performance.now();
+    totalQueryHits += physics.raycastAll(ray).length;
+    queryTimes.push(performance.now() - start);
+  }
+
+  const memoryBeforeDispose = process.memoryUsage();
+  const result = {
+    bodies: bodyCount,
+    colliders: bodyCount + 1,
+    createMs: Number(createMs.toFixed(2)),
+    fixedStep: summarize(stepTimes),
+    raycastAll: summarize(queryTimes),
+    averageRaycastHits: Number((totalQueryHits / QUERY_COUNT).toFixed(2)),
+    collisionEventsDrained: collisionEvents,
+    stepsWithCollisionEvents: stepsWithEvents,
+    maxCollisionEventsPerStep: maxEventsPerStep,
+    memoryBeforeDisposeBytes: {
+      rss: memoryBeforeDispose.rss,
+      heapUsed: memoryBeforeDispose.heapUsed,
+      external: memoryBeforeDispose.external,
+      arrayBuffers: memoryBeforeDispose.arrayBuffers,
+    },
+  };
+  const disposeStart = performance.now();
+  physics.dispose();
+  result.disposeMs = Number((performance.now() - disposeStart).toFixed(3));
+  return result;
+}
+
 const results = [];
 for (const size of SIZES) results.push(await runScenario(size));
 const collisionEventStress = await runCollisionEventScenario();
-console.log(
+const denseContactStress = await runDenseContactScenario();
+process.stdout.write(
   JSON.stringify(
     {
       runtime: process.version,
@@ -145,14 +231,17 @@ console.log(
       queryCountPerScenario: QUERY_COUNT,
       results,
       collisionEventStress,
+      denseContactStress,
       limitations: [
         'Node.js/Rapier adapter microbenchmark; not a browser frame-time or end-user workload benchmark.',
         'Shared Vercel sandbox hardware is virtualized and not a stable dedicated benchmark host.',
         'heapUsed excludes WASM linear memory and does not represent total process RSS or GPU memory.',
         'Collision-event count measures drained events, not allocation volume.',
+        'Dense-contact scenario is a deterministic synthetic sphere pile, not a representative game level or worst-case geometry workload.',
+        'Memory snapshots are point-in-time process counters; WASM linear-memory attribution and post-dispose reclamation are not measured.',
       ],
     },
     null,
     2,
-  ),
+  ) + '\n',
 );
