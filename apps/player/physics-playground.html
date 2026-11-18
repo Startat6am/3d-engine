@@ -34,9 +34,21 @@
             <span class="touch-joystick-knob" aria-hidden="true"></span>
             <span class="touch-joystick-label" aria-hidden="true">MOVE</span>
           </div>
-          <button class="touch-jump" type="button" data-control="Space" aria-label="Jump">
-            JUMP
-          </button>
+          <div class="touch-actions">
+            <button
+              id="camera-mode"
+              class="touch-camera"
+              type="button"
+              aria-label="Toggle camera orbit mode"
+              aria-pressed="false"
+              data-active="false"
+            >
+              CAMERA
+            </button>
+            <button class="touch-jump" type="button" data-control="Space" aria-label="Jump">
+              JUMP
+            </button>
+          </div>
         </section>
         <section class="help-panel">
           <strong>Move the sphere</strong>
