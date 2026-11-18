@@ -10,6 +10,7 @@ test('browser physics benchmark runs against the production Rapier WASM backend'
   const report = JSON.parse((await page.locator('#benchmark-results').textContent()) ?? '{}') as {
     runtime: string;
     userAgent: string;
+    crossOriginIsolated: boolean;
     wasmInitializationMs: number;
     sparseScenarios: Array<{
       bodies: number;
@@ -34,6 +35,7 @@ test('browser physics benchmark runs against the production Rapier WASM backend'
   };
   expect(report.runtime).toContain('Rapier WASM');
   expect(report.userAgent).toContain('Chrome');
+  expect(report.crossOriginIsolated).toBe(true);
   expect(report.wasmInitializationMs).toBeGreaterThan(0);
   expect(report.sparseScenarios.map((scenario) => scenario.bodies)).toEqual([100, 500, 1_000]);
   expect(report.sparseScenarios.every((scenario) => scenario.fixedStep.p95Ms >= 0)).toBe(true);
