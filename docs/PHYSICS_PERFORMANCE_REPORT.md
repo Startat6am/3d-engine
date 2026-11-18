@@ -109,3 +109,38 @@ This extends the Node/Rapier adapter evidence only. Browser/device profiling, co
 - Full repository `pnpm check` passed under Node.js 22.23.5 / pnpm 12.18.0: formatting, lint, typecheck, 180/180 Vitest tests, package builds, and Editor/Player production builds.
 - GitHub Actions run #432 executed the full Chromium suite: 21/22 passed. The only failure was the Physics Playground touch-distance upper-bound assertion, which used strict `< 0.4` while Chromium measured exactly `0.4`; all 21 other tests passed, including the browser-memory lifecycle test. The assertion is now inclusive (`<= 0.4`) and also explicitly checks that the HUD button has released (`data-pressed=false`). The focused Physics Playground E2E passed twice consecutively after the fix (2/2).
 - `git diff --check` and Prettier checks passed for the changed benchmark and documentation.
+
+## Browser Rapier WASM profile — 2026-11-18
+
+A development-only browser benchmark page (`apps/player/physics-benchmark.html`) now exercises the production `@dimforge/rapier3d` WASM backend through `@engine/physics`. It is served by the Player Vite development server and is intentionally excluded from the production build inputs. The automated Chromium test (`tests/e2e/physics-benchmark.spec.ts`) verifies WASM initialization and the sparse/dense workloads.
+
+### Environment and method
+
+- Browser: HeadlessChrome 158.0.8127.18, Linux x86_64, Playwright Chromium.
+- Renderer/GPU: headless SwiftShader configuration; the benchmark itself does not create a WebGL renderer or measure GPU work.
+- Browser-reported hardware: 48 logical processors and 32 GiB `deviceMemory` (browser-provided estimates, not a dedicated runner specification).
+- Rapier production WASM initialization: 89.1–101.0 ms across three independent browser contexts.
+- Each sparse scenario uses 120 warm-up and 300 measured 1/60-second steps plus 1,200 raycasts. Dense contact uses 216 dynamic spheres in a 6×6×6 pile, 120 warm-up and 300 measured steps, drains events every tick, and runs 1,200 `raycastAll` queries.
+- The browser benchmark runs three times in fresh Playwright contexts within one browser process.
+
+### Results across three browser runs
+
+| Scenario      | Bodies / colliders | Fixed-step median | Fixed-step p95 |
+| ------------- | -----------------: | ----------------: | -------------: |
+| Sparse        |          100 / 101 |            0.2 ms |         0.3 ms |
+| Sparse        |          500 / 501 |            0.9 ms |         1.0 ms |
+| Sparse        |      1,000 / 1,001 |            1.5 ms |     1.6–1.7 ms |
+| Dense contact |          216 / 217 |            0.6 ms |         0.7 ms |
+
+The dense-contact run produced exactly 1,610 drained collision events in each run, across 259 of 300 measured steps, with a maximum of 36 events in one step. `raycast`/`raycastAll` p95 measurements were at or below the browser timer's effective 0.1 ms resolution in most runs (0–0.1 ms); do not treat these values as precise query latency. The optional Chromium JS heap counter reported approximately 18.2 MB used after the scenarios, but this is a single post-run snapshot and does not include WASM linear memory.
+
+### Interpretation and limits
+
+- The production browser WASM backend's fixed-step results are directionally consistent with the Node/Rapier results: the 1,000-body sparse workload measured 1.6–1.7 ms p95 and the 216-body dense-contact workload measured 0.7 ms p95 in this headless run.
+- This is a physics-only microbenchmark, not a full Player frame-time measurement. It excludes ECS synchronization, scene extraction, rendering, GPU upload, and real foreground tab scheduling.
+- SwiftShader/headless Chromium is not representative of a physical GPU. The reported browser hardware values are not a dedicated hardware baseline.
+- Ray query timings are resolution-limited by `performance.now()` in this environment.
+- No browser API here attributes WASM linear memory, allocation volume, GC pressure, process RSS, or GPU memory. The JS heap snapshot is not a leak test.
+- Repeat on named desktop hardware and at least one target device/browser configuration before setting user-facing performance budgets.
+
+The browser profile is supplemental evidence only; real-device/desktop profiling, controlled memory and allocation analysis, complete rendered-frame profiling, and owner-approved budgets remain open M6 gates.
