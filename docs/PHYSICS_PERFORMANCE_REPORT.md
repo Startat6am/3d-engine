@@ -144,3 +144,9 @@ The dense-contact run produced exactly 1,610 drained collision events in each ru
 - Repeat on named desktop hardware and at least one target device/browser configuration before setting user-facing performance budgets.
 
 The browser profile is supplemental evidence only; real-device/desktop profiling, controlled memory and allocation analysis, complete rendered-frame profiling, and owner-approved budgets remain open M6 gates.
+
+### Final local verification — 2026-11-18
+
+- `pnpm check` passed under Node.js 22.23.5 / pnpm 12.18.0 after adding the browser benchmark page: formatting, lint, typecheck, 180/180 Vitest tests, package builds, and Editor/Player production builds. The production Player build contains only the configured `index.html` and `physics-playground.html` entries; the benchmark page remains dev-only.
+- Full Playwright Chromium E2E passed 23/23, including the new production-WASM browser benchmark, touch-HUD movement/jump, Editor, GLB asset lifecycle, browser memory/WebGL resource lifecycle, and Player shutdown tests.
+- GitHub Actions run #435 passed the touch-boundary correction on its exact code head (`24bc67e`), including all existing 22 E2E tests. The later browser-benchmark additions were verified locally by the 23/23 run; a fresh exact-head CI result is still required for those additions.
