@@ -292,9 +292,28 @@ async function start() {
         const handle = physicsSystem!.getBodyHandle(playerEntity!);
         if (!handle) return;
         const [x, z] = snapshot.getAxis2D('Move');
-        // Keep directional acceleration gentle for precise keyboard and touch-HUD control.
-        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 0.15, 0, -z * 0.15]);
-        if (snapshot.wasPressed('Jump')) physics!.applyImpulse(handle, [0, 1.2, 0]);
+        // Set horizontal speed from input directly: no acceleration buildup or residual drift.
+        const magnitude = Math.hypot(x, z);
+        const velocity = physics!.getLinearVelocity(handle);
+        const speed = 0.75;
+        physics!.setLinearVelocity(
+          handle,
+          magnitude > 0
+            ? [
+                (x / Math.max(1, magnitude)) * speed,
+                velocity[1],
+                -(z / Math.max(1, magnitude)) * speed,
+              ]
+            : [0, velocity[1], 0],
+        );
+        if (snapshot.wasPressed('Jump')) {
+          const pose = physics!.getPose(handle);
+          const ground = physics!.raycast(
+            { origin: pose.position, direction: [0, -1, 0], maxDistance: 0.56 },
+            { excludeEntities: [playerEntity!] },
+          );
+          if (ground && ground.normal[1] > 0.5) physics!.applyImpulse(handle, [0, 1.2, 0]);
+        }
       },
     });
     runtime.scheduler.add(physicsSystem);
