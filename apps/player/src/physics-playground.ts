@@ -40,6 +40,9 @@ const resetSceneButton = document.querySelector<HTMLButtonElement>('#reset-scene
 const raycastResult = document.querySelector<HTMLOutputElement>('#raycast-result');
 const touchHud = document.querySelector<HTMLElement>('#touch-hud');
 const cameraModeButton = document.querySelector<HTMLButtonElement>('#camera-mode');
+const desktopCameraModeButton = document.querySelector<HTMLButtonElement>('#desktop-camera-mode');
+const cameraLeftButton = document.querySelector<HTMLButtonElement>('#camera-left');
+const cameraRightButton = document.querySelector<HTMLButtonElement>('#camera-right');
 
 if (
   !canvas ||
@@ -53,7 +56,10 @@ if (
   !resetSceneButton ||
   !raycastResult ||
   !touchHud ||
-  !cameraModeButton
+  !cameraModeButton ||
+  !desktopCameraModeButton ||
+  !cameraLeftButton ||
+  !cameraRightButton
 ) {
   throw new Error('Physics Playground UI is incomplete');
 }
@@ -256,11 +262,24 @@ function setCameraOrbitEnabled(enabled: boolean) {
   cameraModeButton!.dataset.active = String(enabled);
   cameraModeButton!.setAttribute('aria-pressed', String(enabled));
   cameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
+  desktopCameraModeButton!.dataset.active = String(enabled);
+  desktopCameraModeButton!.setAttribute('aria-pressed', String(enabled));
+  desktopCameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
   canvas!.dataset.cameraMode = String(enabled);
 }
 cameraModeButton.addEventListener('click', () => {
   setCameraOrbitEnabled(!cameraOrbitEnabled);
 });
+desktopCameraModeButton.addEventListener('click', () => {
+  setCameraOrbitEnabled(!cameraOrbitEnabled);
+});
+const rotateCameraByButton = (direction: -1 | 1) => {
+  if (!cameraOrbitEnabled) setCameraOrbitEnabled(true);
+  cameraAzimuth += direction * 0.22;
+  updateOrbitCamera();
+};
+cameraLeftButton.addEventListener('click', () => rotateCameraByButton(-1));
+cameraRightButton.addEventListener('click', () => rotateCameraByButton(1));
 
 canvas.addEventListener('pointerdown', (event) => {
   if (!cameraOrbitEnabled || cameraOrbitPointerId !== null || event.button !== 0) return;
