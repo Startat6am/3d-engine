@@ -282,8 +282,9 @@ body {
   }
 
   .touch-hud .touch-camera {
-    width: 62px;
-    height: 62px;
+    width: 41px;
+    height: 41px;
+    transform: translateX(-40px);
     border-radius: 50%;
     background: rgba(48, 67, 91, 0.58);
     border-color: rgba(185, 207, 235, 0.34);
@@ -342,8 +343,8 @@ body {
   }
 
   .touch-hud .touch-camera {
-    width: 56px;
-    height: 56px;
+    width: 37px;
+    height: 37px;
   }
 
   .touch-hud .touch-jump {
@@ -358,7 +359,7 @@ body {
   position: absolute;
   z-index: 6;
   top: 16px;
-  right: 16px;
+  right: 56px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -386,8 +387,10 @@ body {
 }
 
 .desktop-camera-controls #desktop-camera-mode {
-  min-width: 88px;
-  font-size: 10px;
+  min-width: 59px;
+  height: 24px;
+  padding: 0 7px;
+  font-size: 7px;
   letter-spacing: 0.04em;
 }
 
