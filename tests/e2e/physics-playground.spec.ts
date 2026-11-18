@@ -61,6 +61,50 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const joystick = page.getByRole('group', { name: 'Movement joystick' });
   await expect(joystick).toBeVisible();
   await expect(page.getByRole('button', { name: 'Jump' })).toBeVisible();
+  const cameraButton = page.getByRole('button', { name: 'Toggle camera orbit mode' });
+  await expect(cameraButton).toBeVisible();
+  await expect(cameraButton).toHaveAttribute('aria-pressed', 'false');
+  await cameraButton.click();
+  await expect(cameraButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(cameraButton).toHaveAttribute('data-active', 'true');
+  const beforeCameraDrag = await page.locator('#player-position').textContent();
+  const beforeCameraXZ = beforeCameraDrag?.match(/X (-?\d+\.\d+).*Z (-?\d+\.\d+)/)?.slice(1);
+  const canvas = page.locator('#playground-canvas');
+  const initialCameraAzimuth = await canvas.getAttribute('data-camera-azimuth');
+  const canvasBounds = await canvas.boundingBox();
+  if (!canvasBounds) throw new Error('Playground canvas has no layout box');
+  const dragStart = { x: canvasBounds.x + canvasBounds.width / 2, y: canvasBounds.y + 100 };
+  await canvas.dispatchEvent('pointerdown', {
+    pointerId: 91,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    clientX: dragStart.x,
+    clientY: dragStart.y,
+  });
+  await canvas.dispatchEvent('pointermove', {
+    pointerId: 91,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    clientX: dragStart.x + 120,
+    clientY: dragStart.y - 35,
+  });
+  await canvas.dispatchEvent('pointerup', {
+    pointerId: 91,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    clientX: dragStart.x + 120,
+    clientY: dragStart.y - 35,
+  });
+  await expect(canvas).not.toHaveAttribute('data-camera-azimuth', initialCameraAzimuth ?? '');
+  const afterCameraDrag = await page.locator('#player-position').textContent();
+  const afterCameraXZ = afterCameraDrag?.match(/X (-?\d+\.\d+).*Z (-?\d+\.\d+)/)?.slice(1);
+  expect(afterCameraXZ).toEqual(beforeCameraXZ);
+  await cameraButton.click();
+  await expect(cameraButton).toHaveAttribute('aria-pressed', 'false');
+  await expect(cameraButton).toHaveAttribute('data-active', 'false');
 
   const beforeTouchMove = await page.locator('#player-position').textContent();
   const beforeTouchZ = Number(beforeTouchMove?.match(/Z (-?\d+\.\d+)/)?.[1]);
