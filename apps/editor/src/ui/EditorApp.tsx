@@ -396,7 +396,8 @@ export function EditorApp() {
       if (lastFpsSample === 0) lastFpsSample = now;
       else if (now - lastFpsSample >= 500) {
         const elapsed = now - lastFpsSample;
-        if (fpsRef.current) fpsRef.current.textContent = `FPS ${Math.round((frameCount * 1000) / elapsed)}`;
+        if (fpsRef.current)
+          fpsRef.current.textContent = `FPS ${Math.round((frameCount * 1000) / elapsed)}`;
         frameCount = 0;
         lastFpsSample = now;
       }
