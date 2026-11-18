@@ -19,6 +19,7 @@ import {
 import {
   createDefaultCamera,
   createDefaultMaterial,
+  lookAtQuaternion,
   ThreeWebGLRendererAdapter,
   type MaterialDescriptor,
   type RenderObject,
@@ -38,6 +39,7 @@ const raycastButton = document.querySelector<HTMLButtonElement>('#raycast');
 const resetSceneButton = document.querySelector<HTMLButtonElement>('#reset-scene');
 const raycastResult = document.querySelector<HTMLOutputElement>('#raycast-result');
 const touchHud = document.querySelector<HTMLElement>('#touch-hud');
+const cameraModeButton = document.querySelector<HTMLButtonElement>('#camera-mode');
 
 if (
   !canvas ||
@@ -50,7 +52,8 @@ if (
   !raycastButton ||
   !resetSceneButton ||
   !raycastResult ||
-  !touchHud
+  !touchHud ||
+  !cameraModeButton
 ) {
   throw new Error('Physics Playground UI is incomplete');
 }
@@ -215,6 +218,89 @@ class TouchHudInputAdapter implements InputDeviceAdapter {
 const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
 const updateFps = attachFpsCounter(canvas);
 const camera = createDefaultCamera();
+let cameraOrbitEnabled = false;
+let cameraOrbitPointerId: number | null = null;
+let cameraOrbitPointerX = 0;
+let cameraOrbitPointerY = 0;
+let cameraAzimuth = Math.atan2(camera.position[0], camera.position[2]);
+let cameraElevation = Math.atan2(
+  camera.position[1],
+  Math.hypot(camera.position[0], camera.position[2]),
+);
+const cameraOrbitRadius = Math.hypot(camera.position[0], camera.position[2]);
+const cameraOrbitSensitivity = 0.006;
+const cameraOrbitMinElevation = -1.2;
+const cameraOrbitMaxElevation = 1.2;
+
+function updateOrbitCamera() {
+  if (!cameraOrbitEnabled || !playerEntity) return;
+  const transform = runtime.world.get(playerEntity, Transform);
+  if (!transform) return;
+  const target: [number, number, number] = [
+    transform.position[0],
+    transform.position[1] + 0.25,
+    transform.position[2],
+  ];
+  const horizontal = Math.cos(cameraElevation) * cameraOrbitRadius;
+  const position: [number, number, number] = [
+    target[0] + Math.sin(cameraAzimuth) * horizontal,
+    target[1] + Math.sin(cameraElevation) * cameraOrbitRadius,
+    target[2] + Math.cos(cameraAzimuth) * horizontal,
+  ];
+  Object.assign(camera, { position, rotation: lookAtQuaternion(position, target) });
+}
+
+function setCameraOrbitEnabled(enabled: boolean) {
+  cameraOrbitEnabled = enabled;
+  cameraOrbitPointerId = null;
+  cameraModeButton!.dataset.active = String(enabled);
+  cameraModeButton!.setAttribute('aria-pressed', String(enabled));
+  cameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
+  canvas!.dataset.cameraMode = String(enabled);
+}
+cameraModeButton.addEventListener('click', () => {
+  setCameraOrbitEnabled(!cameraOrbitEnabled);
+});
+
+canvas.addEventListener('pointerdown', (event) => {
+  if (!cameraOrbitEnabled || cameraOrbitPointerId !== null || event.button !== 0) return;
+  cameraOrbitPointerId = event.pointerId;
+  cameraOrbitPointerX = event.clientX;
+  cameraOrbitPointerY = event.clientY;
+  try {
+    canvas.setPointerCapture(event.pointerId);
+  } catch {
+    // Pointer capture may be unavailable for synthetic test events.
+  }
+});
+canvas.addEventListener('pointermove', (event) => {
+  if (!cameraOrbitEnabled || cameraOrbitPointerId !== event.pointerId) return;
+  event.preventDefault();
+  const deltaX = event.clientX - cameraOrbitPointerX;
+  const deltaY = event.clientY - cameraOrbitPointerY;
+  cameraOrbitPointerX = event.clientX;
+  cameraOrbitPointerY = event.clientY;
+  cameraAzimuth -= deltaX * cameraOrbitSensitivity;
+  canvas.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
+  cameraElevation = Math.max(
+    cameraOrbitMinElevation,
+    Math.min(cameraOrbitMaxElevation, cameraElevation + deltaY * cameraOrbitSensitivity),
+  );
+});
+const releaseCameraOrbitPointer = (event: PointerEvent) => {
+  if (cameraOrbitPointerId === event.pointerId) cameraOrbitPointerId = null;
+};
+canvas.addEventListener('pointerup', releaseCameraOrbitPointer);
+canvas.addEventListener('pointercancel', releaseCameraOrbitPointer);
+canvas.addEventListener('lostpointercapture', releaseCameraOrbitPointer);
+window.addEventListener('blur', () => {
+  cameraOrbitPointerId = null;
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') cameraOrbitPointerId = null;
+});
+
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
   'Renderable',
 );
@@ -283,6 +369,7 @@ function renderFrame(now: number) {
     status!.textContent = 'PAUSED · STEP COMPLETE';
   }
   lastObservedStepCount = currentStepCount;
+  updateOrbitCamera();
   const objects: RenderObject[] = [];
   runtime.world.query(Renderable).forEach((entity, value) => {
     const renderable = value as { geometry: MeshData; material: MaterialDescriptor };
