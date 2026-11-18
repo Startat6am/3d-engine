@@ -158,3 +158,11 @@ The browser profile is supplemental evidence only; real-device/desktop profiling
 - Headless Chromium 158 / SwiftShader against the exact current deployment verified HTTP 200 for root and Physics Playground, `WEBGL2 READY`, `WASM READY`, five initialized bodies, and a WASM response with HTTP 200 / `application/wasm` / CORS `*`.
 - Desktop interactions: keyboard movement changed player Z from 0 to -0.297 m in the sample; raycast returned a hit; paused state held stable; after reset, a requested single step advanced the player Y from 2.679 to 2.686; reset restored the scene. Mobile CDP touch at 360×780 moved forward 0.177 m during a 400 ms hold, released the control (`data-pressed=false`), and produced a jump response from Y 0.500 to 0.663 at approximately 50 ms. No horizontal overflow or page/console errors were observed.
 - This closes the automated exact-head staging smoke check only. It is still a headless software-renderer test, not physical GPU/device performance, full rendered-frame profiling, WASM memory/allocation profiling, physical gamepad testing, or owner visual sign-off.
+
+
+## Real-device profiling protocol — 2026-11-19
+
+- The owner completed an interactive Chrome review of the current deployed Physics Playground and reported no issues. This closes the visual/runtime review item for that reviewed staging build only; it is not a performance result.
+- A repeatable capture worksheet is now maintained in [M6 Real-Device Physics Profile Worksheet](PHYSICS_DEVICE_PROFILE_TEMPLATE.md). It specifies the exact local dev-only browser route (`pnpm dev:player` → `/physics-benchmark.html`), pinned workspace build prerequisite, device/browser/power metadata, three independent runs per device, raw JSON retention, full-Playground observation, and sign-off requirements.
+- The next required measurement is three runs on a named desktop and three runs on at least one named target device, using the same evaluated commit. Preserve raw JSON; do not infer WASM linear-memory size from JS heap. The current benchmark explicitly reports WASM linear memory as unavailable through the public Rapier API.
+- No physical-device measurements or owner-approved performance budgets have been added by this documentation update. The M6 performance gate remains open until hardware evidence is recorded and reviewed.
