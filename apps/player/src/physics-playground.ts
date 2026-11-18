@@ -258,41 +258,50 @@ function updateOrbitCamera() {
 
 function setCameraOrbitEnabled(enabled: boolean) {
   cameraOrbitEnabled = enabled;
-  cameraOrbitPointerId = null;
   cameraModeButton!.dataset.active = String(enabled);
   cameraModeButton!.setAttribute('aria-pressed', String(enabled));
-  cameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
+  cameraModeButton!.textContent = enabled ? 'CAMERA ACTIVE' : 'CAMERA';
   desktopCameraModeButton!.dataset.active = String(enabled);
   desktopCameraModeButton!.setAttribute('aria-pressed', String(enabled));
-  desktopCameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
+  desktopCameraModeButton!.textContent = enabled ? 'CAMERA ACTIVE' : 'CAMERA';
   canvas!.dataset.cameraMode = String(enabled);
 }
-cameraModeButton.addEventListener('click', () => {
-  setCameraOrbitEnabled(!cameraOrbitEnabled);
-});
-desktopCameraModeButton.addEventListener('click', () => {
-  setCameraOrbitEnabled(!cameraOrbitEnabled);
-});
-const rotateCameraByButton = (direction: -1 | 1) => {
-  if (!cameraOrbitEnabled) setCameraOrbitEnabled(true);
-  cameraAzimuth += direction * 0.22;
-  updateOrbitCamera();
-};
-cameraLeftButton.addEventListener('click', () => rotateCameraByButton(-1));
-cameraRightButton.addEventListener('click', () => rotateCameraByButton(1));
 
-canvas.addEventListener('pointerdown', (event) => {
-  if (!cameraOrbitEnabled || cameraOrbitPointerId !== null || event.button !== 0) return;
+function beginCameraOrbit(event: PointerEvent) {
+  if (event.button !== 0 || cameraOrbitPointerId !== null) return;
+  event.preventDefault();
   cameraOrbitPointerId = event.pointerId;
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
-  try {
-    canvas.setPointerCapture(event.pointerId);
-  } catch {
-    // Pointer capture may be unavailable for synthetic test events.
-  }
+  setCameraOrbitEnabled(true);
+}
+
+function endCameraOrbit(event: PointerEvent) {
+  if (cameraOrbitPointerId !== event.pointerId) return;
+  cameraOrbitPointerId = null;
+  setCameraOrbitEnabled(false);
+}
+
+// Camera orbit is a momentary hold action: it is active only while CAMERA is pressed.
+for (const button of [cameraModeButton, desktopCameraModeButton]) {
+  button.addEventListener('pointerdown', beginCameraOrbit);
+  button.addEventListener('pointerup', endCameraOrbit);
+  button.addEventListener('pointercancel', endCameraOrbit);
+  button.addEventListener('lostpointercapture', endCameraOrbit);
+}
+
+cameraLeftButton.addEventListener('click', () => {
+  if (!cameraOrbitEnabled) return;
+  cameraAzimuth -= 0.22;
+  updateOrbitCamera();
 });
-canvas.addEventListener('pointermove', (event) => {
+cameraRightButton.addEventListener('click', () => {
+  if (!cameraOrbitEnabled) return;
+  cameraAzimuth += 0.22;
+  updateOrbitCamera();
+});
+
+window.addEventListener('pointermove', (event) => {
   if (!cameraOrbitEnabled || cameraOrbitPointerId !== event.pointerId) return;
   event.preventDefault();
   const deltaX = event.clientX - cameraOrbitPointerX;
@@ -300,24 +309,23 @@ canvas.addEventListener('pointermove', (event) => {
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
   cameraAzimuth -= deltaX * cameraOrbitSensitivity;
-  canvas.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
   cameraElevation = Math.max(
     cameraOrbitMinElevation,
     Math.min(cameraOrbitMaxElevation, cameraElevation + deltaY * cameraOrbitSensitivity),
   );
+  canvas!.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
 });
-const releaseCameraOrbitPointer = (event: PointerEvent) => {
-  if (cameraOrbitPointerId === event.pointerId) cameraOrbitPointerId = null;
-};
-canvas.addEventListener('pointerup', releaseCameraOrbitPointer);
-canvas.addEventListener('pointercancel', releaseCameraOrbitPointer);
-canvas.addEventListener('lostpointercapture', releaseCameraOrbitPointer);
+window.addEventListener('pointerup', endCameraOrbit);
+window.addEventListener('pointercancel', endCameraOrbit);
 window.addEventListener('blur', () => {
   cameraOrbitPointerId = null;
+  setCameraOrbitEnabled(false);
 });
-
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') cameraOrbitPointerId = null;
+  if (document.visibilityState !== 'visible') {
+    cameraOrbitPointerId = null;
+    setCameraOrbitEnabled(false);
+  }
 });
 
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
