@@ -236,6 +236,23 @@ export class FakePhysicsWorld implements PhysicsWorld {
     return this.#copyPose(this.#body(handle).pose);
   }
 
+  getLinearVelocity(handle: PhysicsBodyHandle): Vec3 {
+    return this.#body(handle).velocity;
+  }
+
+  setLinearVelocity(handle: PhysicsBodyHandle, velocity: Vec3, wakeUp = true): void {
+    void wakeUp;
+    const body = this.#body(handle);
+    if (body.type !== 'dynamic')
+      throw new PhysicsError(
+        'physics.body-type-mismatch',
+        'Velocity requires a dynamic rigid body',
+      );
+    if (!velocity.every(Number.isFinite))
+      throw new PhysicsError('physics.invalid-vector', 'Velocity must be finite');
+    body.velocity = [...velocity];
+  }
+
   applyImpulse(handle: PhysicsBodyHandle, impulse: Vec3, wakeUp = true): void {
     void wakeUp;
     const body = this.#body(handle);
