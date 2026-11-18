@@ -1,5 +1,6 @@
 Checking formatting...
 All matched files use Prettier code style!
+
 # Project Handoff — M6 Physics/Input
 
 Updated: 2026-11-18
