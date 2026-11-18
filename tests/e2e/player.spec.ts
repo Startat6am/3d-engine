@@ -17,7 +17,7 @@ test('player renders the primitive acceptance scene through WebGL2', async ({ pa
   const canvas = page.locator('#player');
   await expect(canvas).toBeVisible();
   const fps = page.getByLabel('Frames per second');
-  await expect.poll(() => fps.textContent()).toMatch(/^FPS \\d+$/);
+  await expect.poll(() => fps.textContent()).toMatch(/^FPS \d+$/);
   await expect
     .poll(() =>
       page.evaluate(() => (window as unknown as { __engineDrawCalls: number }).__engineDrawCalls),
