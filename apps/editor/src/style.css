@@ -165,7 +165,9 @@ body {
   border-radius: 4px;
   background: rgb(12 18 28 / 72%);
   color: #aebed2;
-  font: 9px/1.2 'DM Mono', monospace;
+  font:
+    9px/1.2 'DM Mono',
+    monospace;
   letter-spacing: 0.04em;
   font-variant-numeric: tabular-nums;
   pointer-events: none;
