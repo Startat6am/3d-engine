@@ -19,6 +19,11 @@
         <button id="step" type="button" disabled>Step</button>
         <button id="raycast" type="button" disabled>Raycast</button>
         <button id="reset-scene" type="button" disabled>Reset scene</button>
+        <div class="desktop-camera-controls" role="group" aria-label="Camera controls">
+          <button id="camera-left" type="button" aria-label="Rotate camera left" title="Rotate camera left">←</button>
+          <button id="desktop-camera-mode" type="button" aria-label="Toggle camera orbit mode" aria-pressed="false" data-active="false">CAMERA</button>
+          <button id="camera-right" type="button" aria-label="Rotate camera right" title="Rotate camera right">→</button>
+        </div>
       </header>
       <main class="playground-main">
         <canvas id="playground-canvas" aria-label="Physics simulation viewport"></canvas>

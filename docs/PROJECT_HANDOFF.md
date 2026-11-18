@@ -58,3 +58,33 @@ Updated: 2026-11-18
 - Keep the standard non-SIMD Rapier browser build.
 - Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
 - Do not merge/close PR #87, mark M6 complete, or start M7/M10 while required gates remain open.
+
+
+## Continuation notes — 2026-11-19
+
+### Camera control UI follow-up
+
+- Work branch: `fix/m6-desktop-camera-controls`. This is a Player/Playground follow-up branch; it must not be confused with the M6 implementation branch `feat/m6-physics-input-core` for PR #87.
+- Commit: `1e079b68002c1c7a8f46c188a8ad52dfe00203f4` — `style(player): shrink and reposition camera toggle`.
+- Changed only `apps/player/src/physics-playground.css`: desktop camera control group moved 40 px left; desktop camera toggle reduced to approximately 2/3 size; touch camera toggle reduced to approximately 2/3 size and shifted 40 px left. Narrow-screen touch sizing was adjusted proportionally.
+- Exact Vercel staging deployment: `dpl_DqCD2PhsFQ1ZMezBXHoXusm1hVvP`, state READY, URL [Physics Playground](https://3d-engine-player-f5a8i1nnu-callback5.vercel.app/physics-playground.html). It was built from the commit above. This is staging, not Production.
+- No physics, input, camera math, or zoom behavior was changed by this CSS-only commit.
+
+### Camera behavior — owner feedback / unresolved design
+
+- Owner observed that activating CAMERA currently recenters/teleports the view toward the ball after the ball has moved. This is not the desired free-look behavior.
+- Desired distinction to preserve for a later design pass: a stationary camera remains stationary; a follow camera follows continuously; activating free-look should take control from the camera's current pose without snapping/teleporting it to the ball.
+- Zoom in/out behavior is explicitly deferred for a later design discussion.
+- Do not change camera-follow, free-look, orbit-target, or zoom logic until the behavior is designed and agreed. The 2026-11-19 change is strictly button sizing/positioning.
+
+### Owner visual acceptance — 2026-11-19
+
+- Owner completed the interactive review of the current deployed Physics Playground in Chrome and reported: "Все проверил, все ок." (checked everything; all OK).
+- Record this as owner visual acceptance of the current staging build, including the camera-button UI follow-up. No visual/runtime issues were reported.
+- This acceptance does not substitute for named-hardware physics profiling, performance-budget agreement, static-only triangle-mesh scope confirmation, or final M6 sign-off.
+
+### Next execution order
+
+1. Continue M6 in the documented order; do not start M7 or M10 while M6 gates remain open.
+2. The next acceptance work is owner-led review of the current Player/Playground in normal Chrome, followed by named-hardware browser physics profiling and agreement on measurable performance budgets. Automated CI/headless results are not substitutes for those gates.
+3. Keep recording exact branch, commit, CI run, deployment ID/URL, test evidence, and limitations in this handoff and the relevant acceptance/spec documents whenever work changes those facts.
