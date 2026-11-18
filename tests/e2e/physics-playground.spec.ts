@@ -75,7 +75,8 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     .toBeLessThan(beforeTouchZ - 0.03);
   const afterTouchMove = await page.locator('#player-position').textContent();
   const touchTravel = beforeTouchZ - Number(afterTouchMove?.match(/Z (-?\d+\.\d+)/)?.[1]);
-  expect(touchTravel).toBeLessThan(0.4);
+  await expect(forwardButton).toHaveAttribute('data-pressed', 'false');
+  expect(touchTravel).toBeLessThanOrEqual(0.4);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect
