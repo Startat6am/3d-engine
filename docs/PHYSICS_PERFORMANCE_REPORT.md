@@ -107,5 +107,5 @@ This extends the Node/Rapier adapter evidence only. Browser/device profiling, co
 ### Verification of the benchmark extension — 2026-11-18
 
 - Full repository `pnpm check` passed under Node.js 22.23.5 / pnpm 12.18.0: formatting, lint, typecheck, 180/180 Vitest tests, package builds, and Editor/Player production builds.
-- The focused Chromium Physics Playground E2E passed (1/1) on this checkout. The full 22-test Playwright suite was attempted but did not complete successfully in this shared sandbox; do not infer a new full-suite pass from the earlier exact-head CI evidence.
+- GitHub Actions run #432 executed the full Chromium suite: 21/22 passed. The only failure was the Physics Playground touch-distance upper-bound assertion, which used strict `< 0.4` while Chromium measured exactly `0.4`; all 21 other tests passed, including the browser-memory lifecycle test. The assertion is now inclusive (`<= 0.4`) and also explicitly checks that the HUD button has released (`data-pressed=false`). The focused Physics Playground E2E passed twice consecutively after the fix (2/2).
 - `git diff --check` and Prettier checks passed for the changed benchmark and documentation.
