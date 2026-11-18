@@ -155,6 +155,21 @@ body {
   height: 100%;
   display: block;
 }
+.viewport-fps {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 12px;
+  padding: 3px 6px;
+  border: 1px solid rgb(145 165 190 / 28%);
+  border-radius: 4px;
+  background: rgb(12 18 28 / 72%);
+  color: #aebed2;
+  font: 9px/1.2 'DM Mono', monospace;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
 .axis {
   position: absolute;
   right: 20px;
