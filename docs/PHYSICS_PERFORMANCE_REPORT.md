@@ -150,3 +150,12 @@ The browser profile is supplemental evidence only; real-device/desktop profiling
 - `pnpm check` passed under Node.js 22.23.5 / pnpm 12.18.0 after adding the browser benchmark page: formatting, lint, typecheck, 180/180 Vitest tests, package builds, and Editor/Player production builds. The production Player build contains only the configured `index.html` and `physics-playground.html` entries; the benchmark page remains dev-only.
 - Full Playwright Chromium E2E passed 23/23, including the new production-WASM browser benchmark, touch-HUD movement/jump, Editor, GLB asset lifecycle, browser memory/WebGL resource lifecycle, and Player shutdown tests.
 - GitHub Actions run #435 passed the touch-boundary correction on its exact code head (`24bc67e`), including all existing 22 E2E tests. The later browser-benchmark additions were verified locally by the 23/23 run; a fresh exact-head CI result is still required for those additions.
+
+
+## Exact-head deployed Player smoke — 2026-11-18
+
+- Vercel deployment `dpl_HzcPXyNrZZGkNhchJbgGr88xfdAa` is READY on PR head `0bd6a6ed9889c60a1d4865283b03f66850e73084`. Current branch alias: https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/ . Exact immutable deployment URL: https://3d-engine-player-28gv19fj3-callback5.vercel.app/ .
+- The old generic `3d-engine-player-callback5.vercel.app` alias still points to the earlier `0260d980269b39ad673b2e8c1f33a56bd401546a` deployment; it is not the latest PR build.
+- Headless Chromium 158 / SwiftShader against the exact current deployment verified HTTP 200 for root and Physics Playground, `WEBGL2 READY`, `WASM READY`, five initialized bodies, and a WASM response with HTTP 200 / `application/wasm` / CORS `*`.
+- Desktop interactions: keyboard movement changed player Z from 0 to -0.297 m in the sample; raycast returned a hit; paused state held stable; after reset, a requested single step advanced the player Y from 2.679 to 2.686; reset restored the scene. Mobile CDP touch at 360×780 moved forward 0.177 m during a 400 ms hold, released the control (`data-pressed=false`), and produced a jump response from Y 0.500 to 0.663 at approximately 50 ms. No horizontal overflow or page/console errors were observed.
+- This closes the automated exact-head staging smoke check only. It is still a headless software-renderer test, not physical GPU/device performance, full rendered-frame profiling, WASM memory/allocation profiling, physical gamepad testing, or owner visual sign-off.
