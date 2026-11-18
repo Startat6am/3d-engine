@@ -8,7 +8,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   await expect(page.locator('#physics-wasm')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#playground-status')).toHaveText('RUNNING');
   await expect(page.locator('#body-count')).toHaveText('5 bodies');
-  await expect.poll(() => page.getByLabel('Frames per second').textContent()).toMatch(/^FPS \\d+$/);
+  await expect.poll(() => page.getByLabel('Frames per second').textContent()).toMatch(/^FPS \d+$/);
 
   const initialPosition = await page.locator('#player-position').textContent();
   const initialZ = Number(initialPosition?.match(/Z (-?\d+\.\d+)/)?.[1]);
