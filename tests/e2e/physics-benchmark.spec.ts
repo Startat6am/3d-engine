@@ -22,6 +22,15 @@ test('browser physics benchmark runs against the production Rapier WASM backend'
       fixedStep: { p95Ms: number };
       raycastAll: { p95Ms: number };
     };
+    memoryDiagnostics: {
+      wasmLinearMemoryBytes: number | null;
+      wasmLinearMemoryStatus: string;
+      snapshots: {
+        beforeRapierInit: { jsHeap: unknown; userAgentSpecificMemoryStatus: string };
+        afterRapierInitAndDispose: { jsHeap: unknown; userAgentSpecificMemoryStatus: string };
+        afterScenariosAndDispose: { jsHeap: unknown; userAgentSpecificMemoryStatus: string };
+      };
+    };
   };
   expect(report.runtime).toContain('Rapier WASM');
   expect(report.userAgent).toContain('Chrome');
@@ -33,4 +42,14 @@ test('browser physics benchmark runs against the production Rapier WASM backend'
   expect(report.denseContact.collisionEventsDrained).toBeGreaterThan(0);
   expect(report.denseContact.fixedStep.p95Ms).toBeGreaterThan(0);
   expect(report.denseContact.raycastAll.p95Ms).toBeGreaterThanOrEqual(0);
+  expect(report.memoryDiagnostics.wasmLinearMemoryBytes).toBeNull();
+  expect(report.memoryDiagnostics.wasmLinearMemoryStatus).toBe('not-exposed-by-public-rapier-api');
+  expect(report.memoryDiagnostics.snapshots.beforeRapierInit).toBeDefined();
+  expect(report.memoryDiagnostics.snapshots.afterRapierInitAndDispose).toBeDefined();
+  expect(report.memoryDiagnostics.snapshots.afterScenariosAndDispose).toBeDefined();
+  for (const snapshot of Object.values(report.memoryDiagnostics.snapshots)) {
+    expect(['available', 'unsupported', 'not-cross-origin-isolated', 'unavailable']).toContain(
+      snapshot.userAgentSpecificMemoryStatus,
+    );
+  }
 });
