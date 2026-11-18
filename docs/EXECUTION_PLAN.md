@@ -34,9 +34,9 @@ The deployed Player root, Playground HTML, JS module and Rapier WASM asset retur
 
 ## Remaining work
 
-1. Verify the deployed Player in an authorized Chrome session: WASM initialization, fallback/error behavior and interactive Playground behavior.
+1. [x] Owner reviewed the current deployed Player/Playground in normal Chrome on 2026-11-19 and reported no issues. This is visual/runtime acceptance for the reviewed staging build, not a hardware performance profile.
 2. Finish Chromium input evidence; distinguish browser-adapter simulation tests from physical gamepad testing.
-3. Profile representative browser/device physics workloads, dense contacts, queries, WASM memory and allocations. Record runtime/hardware context and obtain owner-approved budgets.
+3. Profile representative browser/device physics workloads, dense contacts, queries, WASM memory and allocations. Follow `docs/PHYSICS_DEVICE_PROFILE_TEMPLATE.md`; record three runs on named desktop hardware and at least one target device, preserve raw JSON, then obtain owner-approved budgets.
 4. Complete visual review and obtain explicit owner acceptance of the static-only triangle-mesh scope.
 5. Update `docs/acceptance/M6_PHYSICS_INPUT.md` with exact evidence, rerun full CI on the final PR head, and obtain M6 sign-off.
 
@@ -48,3 +48,9 @@ The deployed Player root, Playground HTML, JS module and Rapier WASM asset retur
 - The preliminary Node/Rapier report is directional only; it is not browser/device performance sign-off or an approved memory/performance budget.
 
 Do not merge/close PR #87, mark M6 complete, or start M7/M10 work while required gates remain open.
+
+
+## Owner review update — 2026-11-19
+
+- The interactive Chrome review of the current deployed Player/Physics Playground is complete and reported OK by the owner. See `docs/PROJECT_HANDOFF.md` and `docs/acceptance/M6_PHYSICS_INPUT.md`.
+- Real-device profiling remains the next open M6 gate. The repeatable capture procedure and results worksheet are in `docs/PHYSICS_DEVICE_PROFILE_TEMPLATE.md`; no hardware measurements or performance budgets are claimed yet.
