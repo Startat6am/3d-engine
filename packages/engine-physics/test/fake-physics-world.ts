@@ -85,8 +85,12 @@ export class FakePhysicsWorld implements PhysicsWorld {
   }
 
   createCollider(body: PhysicsBodyHandle, descriptor: ColliderDescriptor): PhysicsColliderHandle {
-    void descriptor;
-    this.#body(body);
+    const bodyRecord = this.#body(body);
+    if (descriptor.shape.type === 'triangle-mesh' && bodyRecord.type !== 'static')
+      throw new PhysicsError(
+        'physics.invalid-collider-descriptor',
+        'Triangle-mesh colliders require a static rigid body',
+      );
     const handle = `fake-collider-${++this.#nextHandle}` as PhysicsColliderHandle;
     this.#colliders.set(handle, { body, descriptor });
     return handle;
