@@ -1,3 +1,5 @@
+Checking formatting...
+All matched files use Prettier code style!
 # M6 — Physics & Input Acceptance
 
 **Status:** implementation in progress; no M6 acceptance gate is claimed complete.  
@@ -119,7 +121,6 @@ Record PR/commit links, CI run IDs, browser/runtime versions, test counts, bench
 - Final local verification on 2026-11-18 after adding the browser benchmark page: `pnpm check` passed under Node.js 22.23.5 / pnpm 12.18.0 (180/180 Vitest, format, lint, typecheck, package and app production builds); full Playwright Chromium E2E passed 23/23. The benchmark HTML is excluded from production build inputs. Exact-head GitHub Actions run #439 subsequently passed the full 23-test suite.
 
 - CI closeout: **complete for current head** — GitHub Actions run [#439](https://github.com/Startat6am/3d-engine/actions/runs/44321353518) passed on exact head `0bd6a6ed9889c60a1d4865283b03f66850e73084`, including format, lint, typecheck, 180/180 Vitest, package/app builds, both GLB benchmarks, Chromium install, and 23/23 Playwright E2E tests.
-
 
 - Deployed Player verification — 2026-11-18: Vercel deployment `dpl_HzcPXyNrZZGkNhchJbgGr88xfdAa` is READY and built from exact PR head `0bd6a6ed9889c60a1d4865283b03f66850e73084`. The current branch alias is https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/; exact deployment: https://3d-engine-player-28gv19fj3-callback5.vercel.app/physics-playground.html. The older generic `3d-engine-player-callback5.vercel.app` alias is stale and resolves to commit `0260d980269b39ad673b2e8c1f33a56bd401546a`.
 - Exact-head automated headless Chromium 158 / SwiftShader smoke: Player root and Playground return HTTP 200; WebGL2 and Rapier WASM report READY; WASM asset returns 200 with `application/wasm` and CORS `*`; five bodies initialize; keyboard movement, raycast hit, pause, one-step advancement, and reset work. Mobile 360×780 CDP touch smoke confirms forward movement, pointer release, jump response (Y 0.500→0.663 at ~50 ms), visible touch HUD, and no horizontal overflow. No page or console errors were observed.
