@@ -34,6 +34,7 @@ const playerPosition = document.querySelector<HTMLElement>('#player-position');
 const pauseButton = document.querySelector<HTMLButtonElement>('#pause');
 const stepButton = document.querySelector<HTMLButtonElement>('#step');
 const raycastButton = document.querySelector<HTMLButtonElement>('#raycast');
+const resetSceneButton = document.querySelector<HTMLButtonElement>('#reset-scene');
 const raycastResult = document.querySelector<HTMLOutputElement>('#raycast-result');
 const touchHud = document.querySelector<HTMLElement>('#touch-hud');
 
@@ -46,6 +47,7 @@ if (
   !pauseButton ||
   !stepButton ||
   !raycastButton ||
+  !resetSceneButton ||
   !raycastResult ||
   !touchHud
 ) {
@@ -141,6 +143,13 @@ const camera = createDefaultCamera();
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
   'Renderable',
 );
+const initialDynamicPoses = new Map<
+  EntityId,
+  {
+    position: readonly [number, number, number];
+    rotation: readonly [number, number, number, number];
+  }
+>();
 
 function addBody(
   position: readonly [number, number, number],
@@ -159,7 +168,9 @@ function addBody(
     parent: null,
   });
   runtime.world.add(entity, Renderable, { geometry, material: createDefaultMaterial(color) });
-  runtime.world.add(entity, RigidBody, { type: bodyType, position, rotation: [0, 0, 0, 1] });
+  const rotation = [0, 0, 0, 1] as const;
+  runtime.world.add(entity, RigidBody, { type: bodyType, position, rotation });
+  if (bodyType === 'dynamic') initialDynamicPoses.set(entity, { position, rotation });
   runtime.world.add(entity, PhysicsCollider, { shape, friction: 0.8, restitution: 0.08 });
   return entity;
 }
@@ -172,7 +183,7 @@ function renderFrame(now: number) {
   if (playerEntity) {
     const transform = runtime.world.get(playerEntity, Transform);
     if (transform)
-      playerPosition!.textContent = `PLAYER X ${transform.position[0].toFixed(2)} · Y ${transform.position[1].toFixed(2)} · Z ${transform.position[2].toFixed(2)}`;
+      playerPosition!.textContent = `PLAYER X ${transform.position[0].toFixed(3)} · Y ${transform.position[1].toFixed(3)} · Z ${transform.position[2].toFixed(3)}`;
   }
   const currentStepCount = physicsSystem?.stepCount ?? 0;
   if (!simulationReady && currentStepCount > 0) {
@@ -182,6 +193,7 @@ function renderFrame(now: number) {
     pauseButton!.disabled = false;
     stepButton!.disabled = false;
     raycastButton!.disabled = false;
+    resetSceneButton!.disabled = false;
   }
   if (pendingSingleStep && currentStepCount > lastObservedStepCount) {
     pendingSingleStep = false;
@@ -276,8 +288,8 @@ async function start() {
         if (!handle) return;
         const [x, z] = snapshot.getAxis2D('Move');
         // Keep directional acceleration gentle for precise keyboard and touch-HUD control.
-        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 2, 0, -z * 2]);
-        if (snapshot.wasPressed('Jump')) physics!.applyImpulse(handle, [0, 4.5, 0]);
+        if (x !== 0 || z !== 0) physics!.applyForce(handle, [x * 0.8, 0, -z * 0.8]);
+        if (snapshot.wasPressed('Jump')) physics!.applyImpulse(handle, [0, 1.2, 0]);
       },
     });
     runtime.scheduler.add(physicsSystem);
@@ -330,6 +342,27 @@ stepButton.addEventListener('click', () => {
   stepButton.disabled = true;
   status!.dataset.state = 'paused';
   status!.textContent = 'PAUSED · STEP QUEUED';
+});
+
+resetSceneButton.addEventListener('click', () => {
+  if (!physics || !physicsSystem) return;
+  for (const [entity, pose] of initialDynamicPoses) {
+    const handle = physicsSystem.getBodyHandle(entity);
+    if (!handle) continue;
+    physics.setDynamicPose(handle, pose);
+    const transform = runtime.world.get(entity, Transform);
+    if (transform) {
+      transform.position = [...pose.position];
+      transform.rotation = [...pose.rotation];
+    }
+  }
+  if (physics.paused) physics.setPaused(false);
+  pendingSingleStep = false;
+  stepButton.disabled = false;
+  pauseButton.textContent = 'Pause';
+  status.dataset.state = 'running';
+  status.textContent = 'RUNNING · SCENE RESET';
+  raycastResult.textContent = 'Raycast not run';
 });
 
 raycastButton.addEventListener('click', () => {
