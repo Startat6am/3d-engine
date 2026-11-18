@@ -7,6 +7,7 @@ test('editor shell loads with a 3D viewport and hierarchy', async ({ page }) => 
   await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
+  await expect.poll(() => page.getByLabel('Frames per second').textContent()).toMatch(/^FPS \\d+$/);
 });
 
 test('editor remains usable on a 360px mobile viewport', async ({ page }) => {
