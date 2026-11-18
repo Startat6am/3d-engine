@@ -1,6 +1,6 @@
 # Project Handoff — M6 Physics/Input
 
-Updated: 2026-11-17
+Updated: 2026-11-18
 
 ## Current state
 
@@ -50,3 +50,12 @@ Updated: 2026-11-17
 - Keep the standard non-SIMD Rapier browser build.
 - Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
 - Do not merge/close PR #87, mark M6 complete, or start M7/M10 while required gates remain open.
+
+## Independent verification — 2026-11-18 (not owner sign-off)
+
+- Reviewed the current PR #87 head `0260d980269b39ad673b2e8c1f33a56bd401546a` (`Tune Physics Playground movement damping`).
+- GitHub Actions run [#431](https://github.com/Startat6am/3d-engine/actions/runs/44275520265) completed successfully on this exact head. The verify job passed frozen install, format, lint, typecheck, unit tests, package/app builds, both GLB stress benchmarks, Chromium installation, and Playwright E2E.
+- An independent clean checkout also passed `pnpm check`: 180/180 Vitest tests, typecheck, lint, formatting, and Editor/Player builds. This supplemental run used Node.js 25.9.0, outside the repository's supported Node 22 range; GitHub Actions remains the supported-runtime evidence.
+- The independent Playwright run passed 22/22 Chromium E2E tests after installing the pinned Playwright browser.
+- A separate headless Chromium 158.0.8127.18 smoke test against the deployed public staging Playground used SwiftShader. It observed `WEBGL2 READY`, `WASM READY`, five physics bodies, keyboard movement, a raycast hit, pause/single-step/resume/reset, mobile-sized (360×780) touch HUD controls, touch movement (0.144 m in the sample), and jump response. No page errors or console errors were observed; the 360 px layout had no horizontal overflow.
+- The headless staging smoke is automated software-renderer evidence, not a real interactive owner Chrome session, physical GPU/device benchmark, physical gamepad test, or visual sign-off. It does not close any owner acceptance gate.
