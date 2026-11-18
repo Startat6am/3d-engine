@@ -20,6 +20,16 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
       return Number(current?.match(/Z (-?\d+\.\d+)/)?.[1]);
     })
     .toBeLessThan(initialZ - 0.05);
+  const releasedZ = Number(
+    (await page.locator('#player-position').textContent())?.match(/Z (-?\d+\.\d+)/)?.[1],
+  );
+  await page.waitForTimeout(180);
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Z (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeCloseTo(releasedZ, 2);
 
   await page.getByRole('button', { name: 'Raycast' }).click();
   await expect(page.locator('#raycast-result')).toContainText('Hit entity');
@@ -98,6 +108,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   await jumpButton.click();
   let peakTouchJumpY = beforeTouchY;
   for (let frame = 0; frame < 35; frame += 1) {
+    if (frame === 6) await jumpButton.click();
     await page.waitForTimeout(20);
     const current = await page.locator('#player-position').textContent();
     peakTouchJumpY = Math.max(
