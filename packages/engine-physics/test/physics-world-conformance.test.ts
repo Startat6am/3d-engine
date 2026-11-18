@@ -36,6 +36,36 @@ function registerPhysicsWorldConformance(
       physics.dispose();
     });
 
+    it('restricts triangle-mesh colliders to static bodies', async () => {
+      const physics = await createWorld();
+      const world = new EngineRuntime().world;
+      const triangleMesh = {
+        shape: {
+          type: 'triangle-mesh' as const,
+          vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+          indices: new Uint32Array([0, 1, 2]),
+        },
+      };
+
+      const staticBody = physics.createBody(world.createEntity(), {
+        type: 'static',
+        position: [0, 0, 0],
+      });
+      expect(() => physics.createCollider(staticBody, triangleMesh)).not.toThrow();
+
+      for (const type of ['dynamic', 'kinematic'] as const) {
+        const body = physics.createBody(world.createEntity(), {
+          type,
+          position: [0, 0, 0],
+        });
+        expect(() => physics.createCollider(body, triangleMesh)).toThrow(
+          expect.objectContaining({ code: 'physics.invalid-collider-descriptor' }),
+        );
+      }
+
+      physics.dispose();
+    });
+
     it('removes child colliders with their body and rejects stale collider handles', async () => {
       const physics = await createWorld();
       const entity = new EngineRuntime().world.createEntity();
