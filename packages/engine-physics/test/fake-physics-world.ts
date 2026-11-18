@@ -221,6 +221,17 @@ export class FakePhysicsWorld implements PhysicsWorld {
     body.pose = this.#copyPose(pose);
   }
 
+  setDynamicPose(handle: PhysicsBodyHandle, pose: PhysicsPose): void {
+    const body = this.#body(handle);
+    if (body.type !== 'dynamic')
+      throw new PhysicsError(
+        'physics.invalid-body-type',
+        'Dynamic pose update requires a dynamic body',
+      );
+    body.pose = this.#copyPose(pose);
+    body.velocity = [0, 0, 0];
+  }
+
   getPose(handle: PhysicsBodyHandle): PhysicsPose {
     return this.#copyPose(this.#body(handle).pose);
   }
