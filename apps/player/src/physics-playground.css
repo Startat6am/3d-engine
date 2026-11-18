@@ -351,3 +351,54 @@ body {
     height: 68px;
   }
 }
+
+
+/* Desktop camera controls stay visible independently of the touch HUD. */
+.desktop-camera-controls {
+  position: absolute;
+  z-index: 6;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid rgba(145, 169, 198, 0.28);
+  border-radius: 10px;
+  background: rgba(18, 27, 40, 0.88);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
+}
+
+.desktop-camera-controls button {
+  min-width: 38px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #40516a;
+  border-radius: 6px;
+  background: #202c3b;
+  color: #e4eaf2;
+  font: 700 13px ui-monospace, SFMono-Regular, Menlo, monospace;
+  cursor: pointer;
+}
+
+.desktop-camera-controls button:hover {
+  background: #2b3b50;
+}
+
+.desktop-camera-controls #desktop-camera-mode {
+  min-width: 88px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.desktop-camera-controls #desktop-camera-mode[data-active='true'] {
+  background: #365f82;
+  border-color: #8bc7f2;
+  box-shadow: 0 0 0 2px rgba(104, 174, 232, 0.18);
+}
+
+@media (pointer: coarse), (max-width: 760px) {
+  .desktop-camera-controls {
+    display: none;
+  }
+}
