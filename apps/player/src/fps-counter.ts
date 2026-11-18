@@ -5,7 +5,7 @@ export function attachFpsCounter(canvas: HTMLCanvasElement): (now: number) => vo
   Object.assign(counter.style, {
     position: 'absolute',
     top: '10px',
-    right: '12px',
+    left: '12px',
     zIndex: '8',
     padding: '3px 6px',
     border: '1px solid rgba(145, 165, 190, 0.28)',
