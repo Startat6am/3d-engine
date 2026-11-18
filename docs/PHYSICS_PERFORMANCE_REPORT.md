@@ -151,7 +151,6 @@ The browser profile is supplemental evidence only; real-device/desktop profiling
 - Full Playwright Chromium E2E passed 23/23, including the new production-WASM browser benchmark, touch-HUD movement/jump, Editor, GLB asset lifecycle, browser memory/WebGL resource lifecycle, and Player shutdown tests.
 - GitHub Actions run #435 passed the touch-boundary correction on its exact code head (`24bc67e`), including all existing 22 E2E tests. The later browser-benchmark additions were verified locally by the 23/23 run; a fresh exact-head CI result is still required for those additions.
 
-
 ## Exact-head deployed Player smoke — 2026-11-18
 
 - Vercel deployment `dpl_HzcPXyNrZZGkNhchJbgGr88xfdAa` is READY on PR head `0bd6a6ed9889c60a1d4865283b03f66850e73084`. Current branch alias: https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/ . Exact immutable deployment URL: https://3d-engine-player-28gv19fj3-callback5.vercel.app/ .
