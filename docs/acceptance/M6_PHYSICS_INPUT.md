@@ -100,3 +100,10 @@ M6 does not claim completion of the full Editor MVP. It does require that the ne
 ## Evidence record
 
 Record PR/commit links, CI run IDs, browser/runtime versions, test counts, benchmark outputs, and reviewer sign-off here as work is completed. Empty evidence is an open gate, not an implicit pass.
+
+## Additional automated evidence — 2026-11-18 (owner gates remain open)
+
+- Exact PR #87 head `0260d980269b39ad673b2e8c1f33a56bd401546a`: GitHub Actions [run #431](https://github.com/Startat6am/3d-engine/actions/runs/44275520265) completed successfully, including the full verify job and Playwright Chromium E2E.
+- Independent Playwright run: 22/22 Chromium E2E tests passed. The clean checkout's `pnpm check` passed 180/180 Vitest tests, formatting, lint, typecheck, and Editor/Player builds under Node 25.9.0; this Node version is outside the supported range, so this is supplemental evidence only.
+- Public staging Playground smoke in headless Chromium 158.0.8127.18 with SwiftShader: WebGL2 and Rapier WASM initialized; five bodies were present; keyboard movement, raycast hit, pause/single-step/resume/reset, touch-HUD visibility/movement/jump at 360×780, and no-horizontal-overflow checks passed. No page or console errors were observed.
+- This software-rendered headless smoke does not replace the required owner review in an authorized Chrome session and does not provide physical GPU, device, gamepad, or browser-performance evidence. The owner visual review, static-triangle-mesh scope acceptance, performance budgets, and explicit M6 sign-off remain open.
