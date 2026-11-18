@@ -133,7 +133,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     );
   }
   expect(peakTouchJumpY - beforeTouchY).toBeGreaterThan(0.25);
-  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(1.5);
+  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(0.5);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect

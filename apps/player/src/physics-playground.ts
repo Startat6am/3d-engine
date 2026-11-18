@@ -388,7 +388,8 @@ async function start() {
             { origin: pose.position, direction: [0, -1, 0], maxDistance: 0.56 },
             { excludeEntities: [playerEntity!] },
           );
-          if (ground && ground.normal[1] > 0.5) physics!.applyImpulse(handle, [0, 3.0, 0]);
+          if (ground && ground.normal[1] > 0.5)
+            physics!.applyImpulse(handle, [0, 1.2 * Math.sqrt(2.5), 0]);
         }
       },
     });
