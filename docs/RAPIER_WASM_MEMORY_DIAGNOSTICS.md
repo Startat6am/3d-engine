@@ -12,6 +12,8 @@
 
 Each snapshot reports the optional Chromium/V8 `performance.memory` JS-heap counters and, when available, `performance.measureUserAgentSpecificMemory()` for the whole page. The latter requires a secure, cross-origin-isolated context; otherwise the report records whether the API is unsupported, isolation is missing, or measurement failed.
 
+The Player Vite development server sets same-origin COOP and require-corp COEP headers for the benchmark context, and the Playwright test asserts `crossOriginIsolated === true`. This makes the whole-page API measurable where the browser implements it; it does not add Rapier-specific attribution.
+
 ## Important attribution boundary
 
 The Rapier 0.21 JavaScript adapter does not expose the underlying `WebAssembly.Memory` instance through the public `@dimforge/rapier3d` API used by this project. Consequently:
