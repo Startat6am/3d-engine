@@ -235,6 +235,7 @@ async function main() {
     runtime: 'Rapier WASM via @engine/physics',
     userAgent: navigator.userAgent,
     hardwareConcurrency: navigator.hardwareConcurrency,
+    crossOriginIsolated: globalThis.crossOriginIsolated,
     deviceMemoryGiB: 'deviceMemory' in navigator ? navigator.deviceMemory : null,
     wasmInitializationMs,
     fixedDeltaSeconds: FIXED_DT,
