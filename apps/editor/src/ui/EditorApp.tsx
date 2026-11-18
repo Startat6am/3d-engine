@@ -409,7 +409,9 @@ export function EditorApp() {
           const now = performance.now();
           const elapsed = now - lastFpsSample;
           if (fpsRef.current)
-            fpsRef.current.textContent = `FPS ${Math.round((renderedFrameCountRef.current * 1000) / elapsed)}`;
+            fpsRef.current.textContent = `FPS ${Math.round(
+              (renderedFrameCountRef.current * 1000) / elapsed,
+            )}`;
           renderedFrameCountRef.current = 0;
           lastFpsSample = now;
         }, 500);
