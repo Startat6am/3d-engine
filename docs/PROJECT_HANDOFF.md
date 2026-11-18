@@ -29,6 +29,7 @@ Updated: 2026-11-18
 - Editor UX cleanup: truthful renderer/save status, real empty-scene state, removal of decorative component placeholders.
 - Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard and touch-HUD movement/jump, pause/resume and single-step. Mouse jump and touch-HUD movement/jump are verified by Chromium E2E.
 - Player Physics Playground mobile controls follow-up (2026-11-18): replace the four-button touch D-pad with a circular analog virtual joystick (radial clamp, pointer capture/cancel, release on blur/visibility loss) while retaining the separate jump button. The joystick feeds the existing semantic Move action through the touch adapter. Movement speed is now `1.0` (previously `0.75`, +`0.25`); jump impulse is now `1.2 * sqrt(2.5)` (approximately `1.90`); this targets 2.5× jump height because ballistic apex height scales with impulse squared. The updated Physics Playground Chromium E2E passes, the full Playwright E2E suite passes, and `pnpm check` passes in the continuation sandbox (Node.js 25.9.0; project CI remains the canonical Node.js 22 verification). Exact-head GitHub Actions run [#477](https://github.com/Startat6am/3d-engine/actions/runs/44372351354) passed on commit `1c8e61fd853280011b6218feabd096b97fa8316a`, including the full Node.js 22 CI workflow.
+- Player Physics Playground camera-orbit follow-up (2026-11-18): add a translucent toggle button beside the mobile jump control. When enabled, drags across the canvas orbit the camera horizontally through a full 360° and vertically within a safe elevation range; the camera follows the player while orbit mode is active. The toggle has an accessible pressed state and active styling; pointer capture/cancel, blur and visibility loss release the active drag. Automated coverage checks the toggle and confirms camera drags do not move the player. Build and typecheck pass; full browser E2E remains pending in this sandbox because its Chromium runtime lacks `libglib-2.0.so.0`; CI on the pushed exact head is the canonical browser verification.
 
 ## Player staging deployment
 
@@ -48,7 +49,7 @@ Updated: 2026-11-18
 2. Repeat the browser physics profile on named desktop hardware and at least one target device; complete controlled WASM-memory/allocation measurements and agree performance budgets. The current headless SwiftShader profile is supplemental only.
 3. Automated exact-head Chromium input/browser evidence is complete (run #439, 23/23); physical gamepad testing is optional separate evidence and is not claimed by the simulated adapter tests.
 4. Complete final visual review, confirm owner acceptance of the static-only triangle-mesh scope, and obtain explicit M6 owner sign-off.
-5. Re-run full CI on any subsequent code changes; exact-head run #439 currently passes all 23 Chromium E2E tests.
+5. Re-run full CI on any subsequent code changes; run #477 passed the prior joystick head. The camera-orbit follow-up requires a new exact-head CI run.
 
 ## Constraints
 
