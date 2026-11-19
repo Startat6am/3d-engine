@@ -1,6 +1,6 @@
 # ADR 0010: Voxel persistence and content-addressed chunk blobs
 
-**Status:** Accepted; shared adapter extracted, voxel extension integration in progress
+**Status:** Accepted; shared adapter extracted and v1 voxel extension persistence implemented
 **Date:** 2026-11-19
 
 ## Context
@@ -20,3 +20,10 @@ The existing world document envelope is versioned and supports an extensible `ex
 ## Consequences
 
 The world envelope remains format-stable and voxel data remains content-addressed. This ADR does not claim Player/Editor voxel persistence is implemented. The adapter extraction is complete; versioned voxel extension serialization, payload integration tests and Player/Editor wiring remain M7 work.
+
+
+## Implementation update — 2026-11-19
+
+`@engine/project-storage` now implements the v1 `com.choreon.voxel-world` extension through `saveVoxelWorldProject` and `loadVoxelWorldProject`. The extension stores `schemaVersion: 1`, `voxelSize`, `chunkDimensions`, and per-chunk signed coordinates, revision, palette, and payload metadata (`assetId`, `byteLength`, `codecVersion`, `contentHash`). Chunk bytes are written under `voxel/chunks/sha256/<prefix>/<digest>.bin`; identical payloads deduplicate by digest. Each blob is read back and hash-verified before `saveDirectoryProject` writes `worlds/main.world` last. Loading validates the extension and codec versions, rejects duplicate coordinates, verifies byte length and SHA-256, and delegates cell/palette validation to the voxel codec.
+
+The raw v1 payload remains exactly 8192 bytes (4096 little-endian Uint16 cell indexes); the codec version is carried in the extension metadata, not embedded in the binary payload. Tests cover round-trip metadata/cells, duplicate coordinates, and corrupted blob rejection. Editor/Player wiring remains intentionally deferred.

@@ -11,7 +11,7 @@ Updated: 2026-11-19
   #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
 - M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
   on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
-- Last committed PR head before the current cancellation slice: `49af7c78602453eb64ec16b350e283ad2eb1affd`.
+- Latest PR head before the current voxel persistence slice: `ebabe4d0e06388fbef758d2c6f49cfe3f707e115`; CI for that exact head failed only at `prettier --check` on the voxel codec files (formatting fix included in the follow-up).
   Cancellation, bounded streaming and seeded generation are included in PR #90; exact-head CI remains the merge gate.
 - Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
   automatically.
@@ -23,8 +23,9 @@ Updated: 2026-11-19
 - M7 World & Voxels: active; coordinates/settings, immutable chunk storage/palette validation,
   deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and a
   bounded chunk scheduler, deterministic seeded generation, and repeated load/eviction lifecycle stress
-  coverage are implemented. The content-addressed project storage adapter has been extracted into
-  `@engine/project-storage`; voxel extension serialization and Editor/Player integration remain pending.
+  coverage are implemented. The content-addressed project storage adapter and v1
+  `com.choreon.voxel-world` persistence are implemented in `@engine/project-storage`; Editor/Player
+  integration and broader persistence/CI coverage remain pending.
 - M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
   started. AI authoring remains M10; do not reorder the roadmap.
 
@@ -99,3 +100,12 @@ pnpm e2e
 Every implementation slice must update its owning spec, M7 execution plan and this handoff in the
 same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test
 counts, hardware measurements, deployment state or acceptance.
+
+
+## Voxel persistence slice — 2026-11-19
+
+- Added `saveVoxelWorldProject` / `loadVoxelWorldProject` in `@engine/project-storage`. V1 extension key: `com.choreon.voxel-world`; extension metadata stores voxel settings and chunk descriptors with coordinate, revision, palette, asset ID, 8192-byte length, codec version 1, and SHA-256.
+- Binary chunk blobs are immutable and content-addressed under `voxel/chunks/sha256/`; identical payloads deduplicate. Save verifies blob read-back before writing `worlds/main.world` last. Load validates metadata, duplicate coordinates, codec version, byte length, hash, and voxel palette/cell indexes.
+- Focused storage tests: round-trip, duplicate coordinate rejection, unsupported codec version, missing blob, corrupted blob, deduplication, and manifest-last ordering.
+- Local `pnpm check`, `pnpm e2e`, and `git diff --check` pass for this slice. Exact-head CI for `ebabe4d` failed on Prettier formatting; the formatted fix is included in this follow-up.
+- PR #90 remains Draft and must not be merged automatically.

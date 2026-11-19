@@ -20,7 +20,9 @@ export class ProjectAssetStoreError extends Error {
       | 'MISSING_PAYLOAD'
       | 'NOT_FOUND'
       | 'IMMUTABLE_CONFLICT'
-      | 'UNSUPPORTED_MIME',
+      | 'UNSUPPORTED_MIME'
+      | 'UNSUPPORTED_VERSION'
+      | 'INVALID_EXTENSION',
   ) {
     super(message);
     this.name = 'ProjectAssetStoreError';
@@ -351,3 +353,5 @@ export async function loadDirectoryProject(store: ProjectFileStore): Promise<Wor
 
   return { ...manifest, assetPayloads: [...payloads.values()] };
 }
+
+export * from './voxel-world.js';

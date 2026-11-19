@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative meshing cancellation, and the bounded chunk scheduler and deterministic seeded generator hooks are implemented; repeated load/eviction lifecycle stress coverage and the shared `@engine/project-storage` package extraction are implemented; voxel extension serialization and integration tests are next.
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative meshing cancellation, and the bounded chunk scheduler and deterministic seeded generator hooks are implemented; repeated load/eviction lifecycle stress coverage and the shared `@engine/project-storage` package extraction are implemented; versioned voxel-world extension persistence and focused integration tests are implemented; Editor/Player wiring and broader M7 validation remain.
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-19
@@ -68,3 +68,11 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - Dynamic/kinematic triangle-mesh physics or implicit mesh cooking.
 - GPU meshing, greedy meshing, advanced LOD, lighting bake and ambient occlusion in the initial implementation.
 - Claims of infinite-world scale or fixed performance on unspecified hardware.
+
+
+## Voxel persistence implementation update — 2026-11-19
+
+- `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16³ chunk).
+- `@engine/project-storage` owns `com.choreon.voxel-world` extension persistence. The extension records schema version, world voxel settings, signed chunk coordinates, revisions, palettes, and payload references with codec version, exact byte length, and SHA-256.
+- Chunk blobs are immutable and content-addressed; duplicate byte-identical chunks share one blob. Save verifies every blob before writing the manifest last. Load rejects missing/corrupt blobs, unsupported versions, malformed metadata, and duplicate coordinates before returning decoded snapshots.
+- Focused tests cover round-trip, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported codec versions, content deduplication, and manifest-last ordering. Editor/Player integration is not started.

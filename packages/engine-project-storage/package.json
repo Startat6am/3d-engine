@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@engine/assets": "workspace:*",
-    "@engine/serialization": "workspace:*"
+    "@engine/serialization": "workspace:*",
+    "@engine/voxel": "workspace:*",
+    "@engine/world": "workspace:*"
   }
 }

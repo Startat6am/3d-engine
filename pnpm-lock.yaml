@@ -362,6 +362,12 @@ importers:
       '@engine/serialization':
         specifier: workspace:*
         version: link:../engine-serialization
+      '@engine/voxel':
+        specifier: workspace:*
+        version: link:../engine-voxel
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../engine-world
 
   packages/engine-renderer:
     dependencies:
