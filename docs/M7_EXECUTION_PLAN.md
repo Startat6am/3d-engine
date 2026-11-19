@@ -77,3 +77,8 @@ Deliver the roadmap's M7 world/voxel foundation: chunk model, bounded meshing, s
 ## Parent CI caveat
 
 The parent M6 head 6d094e495be7e1c23c4cf5c1619c6a708a87d081 has failed documentation-head CI run #495: pnpm format:check reports five M6 documentation files as not Prettier-formatted. Lint, typecheck, tests, builds, and E2E were skipped by workflow dependency ordering. This is an integration/formatting issue, not evidence of an M7 code failure. Resolve it on the parent M6 branch and re-run exact-head CI before merging the stack.
+
+## Parent integration update — 2026-11-19
+
+- The five M6 documentation files that stopped run #495 have now been Prettier-formatted on the M6 parent branch. Exact-head CI run #506 is in progress on parent head 44689fb4cbe1ed38fb53842b18d193abd9bf8b2e.
+- M7 PR #89 has been rebased onto that updated M6 parent head. It remains Draft and stacked; do not merge until the exact M7 head has green GitHub Actions CI and the parent PR integration is reviewed.
