@@ -70,10 +70,7 @@ describe('voxel chunk snapshots', () => {
   });
 
   it('rejects duplicate and malformed palette references', () => {
-    const duplicate = [
-      ...palette,
-      { material: { kind: 'asset' as const, assetId: 'mat:stone' } },
-    ];
+    const duplicate = [...palette, { material: { kind: 'asset' as const, assetId: 'mat:stone' } }];
     expect(() =>
       createVoxelChunkSnapshot({ coordinate, palette: duplicate, cells: emptyCells() }),
     ).toThrow(VoxelChunkError);
@@ -118,9 +115,9 @@ describe('voxel chunk snapshots', () => {
 
   it('rejects invalid edit values and revision overflow', () => {
     const snapshot = createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells() });
-    expect(() =>
-      editVoxelChunk(snapshot, [{ x: 0, y: 0, z: 0, value: 3 }]),
-    ).toThrow(VoxelChunkError);
+    expect(() => editVoxelChunk(snapshot, [{ x: 0, y: 0, z: 0, value: 3 }])).toThrow(
+      VoxelChunkError,
+    );
     const maxRevision = createVoxelChunkSnapshot({
       coordinate,
       palette,
@@ -130,8 +127,8 @@ describe('voxel chunk snapshots', () => {
     expect(editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 0 }]).snapshot).toBe(
       maxRevision,
     );
-    expect(() =>
-      editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 1 }]),
-    ).toThrow(VoxelChunkError);
+    expect(() => editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 1 }])).toThrow(
+      VoxelChunkError,
+    );
   });
 });

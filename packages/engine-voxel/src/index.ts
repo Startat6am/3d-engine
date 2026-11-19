@@ -43,7 +43,10 @@ export type VoxelChunkErrorCode =
   | 'REVISION_OVERFLOW';
 
 export class VoxelChunkError extends Error {
-  constructor(readonly code: VoxelChunkErrorCode, message: string) {
+  constructor(
+    readonly code: VoxelChunkErrorCode,
+    message: string,
+  ) {
     super(message);
     this.name = 'VoxelChunkError';
   }
@@ -162,8 +165,12 @@ export class VoxelChunkSnapshot {
 
   withEdits(edits: readonly VoxelCellEdit[]): VoxelEditResult {
     const nextCells = this.#cells.slice();
-    let minX = 16, minY = 16, minZ = 16;
-    let maxX = -1, maxY = -1, maxZ = -1;
+    let minX = 16,
+      minY = 16,
+      minZ = 16;
+    let maxX = -1,
+      maxY = -1,
+      maxZ = -1;
     for (const edit of edits) {
       const index = cellIndex(edit.x, edit.y, edit.z);
       if (!Number.isSafeInteger(edit.value) || edit.value < 0 || edit.value > this.palette.length) {
@@ -186,12 +193,7 @@ export class VoxelChunkSnapshot {
       throw new VoxelChunkError('REVISION_OVERFLOW', 'Chunk revision cannot be incremented safely');
     }
     return {
-      snapshot: new VoxelChunkSnapshot(
-        this.coordinate,
-        this.revision + 1,
-        this.palette,
-        nextCells,
-      ),
+      snapshot: new VoxelChunkSnapshot(this.coordinate, this.revision + 1, this.palette, nextCells),
       changedBounds: Object.freeze({
         min: Object.freeze({ x: minX, y: minY, z: minZ }),
         max: Object.freeze({ x: maxX, y: maxY, z: maxZ }),

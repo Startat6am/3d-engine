@@ -32,6 +32,7 @@ Updated: 2026-11-19
 ## M6 implementation and accepted limitations
 
 Implemented:
+
 - `@engine/physics`: engine-owned PhysicsWorld API, Rapier 0.21.0 adapter, fixed-tick integration,
   rigid bodies/colliders, events, raycasts, character controller, pause/single-step, resource limits
   and opt-in bounded static-only triangle meshes.
@@ -44,6 +45,7 @@ Implemented:
 - M6 contracts, ADRs, acceptance criteria, performance report and real-device profiling worksheet.
 
 Verification:
+
 - GitHub Actions run #506 passed on exact M6 PR head `44689fb4cbe1ed38fb53842b18d193abd9bf8b2e`:
   install, Prettier, ESLint, TypeScript, Vitest, package/app builds, GLB stress benchmarks and
   Playwright Chromium E2E.
@@ -51,6 +53,7 @@ Verification:
   no issues.
 
 Explicitly deferred; do not describe as passed:
+
 - Physical desktop/target-device profiling.
 - Controlled WASM-memory/allocation and GPU/frame-time profiling; numeric performance budgets.
 - Physical gamepad verification.
@@ -82,6 +85,7 @@ Explicitly deferred; do not describe as passed:
 - [ADR 0011 — Static voxel collision](ADR/0011-voxel-static-collision.md)
 
 Next sequence:
+
 1. Validate decisions against public APIs in geometry, assets, serialization, Editor
    ProjectAssetStore and physics.
 2. Implement validated world settings, immutable chunk snapshots, dense Uint16 cell payloads and
