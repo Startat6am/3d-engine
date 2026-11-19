@@ -12,12 +12,13 @@
 - Treat an unavailable neighbor as provisional air so a newly loaded chunk has no holes at its outer boundary. Mark the result as dependent on that neighbor's availability/revision.
 - Neighbor arrival, removal or revision change invalidates affected boundary faces on both sides.
 - Results carry source chunk revision and six neighbor revision/availability tokens. Discard results if any token is stale at publication time.
+- Keep the synchronous mesher as the deterministic baseline and expose a cooperative async entry point accepting `AbortSignal`. The async path yields between z-slices and rejects with `MESHING_ABORTED`; mutable intermediate geometry is private and no partial result is returned.
 - Emit deterministic positions, outward normals, consistent triangle winding and valid Uint32 indices. Scale geometry by world voxel size.
 - Empty chunks return an empty result without allocating vertex/index buffers.
 
 ## Implementation status
 
-The current `@engine/voxel` mesher implements exposed-face culling, deterministic material-part ordering, outward normals/winding, UVs, voxel-size scaling, intra-chunk and loaded-neighbor culling, and neighbor revision tokens. The `isVoxelMeshResultCurrent` helper rejects output when source revision, neighbor revision/availability, or neighbor coordinates have changed. Tests cover empty/full chunks, adjacent cells/chunks, multiple materials, provisional boundaries, invalid neighbors, face winding and stale results. Cancellation orchestration remains open.
+The current `@engine/voxel` mesher implements exposed-face culling, deterministic material-part ordering, outward normals/winding, UVs, voxel-size scaling, intra-chunk and loaded-neighbor culling, and neighbor revision tokens. The `isVoxelMeshResultCurrent` helper rejects output when source revision, neighbor revision/availability, or neighbor coordinates have changed. Tests cover empty/full chunks, adjacent cells/chunks, multiple materials, provisional boundaries, invalid neighbors, face winding, stale results, async/sync parity, pre-aborted jobs and mid-job cancellation. `meshVoxelChunkAsync` observes `AbortSignal` between z-slices and rejects without publishing partial geometry.
 
 ## Consequences
 

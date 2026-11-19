@@ -216,6 +216,7 @@ export function editVoxelChunk(
 export {
   isVoxelMeshResultCurrent,
   meshVoxelChunk,
+  meshVoxelChunkAsync,
   VoxelMeshingError,
   type VoxelChunkNeighbors,
   type VoxelFaceDirection,

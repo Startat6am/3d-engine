@@ -1,6 +1,6 @@
 # World and Voxel Subsystem Specification
 
-**Status:** M7 contract baseline; coordinate/settings, immutable chunk storage/palette validation, and baseline CPU meshing implemented. Streaming, stale-result orchestration, persistence and runtime integration remain pending.
+**Status:** M7 contract baseline; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are implemented. Bounded streaming, persistence and runtime integration remain pending.
 **Milestone:** 7 — World & Voxels.
 
 ## Purpose and boundaries
@@ -24,7 +24,8 @@ The voxel subsystem is a geometry provider. It must not introduce voxel-specific
 - `@engine/world`: signed safe-integer chunk coordinates, canonical keys, floor-based world-to-chunk mapping, finite positive voxel-size validation, and fixed 16³ schema-v1 chunk dimensions.
 - `@engine/voxel`: immutable snapshots backed by owned Uint16 cell buffers (4,096 cells); zero is air and non-zero values are one-based palette indexes. Palette references are stable asset IDs or built-in material keys. Batch edits increment one revision and report inclusive changed bounds.
 - CPU meshing: deterministic exposed-face culling, one `MeshData` part per palette index, outward normals/consistent winding, UVs, voxel-size scaling, intra-chunk and six-neighbor culling, neighbor revision tokens, and provisional boundary faces when a neighbor is unavailable.
-- Not yet implemented: meshing-job cancellation orchestration, bounded streaming, generators, persisted chunk blobs, static collision generation, and Editor/Player integration.
+- Meshing cancellation: `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal`, and rejects with `MESHING_ABORTED` before returning any result; partial geometry remains private.
+- Not yet implemented: bounded streaming, generators, persisted chunk blobs, static collision generation, and Editor/Player integration.
 
 ## Coordinate and identity model
 

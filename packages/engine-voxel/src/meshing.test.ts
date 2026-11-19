@@ -3,6 +3,7 @@ import {
   createVoxelChunkSnapshot,
   isVoxelMeshResultCurrent,
   meshVoxelChunk,
+  meshVoxelChunkAsync,
   VoxelMeshingError,
   type VoxelPaletteEntry,
 } from './index.js';
@@ -37,6 +38,40 @@ function faceCount(result: ReturnType<typeof meshVoxelChunk>): number {
 }
 
 describe('voxel CPU meshing', () => {
+  it('async meshing produces the same immutable result as synchronous meshing', async () => {
+    const source = snapshot(coordinate, [
+      { x: 1, y: 2, z: 3, value: 1 },
+      { x: 2, y: 2, z: 3, value: 1 },
+    ]);
+    const synchronous = meshVoxelChunk(source);
+    const asynchronous = await meshVoxelChunkAsync(source);
+
+    expect(asynchronous).toEqual(synchronous);
+  });
+
+  it('rejects a meshing job that is already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(meshVoxelChunkAsync(snapshot(), {}, 1, controller.signal)).rejects.toMatchObject({
+      code: 'MESHING_ABORTED',
+    });
+  });
+
+  it('cancels cooperatively and never publishes partially built geometry', async () => {
+    const controller = new AbortController();
+    const denseCells = new Uint16Array(4096).fill(1);
+    const source = createVoxelChunkSnapshot({
+      coordinate,
+      palette: stonePalette,
+      cells: denseCells,
+    });
+    const pending = meshVoxelChunkAsync(source, {}, 1, controller.signal);
+    setTimeout(() => controller.abort(), 0);
+
+    await expect(pending).rejects.toMatchObject({ code: 'MESHING_ABORTED' });
+  });
+
   it('returns no mesh buffers for an empty chunk', () => {
     const result = meshVoxelChunk(snapshot());
     expect(result.parts).toEqual([]);

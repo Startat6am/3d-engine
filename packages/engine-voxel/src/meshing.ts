@@ -35,7 +35,10 @@ export interface VoxelMeshResult {
   readonly provisional: boolean;
 }
 
-export type VoxelMeshingErrorCode = 'INVALID_MESH_VOXEL_SIZE' | 'INVALID_NEIGHBOR_COORDINATE';
+export type VoxelMeshingErrorCode =
+  | 'INVALID_MESH_VOXEL_SIZE'
+  | 'INVALID_NEIGHBOR_COORDINATE'
+  | 'MESHING_ABORTED';
 
 export class VoxelMeshingError extends Error {
   constructor(
@@ -256,61 +259,78 @@ export function isVoxelMeshResultCurrent(
   }
 }
 
-/** Build deterministic exposed-face geometry from an immutable chunk and its six neighbors. */
-export function meshVoxelChunk(
+interface MutableMeshingState {
+  readonly neighborRevisions: readonly VoxelNeighborRevision[];
+  readonly mutableParts: Map<number, MutableMeshPart>;
+  provisional: boolean;
+}
+
+function createMeshingState(
   snapshot: VoxelChunkSnapshot,
-  neighbors: VoxelChunkNeighbors = {},
-  voxelSize = 1,
-): VoxelMeshResult {
+  neighbors: VoxelChunkNeighbors,
+  voxelSize: number,
+): MutableMeshingState {
   if (!Number.isFinite(voxelSize) || voxelSize <= 0) {
     throw new VoxelMeshingError(
       'INVALID_MESH_VOXEL_SIZE',
       'Meshing voxel size must be a finite positive number',
     );
   }
+  return {
+    neighborRevisions: validateNeighbors(snapshot.coordinate, neighbors),
+    mutableParts: new Map(),
+    provisional: false,
+  };
+}
 
-  const neighborRevisions = validateNeighbors(snapshot.coordinate, neighbors);
-  const mutableParts = new Map<number, MutableMeshPart>();
-  let provisional = false;
+function meshZSlice(
+  snapshot: VoxelChunkSnapshot,
+  neighbors: VoxelChunkNeighbors,
+  voxelSize: number,
+  z: number,
+  state: MutableMeshingState,
+): void {
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const paletteIndex = snapshot.getCell(x, y, z);
+      if (paletteIndex === 0) continue;
 
-  for (let z = 0; z < 16; z++) {
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        const paletteIndex = snapshot.getCell(x, y, z);
-        if (paletteIndex === 0) continue;
+      for (const face of FACES) {
+        const [dx, dy, dz] = face.offset;
+        const nx = x + dx;
+        const ny = y + dy;
+        const nz = z + dz;
+        let adjacentValue: number;
 
-        for (const face of FACES) {
-          const [dx, dy, dz] = face.offset;
-          const nx = x + dx;
-          const ny = y + dy;
-          const nz = z + dz;
-          let adjacentValue: number;
-
-          if (nx >= 0 && nx < 16 && ny >= 0 && ny < 16 && nz >= 0 && nz < 16) {
-            adjacentValue = snapshot.getCell(nx, ny, nz);
+        if (nx >= 0 && nx < 16 && ny >= 0 && ny < 16 && nz >= 0 && nz < 16) {
+          adjacentValue = snapshot.getCell(nx, ny, nz);
+        } else {
+          const neighbor = neighbors[face.direction];
+          if (!neighbor) {
+            adjacentValue = 0;
+            state.provisional = true;
           } else {
-            const neighbor = neighbors[face.direction];
-            if (!neighbor) {
-              adjacentValue = 0;
-              provisional = true;
-            } else {
-              adjacentValue = neighborCell(neighbor, face.direction, x, y, z);
-            }
+            adjacentValue = neighborCell(neighbor, face.direction, x, y, z);
           }
-
-          if (adjacentValue !== 0) continue;
-          let part = mutableParts.get(paletteIndex);
-          if (!part) {
-            part = { positions: [], normals: [], uvs: [], indices: [] };
-            mutableParts.set(paletteIndex, part);
-          }
-          addFace(part, x, y, z, voxelSize, face);
         }
+
+        if (adjacentValue !== 0) continue;
+        let part = state.mutableParts.get(paletteIndex);
+        if (!part) {
+          part = { positions: [], normals: [], uvs: [], indices: [] };
+          state.mutableParts.set(paletteIndex, part);
+        }
+        addFace(part, x, y, z, voxelSize, face);
       }
     }
   }
+}
 
-  const parts = [...mutableParts.entries()]
+function finalizeMeshResult(
+  snapshot: VoxelChunkSnapshot,
+  state: MutableMeshingState,
+): VoxelMeshResult {
+  const parts = [...state.mutableParts.entries()]
     .sort(([left], [right]) => left - right)
     .map(([paletteIndex, part]) => {
       const paletteEntry = snapshot.palette[paletteIndex - 1];
@@ -336,7 +356,55 @@ export function meshVoxelChunk(
     sourceCoordinate: snapshot.coordinate,
     sourceRevision: snapshot.revision,
     parts: Object.freeze(parts),
-    neighborRevisions,
-    provisional,
+    neighborRevisions: state.neighborRevisions,
+    provisional: state.provisional,
   });
+}
+
+function throwIfMeshingAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new VoxelMeshingError('MESHING_ABORTED', 'Voxel meshing was cancelled');
+  }
+}
+
+function yieldToEventLoop(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** Build deterministic exposed-face geometry from an immutable chunk and its six neighbors. */
+export function meshVoxelChunk(
+  snapshot: VoxelChunkSnapshot,
+  neighbors: VoxelChunkNeighbors = {},
+  voxelSize = 1,
+): VoxelMeshResult {
+  const state = createMeshingState(snapshot, neighbors, voxelSize);
+  for (let z = 0; z < 16; z++) {
+    meshZSlice(snapshot, neighbors, voxelSize, z, state);
+  }
+  return finalizeMeshResult(snapshot, state);
+}
+
+/**
+ * Cooperative async meshing for cancellable jobs. Work yields between z-slices so
+ * AbortSignal can be observed; partial geometry stays private and is never returned.
+ */
+export async function meshVoxelChunkAsync(
+  snapshot: VoxelChunkSnapshot,
+  neighbors: VoxelChunkNeighbors = {},
+  voxelSize = 1,
+  signal?: AbortSignal,
+): Promise<VoxelMeshResult> {
+  throwIfMeshingAborted(signal);
+  const state = createMeshingState(snapshot, neighbors, voxelSize);
+
+  for (let z = 0; z < 16; z++) {
+    throwIfMeshingAborted(signal);
+    meshZSlice(snapshot, neighbors, voxelSize, z, state);
+    if (z < 15) {
+      await yieldToEventLoop();
+    }
+  }
+
+  throwIfMeshingAborted(signal);
+  return finalizeMeshResult(snapshot, state);
 }
