@@ -25,7 +25,8 @@ function result(value: string, byteLength = 8): WorldChunkJobResult<string> {
 function request(
   x: number,
   revision: number,
-  run: (signal: AbortSignal) => Promise<WorldChunkJobResult<string>> = async () => result(`chunk-${x}`),
+  run: (signal: AbortSignal) => Promise<WorldChunkJobResult<string>> = async () =>
+    result(`chunk-${x}`),
   priority = 0,
 ) {
   return { coordinate: { x, y: 0, z: 0 }, revision, priority, run };
@@ -62,15 +63,37 @@ describe('bounded world chunk scheduler', () => {
   it('enforces concurrency, queue bounds and stable priority ordering', async () => {
     const firstGate = deferred<WorldChunkJobResult<string>>();
     const started: string[] = [];
-    const scheduler = new WorldChunkScheduler<string>({ limits: { ...limits, maxResidentChunks: 3 } });
+    const scheduler = new WorldChunkScheduler<string>({
+      limits: { ...limits, maxResidentChunks: 3 },
+    });
     const first = scheduler.request(
       request(0, 1, async () => {
         started.push('first');
         return firstGate.promise;
       }),
     );
-    const low = scheduler.request(request(1, 1, async () => { started.push('low'); return result('low'); }, 1));
-    const high = scheduler.request(request(2, 1, async () => { started.push('high'); return result('high'); }, 9));
+    const low = scheduler.request(
+      request(
+        1,
+        1,
+        async () => {
+          started.push('low');
+          return result('low');
+        },
+        1,
+      ),
+    );
+    const high = scheduler.request(
+      request(
+        2,
+        1,
+        async () => {
+          started.push('high');
+          return result('high');
+        },
+        9,
+      ),
+    );
     const overflow = scheduler.request(request(3, 1));
 
     await expectStreamingError(overflow, 'WORLD_QUEUE_FULL');
@@ -85,12 +108,21 @@ describe('bounded world chunk scheduler', () => {
     const scheduler = new WorldChunkScheduler<string>({ limits });
     let observedAbort = false;
     const pending = scheduler.request(
-      request(0, 1, (signal) => new Promise((_resolve, reject) => {
-        signal.addEventListener('abort', () => {
-          observedAbort = true;
-          reject(new Error('worker observed abort'));
-        }, { once: true });
-      })),
+      request(
+        0,
+        1,
+        (signal) =>
+          new Promise((_resolve, reject) => {
+            signal.addEventListener(
+              'abort',
+              () => {
+                observedAbort = true;
+                reject(new Error('worker observed abort'));
+              },
+              { once: true },
+            );
+          }),
+      ),
     );
 
     expect(scheduler.cancel({ x: 0, y: 0, z: 0 }, 1)).toBe(true);
@@ -114,7 +146,9 @@ describe('bounded world chunk scheduler', () => {
 
   it('rejects stale revision completion instead of publishing it', async () => {
     const oldGate = deferred<WorldChunkJobResult<string>>();
-    const scheduler = new WorldChunkScheduler<string>({ limits: { ...limits, maxConcurrentJobs: 2 } });
+    const scheduler = new WorldChunkScheduler<string>({
+      limits: { ...limits, maxConcurrentJobs: 2 },
+    });
     const old = scheduler.request(request(0, 1, () => oldGate.promise));
     const current = scheduler.request(request(0, 2, async () => result('new-revision')));
 
@@ -126,8 +160,13 @@ describe('bounded world chunk scheduler', () => {
   });
 
   it('enforces payload and resident bounds without implicit eviction', async () => {
-    const scheduler = new WorldChunkScheduler<string>({ limits: { ...limits, maxResidentChunks: 1 } });
-    await expectStreamingError(scheduler.request(request(0, 1, async () => result('large', 65))), 'CHUNK_PAYLOAD_TOO_LARGE');
+    const scheduler = new WorldChunkScheduler<string>({
+      limits: { ...limits, maxResidentChunks: 1 },
+    });
+    await expectStreamingError(
+      scheduler.request(request(0, 1, async () => result('large', 65))),
+      'CHUNK_PAYLOAD_TOO_LARGE',
+    );
     await expect(scheduler.request(request(0, 1))).resolves.toBe('chunk-0');
     await expectStreamingError(scheduler.request(request(1, 1)), 'WORLD_RESIDENT_CAPACITY');
     expect(scheduler.residentCount).toBe(1);
