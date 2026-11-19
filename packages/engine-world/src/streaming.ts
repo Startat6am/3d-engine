@@ -192,7 +192,9 @@ export class WorldChunkScheduler<T> {
 
     this.#jobs.set(key, job);
     this.#queue.push(job);
-    this.#queue.sort((left, right) => right.priority - left.priority || left.sequence - right.sequence);
+    this.#queue.sort(
+      (left, right) => right.priority - left.priority || left.sequence - right.sequence,
+    );
     this.#pump();
     return promise;
   }
@@ -202,7 +204,9 @@ export class WorldChunkScheduler<T> {
     if (this.#disposed) return false;
     const coordinateKey = chunkCoordinateKey(createChunkCoordinate(coordinate));
     const matching = [...this.#jobs.values()].filter(
-      (job) => job.coordinateKey === coordinateKey && (revision === undefined || job.revision === revision),
+      (job) =>
+        job.coordinateKey === coordinateKey &&
+        (revision === undefined || job.revision === revision),
     );
     for (const job of matching) this.#cancelJob(job, 'WORLD_JOB_CANCELLED');
     if (revision === undefined || this.#desiredRevisions.get(coordinateKey) === revision) {
@@ -225,7 +229,9 @@ export class WorldChunkScheduler<T> {
     const resident = this.#residents.get(coordinateKey);
     if (!resident) return undefined;
     const desiredRevision = this.#desiredRevisions.get(coordinateKey);
-    return desiredRevision === undefined || desiredRevision === resident.revision ? resident : undefined;
+    return desiredRevision === undefined || desiredRevision === resident.revision
+      ? resident
+      : undefined;
   }
 
   dispose(): void {
@@ -270,7 +276,11 @@ export class WorldChunkScheduler<T> {
   }
 
   #pump(): void {
-    while (!this.#disposed && this.#active.size < this.#limits.maxConcurrentJobs && this.#queue.length > 0) {
+    while (
+      !this.#disposed &&
+      this.#active.size < this.#limits.maxConcurrentJobs &&
+      this.#queue.length > 0
+    ) {
       const job = this.#queue.shift()!;
       if (job.settled) continue;
       this.#active.add(job);
@@ -288,7 +298,10 @@ export class WorldChunkScheduler<T> {
         job.controller.signal.aborted ||
         this.#desiredRevisions.get(job.coordinateKey) !== job.revision
       ) {
-        throw new WorldStreamingError('WORLD_JOB_CANCELLED', 'Chunk job result became stale before publication');
+        throw new WorldStreamingError(
+          'WORLD_JOB_CANCELLED',
+          'Chunk job result became stale before publication',
+        );
       }
       if (!Number.isSafeInteger(result.byteLength) || result.byteLength < 0) {
         throw new WorldStreamingError(
