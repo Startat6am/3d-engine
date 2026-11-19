@@ -227,7 +227,11 @@ let cameraElevation = Math.atan2(
   camera.position[1],
   Math.hypot(camera.position[0], camera.position[2]),
 );
-const cameraOrbitRadius = Math.hypot(camera.position[0], camera.position[2]);
+const cameraOrbitRadius = Math.hypot(
+  camera.position[0],
+  camera.position[1],
+  camera.position[2],
+);
 const cameraOrbitSensitivity = 0.006;
 const cameraOrbitMinElevation = -1.2;
 const cameraOrbitMaxElevation = 1.2;
@@ -257,6 +261,7 @@ function setCameraOrbitEnabled(enabled: boolean) {
   cameraModeButton!.setAttribute('aria-pressed', String(enabled));
   cameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
   canvas!.dataset.cameraMode = String(enabled);
+  if (enabled) updateOrbitCamera();
 }
 cameraModeButton.addEventListener('click', () => {
   setCameraOrbitEnabled(!cameraOrbitEnabled);
@@ -273,7 +278,7 @@ canvas.addEventListener('pointerdown', (event) => {
     // Pointer capture may be unavailable for synthetic test events.
   }
 });
-canvas.addEventListener('pointermove', (event) => {
+window.addEventListener('pointermove', (event) => {
   if (!cameraOrbitEnabled || cameraOrbitPointerId !== event.pointerId) return;
   event.preventDefault();
   const deltaX = event.clientX - cameraOrbitPointerX;
@@ -290,8 +295,8 @@ canvas.addEventListener('pointermove', (event) => {
 const releaseCameraOrbitPointer = (event: PointerEvent) => {
   if (cameraOrbitPointerId === event.pointerId) cameraOrbitPointerId = null;
 };
-canvas.addEventListener('pointerup', releaseCameraOrbitPointer);
-canvas.addEventListener('pointercancel', releaseCameraOrbitPointer);
+window.addEventListener('pointerup', releaseCameraOrbitPointer);
+window.addEventListener('pointercancel', releaseCameraOrbitPointer);
 canvas.addEventListener('lostpointercapture', releaseCameraOrbitPointer);
 window.addEventListener('blur', () => {
   cameraOrbitPointerId = null;
