@@ -12,7 +12,7 @@ Updated: 2026-11-19
 - M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
   on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
 - Last committed PR head before the current cancellation slice: `49af7c78602453eb64ec16b350e283ad2eb1affd`.
-  The cancellation implementation in the working tree must be committed and pushed before merge.
+  Cancellation, bounded streaming and seeded generation are included in PR #90; exact-head CI remains the merge gate.
 - Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
   automatically.
 
@@ -59,12 +59,18 @@ Explicitly deferred; do not describe as passed:
 
 ## M7 current implementation
 
-- `@engine/world` is registered in the root TypeScript project graph. It provides signed safe-integer chunk coordinates, canonical keys, floor-based world-position mapping, and validated world settings with 16³ chunk dimensions.
-- `@engine/voxel` is a separate package. It provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits, and inclusive changed bounds.
-- CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal faces and loaded-neighbor faces, records all six neighbor revision/availability tokens, and marks missing-neighbor boundary faces provisional.
-- `meshVoxelChunkAsync` adds cooperative `AbortSignal` cancellation by yielding between z-slices. Aborted jobs reject with `MESHING_ABORTED`; mutable partial geometry is never returned. The sync...[truncated]Next sequence:
+- `@engine/world` provides signed safe-integer chunk coordinates, canonical keys, floor-based world-position mapping, validated world settings and a bounded `WorldChunkScheduler<T>`.
+- The scheduler bounds concurrent jobs, queued jobs, resident chunks and per-chunk payload bytes; it deduplicates coordinate/revision requests, orders by priority with FIFO ties, propagates AbortSignal, rejects stale completions, enforces explicit eviction and disposes idempotently.
+- `createChunkGenerationContext` supplies a deterministic PRNG scoped to a validated world seed and signed chunk coordinate, plus the request AbortSignal.
+- `@engine/voxel` provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits and inclusive changed bounds.
+- CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal and loaded-neighbor faces, records six neighbor revision/availability tokens and marks missing-neighbor boundary faces provisional.
+- `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal` and rejects with `MESHING_ABORTED`; partial geometry is never returned. The synchronous mesher remains the deterministic baseline.
+- Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passes with 229/229 Vitest tests; Chromium E2E passes 23/23 after the seeded generator hooks. Exact-head GitHub Actions remains the merge gate.
+- Not implemented yet: repeated end-to-end lifecycle stress coverage, persisted voxel extension/binary asset adapter, static collision generation and Editor/Player voxel acceptance scene.
 
-1. Add deterministic seeded generator hooks and lifecycle stress tests around request/edit/mesh/evict/dispose.
+Next sequence:
+
+1. Add repeated load/edit/mesh/evict/dispose lifecycle stress tests and diagnostics.
 2. Extract the shared project storage adapter; persist chunk descriptors and content-addressed
    payload blobs through the versioned world envelope.
 3. Add static collision descriptors through public physics APIs.
