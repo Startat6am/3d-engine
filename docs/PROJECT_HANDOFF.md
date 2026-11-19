@@ -12,7 +12,7 @@ Updated: 2026-11-19
 - M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
   on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
 - Last committed PR head before the current cancellation slice: `49af7c78602453eb64ec16b350e283ad2eb1affd`.
-  The cancellation implementation is now committed in the current branch update.
+  The cancellation implementation in the working tree must be committed and pushed before merge.
 - Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
   automatically.
 
@@ -36,9 +36,7 @@ Implemented:
   and opt-in bounded static-only triangle meshes.
 - `@engine/input`: semantic action maps/contexts, fixed-tick snapshots, keyboard/mouse/gamepad
   adapters, transient input handling and focus/visibility/disconnect neutralization.
-- Player Physics Playground with Rapier WASM, collisions, raycast, keyboard/touch movement, virtual
-  joystick, jump, pause/resume, single-step and camera orbit.
-- Editor UX cleanup: truthful renderer/save status, actionable empty-scene state and removal of
+- Pl...[truncated]- Editor UX cleanup: truthful renderer/save status, actionable empty-scene state and removal of
   decorative/non-functional placeholders.
 - M6 contracts, ADRs, acceptance criteria, performance report and real-device profiling worksheet.
 
@@ -64,20 +62,7 @@ Explicitly deferred; do not describe as passed:
 - `@engine/world` is registered in the root TypeScript project graph. It provides signed safe-integer chunk coordinates, canonical keys, floor-based world-position mapping, and validated world settings with 16³ chunk dimensions.
 - `@engine/voxel` is a separate package. It provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits, and inclusive changed bounds.
 - CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal faces and loaded-neighbor faces, records all six neighbor revision/availability tokens, and marks missing-neighbor boundary faces provisional.
-- `meshVoxelChunkAsync` adds cooperative `AbortSignal` cancellation by yielding between z-slices. Aborted jobs reject with `MESHING_ABORTED`; mutable partial geometry is never returned. The synchronous mesher remains available as the deterministic baseline.
-- Cancellation tests cover synchronous/asynchronous parity, pre-aborted signals and mid-job abort. Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passes with 215/215 Vitest tests; Chromium E2E passes 23/23 after the cancellation change. Exact-head GitHub Actions must pass before merge.
-- Not implemented yet: bounded streaming, seeded generators, persisted voxel extension/binary asset adapter, static collision generation, and Editor/Player voxel acceptance scene.
-## M7 architecture decisions and next work
-
-- [ADR 0005 — World/Voxel package boundaries](ADR/0005-world-voxel-package-boundaries.md)
-- [ADR 0006 — Chunk coordinates and dimensions](ADR/0006-chunk-coordinates.md)
-- [ADR 0007 — Dense cell storage and palette](ADR/0007-voxel-cell-storage.md)
-- [ADR 0008 — CPU meshing and chunk borders](ADR/0008-voxel-meshing.md)
-- [ADR 0009 — Bounded streaming lifecycle](ADR/0009-world-streaming.md)
-- [ADR 0010 — Persistence and asset blobs](ADR/0010-voxel-serialization.md)
-- [ADR 0011 — Static voxel collision](ADR/0011-voxel-static-collision.md)
-
-Next sequence:
+- `meshVoxelChunkAsync` adds cooperative `AbortSignal` cancellation by yielding between z-slices. Aborted jobs reject with `MESHING_ABORTED`; mutable partial geometry is never returned. The sync...[truncated]Next sequence:
 
 1. Implement bounded world streaming: request queue, concurrency/priority, cancellation propagation,
    deduplication, explicit eviction, and disposal.
