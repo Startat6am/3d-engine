@@ -59,6 +59,29 @@ describe('voxel world project persistence', () => {
     expect(store.writes.at(-1)).toBe('worlds/main.world');
   });
 
+  it('rejects invalid voxel settings', async () => {
+    const store = new MemoryProjectFileStore();
+    await expect(
+      saveVoxelWorldProject(store, document, { ...settings, voxelSize: 0 }, []),
+    ).rejects.toMatchObject({ code: 'INVALID_EXTENSION' });
+    expect(store.paths()).not.toContain('worlds/main.world');
+  });
+
+  it('rejects unsupported extension schema versions', async () => {
+    const store = new MemoryProjectFileStore();
+    await saveVoxelWorldProject(store, document, settings, [chunk(4)]);
+    const manifest = JSON.parse(
+      new TextDecoder().decode(await store.readFile('worlds/main.world')),
+    ) as {
+      extensions: Record<string, { schemaVersion: number }>;
+    };
+    manifest.extensions['com.choreon.voxel-world']!.schemaVersion = 99;
+    await store.writeFile('worlds/main.world', new TextEncoder().encode(JSON.stringify(manifest)));
+    await expect(loadVoxelWorldProject(store)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_VERSION',
+    });
+  });
+
   it('rejects duplicate chunk coordinates before writing the manifest', async () => {
     const store = new MemoryProjectFileStore();
     await expect(

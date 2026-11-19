@@ -51,7 +51,10 @@ function coordinateKey(coordinate: ChunkCoordinate3): string {
 
 function validateSettings(settings: VoxelWorldSettings): void {
   if (!Number.isFinite(settings.voxelSize) || settings.voxelSize <= 0) {
-    throw new ProjectAssetStoreError('Voxel size must be a positive finite number', 'INVALID_PATH');
+    throw new ProjectAssetStoreError(
+      'Voxel size must be a positive finite number',
+      'INVALID_EXTENSION',
+    );
   }
   if (!isRecord(settings.chunkDimensions)) {
     throw new ProjectAssetStoreError('Chunk dimensions must be an object', 'INVALID_EXTENSION');
@@ -60,7 +63,7 @@ function validateSettings(settings: VoxelWorldSettings): void {
     if (!Number.isSafeInteger(value) || value <= 0) {
       throw new ProjectAssetStoreError(
         'Chunk dimensions must be positive safe integers',
-        'INVALID_PATH',
+        'INVALID_EXTENSION',
       );
     }
   }
@@ -139,15 +142,19 @@ export async function loadVoxelWorldProject(store: ProjectFileStore): Promise<{
 }> {
   const document = await loadDirectoryProject(store);
   const raw = document.extensions[VOXEL_WORLD_EXTENSION_KEY];
-  if (
-    !isRecord(raw) ||
-    raw.schemaVersion !== VOXEL_WORLD_EXTENSION_VERSION ||
-    !Array.isArray(raw.chunks) ||
-    !isRecord(raw.settings)
-  ) {
+  if (!isRecord(raw)) {
+    throw new ProjectAssetStoreError('Voxel-world extension is missing', 'MISSING_PAYLOAD');
+  }
+  if (raw.schemaVersion !== VOXEL_WORLD_EXTENSION_VERSION) {
     throw new ProjectAssetStoreError(
-      'Missing or unsupported voxel-world extension',
-      'MISSING_PAYLOAD',
+      'Unsupported voxel-world extension version',
+      'UNSUPPORTED_VERSION',
+    );
+  }
+  if (!Array.isArray(raw.chunks) || !isRecord(raw.settings)) {
+    throw new ProjectAssetStoreError(
+      'Invalid voxel-world extension structure',
+      'INVALID_EXTENSION',
     );
   }
   const settings = raw.settings as unknown as VoxelWorldSettings;
