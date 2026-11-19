@@ -1,6 +1,8 @@
 # M6 Execution Plan — Physics/Input
 
-Updated: 2026-11-17
+**Status: CLOSED (owner-directed functional milestone closure, 2026-11-19).**
+
+Updated: 2026-11-19
 
 ## Scope and browser target
 
@@ -32,13 +34,13 @@ A separate Vercel project `3d-engine-player` is linked to this repository with R
 
 The deployed Player root, Playground HTML, JS module and Rapier WASM asset returned HTTP 200. The WASM response was verified with `Content-Type: application/wasm`, `Access-Control-Allow-Origin: *`, and `Cache-Control: public, max-age=0, must-revalidate`; repeated fetches changed from cache MISS to HIT. This does not prove browser execution. An isolated headless Chromium attempt was redirected to Vercel SSO, so deployed Chrome initialization, fallback/error behavior and interactive behavior remain open pending an authorized browser session. No production deployment or domain promotion was performed.
 
-## Remaining work
+## Deferred follow-ups (not M6 closure blockers)
 
-1. [x] Owner reviewed the current deployed Player/Playground in normal Chrome on 2026-11-19 and reported no issues. This is visual/runtime acceptance for the reviewed staging build, not a hardware performance profile.
-2. Finish Chromium input evidence; distinguish browser-adapter simulation tests from physical gamepad testing.
-3. Profile representative browser/device physics workloads, dense contacts, queries, WASM memory and allocations. Follow `docs/PHYSICS_DEVICE_PROFILE_TEMPLATE.md`; record three runs on named desktop hardware and at least one target device, preserve raw JSON, then obtain owner-approved budgets.
-4. Complete visual review and obtain explicit owner acceptance of the static-only triangle-mesh scope.
-5. Update `docs/acceptance/M6_PHYSICS_INPUT.md` with exact evidence, rerun full CI on the final PR head, and obtain M6 sign-off.
+1. [x] Owner reviewed the current deployed Player/Playground in normal Chrome on 2026-11-19 and reported no issues.
+2. [x] Automated Chromium input/browser evidence is recorded; physical gamepad verification remains optional and is not inferred from simulated adapter tests.
+3. [deferred] Physical desktop/target-device profiling, controlled WASM memory/allocation measurements, full rendered-frame/GPU profiling, and owner-approved numeric budgets. The owner has no nearby computer; closure proceeds without fabricating measurements.
+4. [x] M6 scope is frozen at opt-in static-only triangle meshes. Dynamic/kinematic triangle meshes and automatic mesh cooking remain out of scope.
+5. [ ] Latest documentation-head CI and PR merge governance remain to be checked separately; this is repository integration housekeeping, not an unrecorded M6 implementation gate.
 
 ## Rapier decision and constraints
 
@@ -47,10 +49,15 @@ The deployed Player root, Playground HTML, JS module and Rapier WASM asset retur
 - Dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred.
 - The preliminary Node/Rapier report is directional only; it is not browser/device performance sign-off or an approved memory/performance budget.
 
-Do not merge/close PR #87, mark M6 complete, or start M7/M10 work while required gates remain open.
+M6 is closed as a functional milestone by owner direction. Start M7 only on a separate `feat/m7-*` branch. Keep M10 at its planned roadmap milestone.
 
 
 ## Owner review update — 2026-11-19
 
 - The interactive Chrome review of the current deployed Player/Physics Playground is complete and reported OK by the owner. See `docs/PROJECT_HANDOFF.md` and `docs/acceptance/M6_PHYSICS_INPUT.md`.
 - Real-device profiling remains the next open M6 gate. The repeatable capture procedure and results worksheet are in `docs/PHYSICS_DEVICE_PROFILE_TEMPLATE.md`; no hardware measurements or performance budgets are claimed yet.
+
+
+## Closure record — 2026-11-19
+
+The owner explicitly directed that M6 be documented and closed despite having no nearby computer for physical-device profiling. This plan therefore records functional M6 closure with a transparent profiling exception: existing Node/Rapier and headless Chromium results are diagnostic evidence only, not physical-hardware acceptance. Device/GPU/WASM-memory/allocation profiling and numeric budgets are deferred follow-ups. This decision does not claim those measurements passed. M7 can proceed independently; PR #87 still requires latest-head CI review and normal merge governance.
