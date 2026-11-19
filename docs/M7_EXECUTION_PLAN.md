@@ -25,7 +25,7 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Add validated world settings and fixed 16³ chunk configuration.
 - [x] Add immutable dense Uint16 cell snapshots, palette references and payload validation.
 - [x] Add stable error codes, edit revisions and changed-region reporting.
-- [x] Current local verification: Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 210/210 Vitest tests, including 20 world/voxel tests. Chromium E2E passed 23/23 on the preceding storage-only head; the final meshing head must rerun E2E and exact-head CI.
+- [x] Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 210/210 Vitest tests; Chromium E2E passed 23/23 on the final meshing head. Exact-head GitHub Actions for the latest PR commit is pending.
 - [x] Original stacked M7 exact-head GitHub Actions run [#508](https://github.com/Startat6am/3d-engine/actions/runs/44465317676) passed the full CI workflow, including Chromium E2E. The clean main-based branch must run CI again.
 
 ## Phase 2 — CPU meshing
