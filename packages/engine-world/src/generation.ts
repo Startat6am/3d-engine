@@ -26,7 +26,10 @@ export class WorldGenerationError extends Error {
 function validateSeed(seed: WorldSeed): WorldSeed {
   if (typeof seed === 'number') {
     if (!Number.isSafeInteger(seed)) {
-      throw new WorldGenerationError('INVALID_WORLD_SEED', 'Numeric world seeds must be safe integers');
+      throw new WorldGenerationError(
+        'INVALID_WORLD_SEED',
+        'Numeric world seeds must be safe integers',
+      );
     }
     return seed;
   }
@@ -46,11 +49,22 @@ function hashSeed(value: string): number {
 }
 
 /** Create a deterministic PRNG stream scoped to one seed and signed chunk coordinate. */
-export function createSeededChunkRandom(seed: WorldSeed, coordinate: ChunkCoordinate3): () => number {
+export function createSeededChunkRandom(
+  seed: WorldSeed,
+  coordinate: ChunkCoordinate3,
+): () => number {
   const validatedSeed = validateSeed(seed);
   const chunk = createChunkCoordinate(coordinate);
   let state = hashSeed(
-    String(typeof validatedSeed) + ':' + String(validatedSeed) + '|' + chunk.x + ',' + chunk.y + ',' + chunk.z,
+    String(typeof validatedSeed) +
+      ':' +
+      String(validatedSeed) +
+      '|' +
+      chunk.x +
+      ',' +
+      chunk.y +
+      ',' +
+      chunk.z,
   );
 
   return () => {
