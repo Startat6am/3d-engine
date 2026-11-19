@@ -86,7 +86,6 @@ Next sequence:
 
 Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
 
-
 ## Quality gates
 
 Requirements: Node.js 22.12+ and pnpm 12.18.0.
