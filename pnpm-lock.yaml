@@ -367,6 +367,15 @@ importers:
         specifier: ^8.20.0
         version: 8.20.0
 
+  packages/engine-voxel:
+    dependencies:
+      '@engine/geometry':
+        specifier: workspace:*
+        version: link:../engine-geometry
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../engine-world
+
 packages:
   '@babel/code-frame@7.29.7':
     resolution:
