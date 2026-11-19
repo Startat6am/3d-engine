@@ -33,23 +33,23 @@ The existing Node and headless Chromium numbers are synthetic/shared-runner diag
 
 ## Capture this environment for every run
 
-| Field | Value |
-| --- | --- |
-| Date/time and timezone | |
-| Device manufacturer/model | |
-| CPU model / core count | |
-| RAM | |
-| GPU model | |
-| OS version / build | |
-| Browser name and full version | |
-| Browser channel (Stable/Beta/Dev) | |
-| Power mode / plugged in or battery | |
-| Display resolution / refresh rate | |
-| Viewport dimensions / device scale factor | |
-| Foreground tab; other workload closed? | |
-| Repository commit SHA | |
-| Benchmark page URL | |
-| Run number (1, 2, 3) / cold or warm | |
+| Field                                     | Value |
+| ----------------------------------------- | ----- |
+| Date/time and timezone                    |       |
+| Device manufacturer/model                 |       |
+| CPU model / core count                    |       |
+| RAM                                       |       |
+| GPU model                                 |       |
+| OS version / build                        |       |
+| Browser name and full version             |       |
+| Browser channel (Stable/Beta/Dev)         |       |
+| Power mode / plugged in or battery        |       |
+| Display resolution / refresh rate         |       |
+| Viewport dimensions / device scale factor |       |
+| Foreground tab; other workload closed?    |       |
+| Repository commit SHA                     |       |
+| Benchmark page URL                        |       |
+| Run number (1, 2, 3) / cold or warm       |       |
 
 ## Record from the JSON report
 
@@ -77,14 +77,14 @@ The benchmark page isolates physics and does not include ECS synchronization, sc
 
 Add one row per independent run; do not average away outliers before recording raw observations.
 
-| Device / run | Commit | WASM init ms | Sparse 1k fixed-step p95 ms | Dense fixed-step p95 ms | Dense events | JS heap after scenarios | UA memory bytes/status | Playground FPS / notes |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | --- |
-| Desktop / 1 | | | | | | | | |
-| Desktop / 2 | | | | | | | | |
-| Desktop / 3 | | | | | | | | |
-| Target device / 1 | | | | | | | | |
-| Target device / 2 | | | | | | | | |
-| Target device / 3 | | | | | | | | |
+| Device / run      | Commit | WASM init ms | Sparse 1k fixed-step p95 ms | Dense fixed-step p95 ms | Dense events | JS heap after scenarios | UA memory bytes/status | Playground FPS / notes |
+| ----------------- | ------ | -----------: | --------------------------: | ----------------------: | -----------: | ----------------------: | ---------------------- | ---------------------- |
+| Desktop / 1       |        |              |                             |                         |              |                         |                        |                        |
+| Desktop / 2       |        |              |                             |                         |              |                         |                        |                        |
+| Desktop / 3       |        |              |                             |                         |              |                         |                        |                        |
+| Target device / 1 |        |              |                             |                         |              |                         |                        |                        |
+| Target device / 2 |        |              |                             |                         |              |                         |                        |                        |
+| Target device / 3 |        |              |                             |                         |              |                         |                        |                        |
 
 ## Interpretation rules
 
