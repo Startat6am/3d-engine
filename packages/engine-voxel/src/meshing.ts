@@ -36,9 +36,7 @@ export interface VoxelMeshResult {
 }
 
 export type VoxelMeshingErrorCode =
-  | 'INVALID_MESH_VOXEL_SIZE'
-  | 'INVALID_NEIGHBOR_COORDINATE'
-  | 'MESHING_ABORTED';
+  'INVALID_MESH_VOXEL_SIZE' | 'INVALID_NEIGHBOR_COORDINATE' | 'MESHING_ABORTED';
 
 export class VoxelMeshingError extends Error {
   constructor(
