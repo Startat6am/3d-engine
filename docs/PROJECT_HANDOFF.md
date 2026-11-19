@@ -11,7 +11,9 @@ Updated: 2026-11-19
   #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
 - M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
   on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
-- Latest PR head before the current voxel persistence slice: `ebabe4d0e06388fbef758d2c6f49cfe3f707e115`; CI for that exact head failed only at `prettier --check` on the voxel codec files (formatting fix included in the follow-up).
+- Latest PR head before the current voxel persistence slice:
+  `ebabe4d0e06388fbef758d2c6f49cfe3f707e115`; CI for that exact head failed only at
+  `prettier --check` on the voxel codec files (formatting fix included in the follow-up).
   Cancellation, bounded streaming and seeded generation are included in PR #90; exact-head CI remains the merge gate.
 - Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
   automatically.
@@ -100,7 +102,6 @@ pnpm e2e
 Every implementation slice must update its owning spec, M7 execution plan and this handoff in the
 same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test
 counts, hardware measurements, deployment state or acceptance.
-
 
 ## Voxel persistence slice — 2026-11-19
 

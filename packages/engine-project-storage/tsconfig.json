@@ -6,20 +6,10 @@
     "outDir": "dist"
   },
   "references": [
-    {
-      "path": "../engine-assets"
-    },
-    {
-      "path": "../engine-serialization"
-    },
-    {
-      "path": "../engine-voxel"
-    },
-    {
-      "path": "../engine-world"
-    }
+    { "path": "../engine-assets" },
+    { "path": "../engine-serialization" },
+    { "path": "../engine-voxel" },
+    { "path": "../engine-world" }
   ],
-  "include": [
-    "src"
-  ]
+  "include": ["src"]
 }

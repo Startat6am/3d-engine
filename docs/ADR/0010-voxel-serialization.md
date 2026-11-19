@@ -21,7 +21,6 @@ The existing world document envelope is versioned and supports an extensible `ex
 
 The world envelope remains format-stable and voxel data remains content-addressed. This ADR does not claim Player/Editor voxel persistence is implemented. The adapter extraction is complete; versioned voxel extension serialization, payload integration tests and Player/Editor wiring remain M7 work.
 
-
 ## Implementation update — 2026-11-19
 
 `@engine/project-storage` now implements the v1 `com.choreon.voxel-world` extension through `saveVoxelWorldProject` and `loadVoxelWorldProject`. The extension stores `schemaVersion: 1`, `voxelSize`, `chunkDimensions`, and per-chunk signed coordinates, revision, palette, and payload metadata (`assetId`, `byteLength`, `codecVersion`, `contentHash`). Chunk bytes are written under `voxel/chunks/sha256/<prefix>/<digest>.bin`; identical payloads deduplicate by digest. Each blob is read back and hash-verified before `saveDirectoryProject` writes `worlds/main.world` last. Loading validates the extension and codec versions, rejects duplicate coordinates, verifies byte length and SHA-256, and delegates cell/palette validation to the voxel codec.

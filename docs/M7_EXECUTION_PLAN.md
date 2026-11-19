@@ -69,7 +69,6 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - GPU meshing, greedy meshing, advanced LOD, lighting bake and ambient occlusion in the initial implementation.
 - Claims of infinite-world scale or fixed performance on unspecified hardware.
 
-
 ## Voxel persistence implementation update — 2026-11-19
 
 - `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16³ chunk).

@@ -140,7 +140,6 @@ describe('voxel chunk snapshots', () => {
   });
 });
 
-
 describe('voxel chunk payload codec', () => {
   it('round-trips chunk cells with stable little-endian bytes', () => {
     const cells = emptyCells();

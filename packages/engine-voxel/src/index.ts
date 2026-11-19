@@ -227,7 +227,6 @@ export {
   type VoxelNeighborRevision,
 } from './meshing.js';
 
-
 /** Stable v1 payload: 4096 tightly packed little-endian Uint16 cell indexes. */
 export const VOXEL_CHUNK_PAYLOAD_VERSION = 1;
 export const VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH = CHUNK_CELL_COUNT * 2;
