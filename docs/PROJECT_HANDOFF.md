@@ -3,15 +3,16 @@ All matched files use Prettier code style!
 
 # Project Handoff — M6 Physics/Input
 
-Updated: 2026-11-18
+Updated: 2026-11-19
 
 ## Current state
 
 - Repository: `Startat6am/3d-engine`
 - PR: [#87 — feat: start M6 physics, input, and editor UX](https://github.com/Startat6am/3d-engine/pull/87)
 - Branch: `feat/m6-physics-input-core`
-- PR remains **open and Draft**. M6 is in progress; no exit gate or owner sign-off is claimed complete.
-- M2–M5 remain complete. Do not reorder milestones or start M7/M10 work.
+- **M6 functional milestone: CLOSED by owner direction on 2026-11-19.** The owner explicitly instructed us to close M6 and proceed without requiring access to a local computer.
+- PR #87 remains open/Draft pending exact-head CI review and normal merge governance; milestone closure is recorded separately from PR merge.
+- M2–M5 remain complete. M7 may begin from a separate branch; M10 remains in its planned later milestone.
 
 ## Latest code and verification
 
@@ -43,7 +44,7 @@ Updated: 2026-11-18
 - This is automated headless/software-renderer evidence, not a real physical GPU/device benchmark or an interactive owner visual review. It does not close the real-device performance, physical gamepad, or owner sign-off gates.
 - Deployment is staging, not Production; no production domain promotion was performed.
 
-## Remaining M6 gates
+## Deferred follow-ups (non-blocking for M6 closure)
 
 1. Complete interactive owner review of the current deployed Player/Playground in a normal Chrome session, including visual appearance and runtime fallback/error behavior. Automated exact-head headless Chromium smoke is now complete; this does not count as owner visual sign-off.
 2. Repeat the browser physics profile on named desktop hardware and at least one target device; complete controlled WASM-memory/allocation measurements and agree performance budgets. The current headless SwiftShader profile is supplemental only.
@@ -57,7 +58,8 @@ Updated: 2026-11-18
 - Dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred.
 - Keep the standard non-SIMD Rapier browser build.
 - Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
-- Do not merge/close PR #87, mark M6 complete, or start M7/M10 while required gates remain open.
+- Do not describe deferred hardware profiling as completed or infer WASM memory from JS heap measurements.
+- M7 work is permitted on a separate branch. Keep M10 deferred to its roadmap milestone.
 
 
 ## Owner review and real-device profiling handoff — 2026-11-19
@@ -67,3 +69,12 @@ Updated: 2026-11-18
 - Added [M6 Real-Device Physics Profile Worksheet](PHYSICS_DEVICE_PROFILE_TEMPLATE.md), commit `adece673ecc710fc7ca2d50b83537c270e1fc4a0`. It documents reproducible commands, environment capture, three runs per device, raw browser JSON, full-Playground observation, and sign-off.
 - Updated [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md), commit `86d20de5a5b7b30b6f2fdfd9864b1b9fef88da8a`, and [physics performance report](PHYSICS_PERFORMANCE_REPORT.md), commit `40a2e3ec2ad248433fe86e178604a2638b09e7fb`. No physical-device numbers or performance budgets are fabricated; those gates remain open.
 - Next: collect three benchmark runs on a named desktop and three on at least one named target device at the same code commit, preserve raw JSON and browser/hardware metadata, then review full-Playground frame behavior. Only after reviewing those results should performance budgets be proposed for owner approval.
+
+
+## M6 closure decision — 2026-11-19
+
+- Owner instruction: “Пиши доки, закрывай м6” (document the work and close M6). The owner also stated there is no computer nearby, so local hardware profiling is not feasible.
+- Decision: close M6 as a **functional implementation and integration milestone**, based on the implemented physics/input/editor/playground scope, automated tests, deployed Playground, and owner visual review reported OK on 2026-11-19.
+- Explicit exception: physical-device/desktop performance, controlled WASM-memory/allocation, full GPU/frame-time profiling, and physical gamepad checks are deferred follow-ups. They are not marked passed, no budgets are invented, and the current synthetic/headless results remain diagnostic only.
+- Scope boundary: static-only triangle meshes remain the supported M6 capability; dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred. Camera follow/free-look/zoom redesign remains deferred by prior product discussion.
+- M7 may start on a new `feat/m7-*` branch. Do not mix M7 implementation into PR #87. PR #87 remains open/Draft until its latest CI result and merge decision are reviewed.
