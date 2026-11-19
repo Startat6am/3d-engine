@@ -77,7 +77,10 @@ function freezePalette(palette: readonly VoxelPaletteEntry[]): readonly VoxelPal
       }
       const key = materialKey(entry.material);
       if (seen.has(key)) {
-        throw new VoxelChunkError('DUPLICATE_PALETTE_MATERIAL', `Duplicate palette material: ${key}`);
+        throw new VoxelChunkError(
+          'DUPLICATE_PALETTE_MATERIAL',
+          `Duplicate palette material: ${key}`,
+        );
       }
       seen.add(key);
       return Object.freeze({ material: Object.freeze({ ...entry.material }) });
@@ -182,6 +185,9 @@ export class VoxelChunkSnapshot {
       maxZ = Math.max(maxZ, edit.z);
     }
     if (maxX < 0) return { snapshot: this, changedBounds: null };
+    if (this.revision === Number.MAX_SAFE_INTEGER) {
+      throw new VoxelChunkError('REVISION_OVERFLOW', 'Chunk revision cannot be incremented safely');
+    }
     return {
       snapshot: new VoxelChunkSnapshot(
         this.coordinate,

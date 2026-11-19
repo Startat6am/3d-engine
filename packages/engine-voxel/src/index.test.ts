@@ -8,6 +8,17 @@ const palette = [
 ];
 const emptyCells = () => new Uint16Array(4096);
 
+function expectVoxelError(run: () => unknown, code: string): void {
+  try {
+    run();
+  } catch (error) {
+    expect(error).toBeInstanceOf(VoxelChunkError);
+    expect(error).toMatchObject({ code });
+    return;
+  }
+  throw new Error(`Expected VoxelChunkError with code ${code}`);
+}
+
 describe('voxel chunk snapshots', () => {
   it('creates a frozen snapshot with an owned cell buffer', () => {
     const cells = emptyCells();
@@ -38,8 +49,16 @@ describe('voxel chunk snapshots', () => {
   });
 
   it('validates buffer type and fixed cell count', () => {
-    expect(() => createVoxelChunkSnapshot({ coordinate, palette, cells: new Uint8Array(4096) as never })).toThrow(VoxelChunkError);
-    expect(() => createVoxelChunkSnapshot({ coordinate, palette, cells: new Uint16Array(10) })).toThrow(VoxelChunkError);
+    expect(() =>
+      createVoxelChunkSnapshot({
+        coordinate,
+        palette,
+        cells: new Uint8Array(4096) as never,
+      }),
+    ).toThrow(VoxelChunkError);
+    expect(() =>
+      createVoxelChunkSnapshot({ coordinate, palette, cells: new Uint16Array(10) }),
+    ).toThrow(VoxelChunkError);
   });
 
   it('rejects cell references outside the palette', () => {
@@ -55,16 +74,24 @@ describe('voxel chunk snapshots', () => {
       ...palette,
       { material: { kind: 'asset' as const, assetId: 'mat:stone' } },
     ];
-    expect(() => createVoxelChunkSnapshot({ coordinate, palette: duplicate, cells: emptyCells() })).toThrow(VoxelChunkError);
-    expect(() => createVoxelChunkSnapshot({ coordinate, palette: [{ material: { kind: 'asset', assetId: '' } }], cells: emptyCells() })).toThrow(VoxelChunkError);
+    expect(() =>
+      createVoxelChunkSnapshot({ coordinate, palette: duplicate, cells: emptyCells() }),
+    ).toThrow(VoxelChunkError);
+    expect(() =>
+      createVoxelChunkSnapshot({
+        coordinate,
+        palette: [{ material: { kind: 'asset', assetId: '' } }],
+        cells: emptyCells(),
+      }),
+    ).toThrow(VoxelChunkError);
   });
 
   it('rejects invalid revisions and cell coordinates', () => {
-    expect(() => createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells(), revision: -1 })).toThrow(VoxelChunkError);
+    expect(() =>
+      createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells(), revision: -1 }),
+    ).toThrow(VoxelChunkError);
     const snapshot = createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells() });
-    expect(() => snapshot.getCell(16, 0, 0)).toThrow(
-      expect.objectContaining({ code: 'INVALID_CELL_COORDINATE' }),
-    );
+    expectVoxelError(() => snapshot.getCell(16, 0, 0), 'INVALID_CELL_COORDINATE');
   });
 
   it('applies edits immutably and increments one revision per batch', () => {
@@ -91,13 +118,17 @@ describe('voxel chunk snapshots', () => {
 
   it('rejects invalid edit values and revision overflow', () => {
     const snapshot = createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells() });
-    expect(() => editVoxelChunk(snapshot, [{ x: 0, y: 0, z: 0, value: 3 }])).toThrow(VoxelChunkError);
+    expect(() =>
+      editVoxelChunk(snapshot, [{ x: 0, y: 0, z: 0, value: 3 }]),
+    ).toThrow(VoxelChunkError);
     const maxRevision = createVoxelChunkSnapshot({
       coordinate,
       palette,
       cells: emptyCells(),
       revision: Number.MAX_SAFE_INTEGER,
     });
-    expect(() => editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 1 }])).toThrow(VoxelChunkError);
+    expect(() =>
+      editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 1 }]),
+    ).toThrow(VoxelChunkError);
   });
 });

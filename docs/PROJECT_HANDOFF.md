@@ -91,7 +91,8 @@ Next sequence:
 5. Add bounded streaming/generator APIs, persistence adapter and mixed Player/Editor acceptance
    scene.
 
-Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
+Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU
+meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
 
 ## Quality gates
 
@@ -107,4 +108,6 @@ pnpm build
 pnpm e2e
 ```
 
-Every implementation slice must update its owning spec, M7 execution plan and this handoff in the same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test counts, hardware measurements, deployment state or acceptance.
+Every implementation slice must update its owning spec, M7 execution plan and this handoff in the
+same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test
+counts, hardware measurements, deployment state or acceptance.
