@@ -11,8 +11,7 @@ Updated: 2026-11-19
   #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
 - M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
   on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
-- Latest PR head before the current Player integration slice: `8b978571d1cb6d0e9615a6863d03b39c74cf1c47`.
-  The exact-head CI for that documentation commit passed; Player folder loading/rendering is the current uncommitted slice. Exact-head CI remains the merge gate.
+- Player project-folder loading and voxel rendering are committed in `a3131b6a1f4c066e6dced58249161d1f5144f28a`; exact-head GitHub Actions [run #557](https://github.com/Startat6am/3d-engine/actions/runs/44598618910) passed. Exact-head CI remains the merge gate.
 - Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
   automatically.
 
