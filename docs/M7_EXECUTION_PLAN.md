@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are implemented; bounded streaming is next.  
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative meshing cancellation, and the bounded chunk scheduler are implemented; seeded generators and persistence are next.  
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-19
@@ -25,7 +25,7 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Add validated world settings and fixed 16³ chunk configuration.
 - [x] Add immutable dense Uint16 cell snapshots, palette references and payload validation.
 - [x] Add stable error codes, edit revisions and changed-region reporting.
-- [x] Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 215/215 Vitest tests after cancellation; Chromium E2E passed 23/23 after the cancellation change. Exact-head CI for the cancellation commit is required before merge.
+- [x] Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 224/224 Vitest tests after the streaming scheduler; Chromium E2E passed 23/23. Exact-head CI for the streaming commit is required before merge.
 - [x] Original stacked M7 exact-head GitHub Actions run [#508](https://github.com/Startat6am/3d-engine/actions/runs/44465317676) passed the full CI workflow, including Chromium E2E. The clean main-based branch must run CI again.
 
 ## Phase 2 — CPU meshing
@@ -39,7 +39,7 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 
 ## Phase 3 — streaming and procedural hooks
 
-- [ ] Add a bounded request queue, concurrency/priority, cancellation propagation, deduplication and explicit eviction.
+- [x] Add a bounded request queue, concurrency/priority, cancellation propagation, deduplication, explicit eviction and disposal; require caller-supplied resident/payload limits.
 - [ ] Add a deterministic seeded generator interface and a test generator.
 - [ ] Keep main-thread execution as the correctness baseline; add workers only after contract parity tests.
 - [ ] Add repeated load/edit/mesh/evict/dispose tests and diagnostics.

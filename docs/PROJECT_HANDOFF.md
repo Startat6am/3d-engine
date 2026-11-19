@@ -21,9 +21,9 @@ Updated: 2026-11-19
 - M2–M5: complete.
 - M6 Physics/Input: functionally closed by owner direction on 2026-11-19.
 - M7 World & Voxels: active; coordinates/settings, immutable chunk storage/palette validation,
-  deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are
-  implemented. Bounded streaming is next; persistence, static collision, and Editor/Player
-  integration remain pending.
+  deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and a
+  bounded chunk scheduler are implemented. Seeded generation is next; persistence, static collision,
+  and Editor/Player integration remain pending.
 - M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
   started. AI authoring remains M10; do not reorder the roadmap.
 
@@ -64,14 +64,12 @@ Explicitly deferred; do not describe as passed:
 - CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal faces and loaded-neighbor faces, records all six neighbor revision/availability tokens, and marks missing-neighbor boundary faces provisional.
 - `meshVoxelChunkAsync` adds cooperative `AbortSignal` cancellation by yielding between z-slices. Aborted jobs reject with `MESHING_ABORTED`; mutable partial geometry is never returned. The sync...[truncated]Next sequence:
 
-1. Implement bounded world streaming: request queue, concurrency/priority, cancellation propagation,
-   deduplication, explicit eviction, and disposal.
-2. Add deterministic seeded generator hooks and lifecycle stress tests.
-3. Extract the shared project storage adapter; persist chunk descriptors and content-addressed
+1. Add deterministic seeded generator hooks and lifecycle stress tests around request/edit/mesh/evict/dispose.
+2. Extract the shared project storage adapter; persist chunk descriptors and content-addressed
    payload blobs through the versioned world envelope.
-4. Add static collision descriptors through public physics APIs.
-5. Add a mixed voxel/conventional mesh Editor/Player acceptance scene.
-6. Update this handoff, M7 plan, spec and ADRs in every implementation slice; run `pnpm check`,
+3. Add static collision descriptors through public physics APIs.
+4. Add a mixed voxel/conventional mesh Editor/Player acceptance scene.
+5. Update this handoff, M7 plan, spec and ADRs in every implementation slice; run `pnpm check`,
    `pnpm e2e`, and exact-head GitHub Actions.
 
 Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU

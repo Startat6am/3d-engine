@@ -165,3 +165,14 @@ function validateChunkDimensions(dimensions: ChunkDimensions3): void {
     );
   }
 }
+
+export {
+  WorldChunkScheduler,
+  WorldStreamingError,
+  type WorldChunkJobRequest,
+  type WorldChunkJobResult,
+  type WorldChunkResident,
+  type WorldChunkSchedulerOptions,
+  type WorldStreamingErrorCode,
+  type WorldStreamingLimits,
+} from './streaming.js';
