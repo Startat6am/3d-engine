@@ -65,7 +65,7 @@ Explicitly deferred; do not describe as passed:
 - `@engine/voxel` provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits and inclusive changed bounds.
 - CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal and loaded-neighbor faces, records six neighbor revision/availability tokens and marks missing-neighbor boundary faces provisional.
 - `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal` and rejects with `MESHING_ABORTED`; partial geometry is never returned. The synchronous mesher remains the deterministic baseline.
-- Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passes with 229/229 Vitest tests; Chromium E2E passes 23/23 after the seeded generator hooks. Exact-head GitHub Actions remains the merge gate.
+- Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passes with 230/230 Vitest tests; Chromium E2E passes 23/23 after the seeded generator hooks. Exact-head GitHub Actions remains the merge gate.
 - Not implemented yet: repeated end-to-end lifecycle stress coverage, persisted voxel extension/binary asset adapter, static collision generation and Editor/Player voxel acceptance scene.
 
 Next sequence:
