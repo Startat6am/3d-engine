@@ -17,7 +17,7 @@
 
 ## Implementation status
 
-The current `@engine/voxel` mesher implements exposed-face culling, deterministic material-part ordering, outward normals/winding, UVs, voxel-size scaling, intra-chunk and loaded-neighbor culling, and neighbor revision tokens. Tests cover empty/full chunks, adjacent cells/chunks, multiple materials, provisional boundaries, invalid neighbors and face winding. Stale-result rejection and cancellation orchestration remain open.
+The current `@engine/voxel` mesher implements exposed-face culling, deterministic material-part ordering, outward normals/winding, UVs, voxel-size scaling, intra-chunk and loaded-neighbor culling, and neighbor revision tokens. The `isVoxelMeshResultCurrent` helper rejects output when source revision, neighbor revision/availability, or neighbor coordinates have changed. Tests cover empty/full chunks, adjacent cells/chunks, multiple materials, provisional boundaries, invalid neighbors, face winding and stale results. Cancellation orchestration remains open.
 
 ## Consequences
 

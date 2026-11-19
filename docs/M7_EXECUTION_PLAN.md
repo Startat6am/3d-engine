@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core and baseline CPU meshing implemented; bounded streaming and stale-result lifecycle are next.  
+**Status:** ACTIVE — world/chunk core, baseline CPU meshing, and stale-result validation are implemented; cancellation and bounded streaming are next.  
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-19
@@ -33,7 +33,8 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Implement deterministic exposed-face meshing against immutable chunk/neighbor snapshots.
 - [x] Emit `@engine/geometry` MeshData-compatible parts; no renderer/backend imports.
 - [x] Define provisional missing-neighbor faces and record neighbor revision/availability tokens.
-- [ ] Add stale-result rejection by chunk and neighbor revisions plus cancellation orchestration.
+- [x] Reject stale mesh results when source or neighbor revisions/availability change.
+- [ ] Add cancellation orchestration for meshing jobs.
 - [x] Test empty/full, material boundaries, adjacent cells/chunks, normals, winding, indices and scale.
 
 ## Phase 3 — streaming and procedural hooks

@@ -68,7 +68,7 @@ Explicitly deferred; do not describe as passed:
 - CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal faces and loaded-neighbor faces, records all six neighbor revision/availability tokens, and marks missing-neighbor boundary faces provisional.
 - Tests cover coordinates/settings, immutable storage, palette validation, edit revisions, empty/full chunks, material splits, adjacent cells/chunks, normals/winding, scaling, provisional borders and invalid neighbors. The Physics Playground touch-distance assertion now allows one additional fixed tick of browser scheduling jitter; targeted and full Chromium E2E both pass.
 - Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 210/210 Vitest tests; Chromium E2E passed 23/23 on the final meshing head. Exact-head GitHub Actions for the latest PR commit is pending.
-- Not implemented yet: stale mesh-result rejection/cancellation orchestration, bounded streaming, generators, persisted voxel extension/binary asset adapter, static collision generation, and Editor/Player voxel acceptance scene.
+- Not implemented yet: meshing-job cancellation orchestration, bounded streaming, generators, persisted voxel extension/binary asset adapter, static collision generation, and Editor/Player voxel acceptance scene.
 
 ## M7 architecture decisions and next work
 

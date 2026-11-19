@@ -24,7 +24,7 @@ The voxel subsystem is a geometry provider. It must not introduce voxel-specific
 - `@engine/world`: signed safe-integer chunk coordinates, canonical keys, floor-based world-to-chunk mapping, finite positive voxel-size validation, and fixed 16³ schema-v1 chunk dimensions.
 - `@engine/voxel`: immutable snapshots backed by owned Uint16 cell buffers (4,096 cells); zero is air and non-zero values are one-based palette indexes. Palette references are stable asset IDs or built-in material keys. Batch edits increment one revision and report inclusive changed bounds.
 - CPU meshing: deterministic exposed-face culling, one `MeshData` part per palette index, outward normals/consistent winding, UVs, voxel-size scaling, intra-chunk and six-neighbor culling, neighbor revision tokens, and provisional boundary faces when a neighbor is unavailable.
-- Not yet implemented: asynchronous job lifecycle, stale-result rejection/cancellation, bounded streaming, generators, persisted chunk blobs, static collision generation, and Editor/Player integration.
+- Not yet implemented: meshing-job cancellation orchestration, bounded streaming, generators, persisted chunk blobs, static collision generation, and Editor/Player integration.
 
 ## Coordinate and identity model
 
