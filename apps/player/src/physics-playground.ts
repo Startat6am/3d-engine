@@ -227,11 +227,7 @@ let cameraElevation = Math.atan2(
   camera.position[1],
   Math.hypot(camera.position[0], camera.position[2]),
 );
-const cameraOrbitRadius = Math.hypot(
-  camera.position[0],
-  camera.position[1],
-  camera.position[2],
-);
+const cameraOrbitRadius = Math.hypot(camera.position[0], camera.position[1], camera.position[2]);
 const cameraOrbitSensitivity = 0.006;
 const cameraOrbitMinElevation = -1.2;
 const cameraOrbitMaxElevation = 1.2;
