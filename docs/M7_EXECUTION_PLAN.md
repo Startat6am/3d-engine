@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative meshing cancellation, and the bounded chunk scheduler and deterministic seeded generator hooks are implemented; repeated load/eviction lifecycle stress coverage and the shared `@engine/project-storage` package extraction are implemented; versioned voxel-world extension persistence and focused integration tests are implemented; Initial Editor directory-project persistence wiring is implemented; voxel authoring, Player wiring and broader M7 validation remain.
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player now loads voxel project folders, renders voxel chunks with neighbor-face culling, and restores supported primitive mesh entities. Voxel authoring, GLB asset rendering, static collision, end-to-end acceptance and broader M7 validation remain.
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-19
@@ -48,7 +48,7 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 
 ## Phase 4 — serialization and runtime integration
 
-The v1 persistence contract and focused storage tests are implemented. Editor directory-project persistence wiring is implemented; authoring UI and end-to-end voxel round-trip coverage remain open. Player loading, static collision and mixed-scene acceptance also remain open.
+The v1 persistence contract, focused storage tests, Editor directory-project persistence wiring, and the first Player project loader are implemented. Player opens project folders through the browser File System Access API, verifies the directory project and voxel blobs, meshes chunks with loaded-neighbor culling, renders supported Box/Sphere/Plane/Cylinder entities, and frames the loaded content. The Player does not yet decode GLB/custom entities or resolve texture/material asset references; browser folder-picker interaction has not yet been manually acceptance-tested.
 
 - [x] Persist chunk descriptors through the versioned world envelope extension.
 - [x] Store binary cell payloads as immutable content-addressed project blobs; avoid Base64 expansion in directory projects.
@@ -78,5 +78,5 @@ The v1 persistence contract and focused storage tests are implemented. Editor di
 - `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16³ chunk).
 - `@engine/project-storage` owns `com.choreon.voxel-world` extension persistence. The extension records schema version, world voxel settings, signed chunk coordinates, revisions, palettes, and payload references with codec version, exact byte length, and SHA-256.
 - Chunk blobs are immutable and content-addressed; duplicate byte-identical chunks share one blob. Save verifies every blob before writing the manifest last. Load rejects missing/corrupt blobs, unsupported versions, malformed metadata, and duplicate coordinates before returning decoded snapshots.
-- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor/Player integration is not started.
+- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and initial Player folder loading/rendering are wired; GLB asset resolution, voxel authoring, static collision, and end-to-end acceptance remain open.
 - Exact-head GitHub Actions run [#44556875444](https://github.com/Startat6am/3d-engine/actions/runs/44556875444) passed for code head `8da13169472965bfb613943a7e91d94084d3edc0`.

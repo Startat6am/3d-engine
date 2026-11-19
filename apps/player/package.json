@@ -14,7 +14,10 @@
     "@engine/geometry": "workspace:*",
     "@engine/renderer": "workspace:*",
     "@engine/input": "workspace:*",
-    "@engine/physics": "workspace:*"
+    "@engine/physics": "workspace:*",
+    "@engine/project-storage": "workspace:*",
+    "@engine/voxel": "workspace:*",
+    "@engine/serialization": "workspace:*"
   },
   "devDependencies": {
     "vite": "7.3.8"

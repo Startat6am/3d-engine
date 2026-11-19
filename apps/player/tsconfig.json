@@ -22,6 +22,15 @@
     },
     {
       "path": "../../packages/engine-physics"
+    },
+    {
+      "path": "../../packages/engine-project-storage"
+    },
+    {
+      "path": "../../packages/engine-voxel"
+    },
+    {
+      "path": "../../packages/engine-serialization"
     }
   ],
   "include": ["src"]

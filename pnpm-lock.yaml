@@ -309,9 +309,18 @@ importers:
       '@engine/physics':
         specifier: workspace:*
         version: link:../../packages/engine-physics
+      '@engine/project-storage':
+        specifier: workspace:*
+        version: link:../../packages/engine-project-storage
       '@engine/renderer':
         specifier: workspace:*
         version: link:../../packages/engine-renderer
+      '@engine/serialization':
+        specifier: workspace:*
+        version: link:../../packages/engine-serialization
+      '@engine/voxel':
+        specifier: workspace:*
+        version: link:../../packages/engine-voxel
     devDependencies:
       vite:
         specifier: 7.3.8
@@ -386,6 +395,8 @@ importers:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+
+  packages/engine-world: {}
 
   packages/engine-voxel:
     dependencies:

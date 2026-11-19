@@ -7,6 +7,47 @@
   </head>
   <body style="margin: 0; background: #111722">
     <canvas id="player" style="display: block; width: 100vw; height: 100vh"></canvas>
+    <button
+      id="load-project"
+      type="button"
+      style="
+        position: fixed;
+        left: 16px;
+        top: 16px;
+        z-index: 3;
+        padding: 9px 12px;
+        border: 1px solid #40516a;
+        border-radius: 6px;
+        background: #202c3b;
+        color: #d9e7fa;
+        font:
+          11px ui-monospace,
+          monospace;
+        cursor: pointer;
+      "
+    >
+      Open project folder
+    </button>
+    <output
+      id="project-status"
+      aria-live="polite"
+      style="
+        position: fixed;
+        left: 16px;
+        top: 58px;
+        z-index: 3;
+        max-width: min(560px, calc(100vw - 32px));
+        padding: 8px 10px;
+        border-radius: 6px;
+        background: #111722dd;
+        color: #d9e7fa;
+        font:
+          11px ui-monospace,
+          monospace;
+        white-space: pre-wrap;
+      "
+      >Sample scene · choose a project folder to load voxel chunks</output
+    >
     <a
       href="/physics-playground.html"
       style="
