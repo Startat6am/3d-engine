@@ -51,12 +51,10 @@ The deployed Player root, Playground HTML, JS module and Rapier WASM asset retur
 
 M6 is closed as a functional milestone by owner direction. Start M7 only on a separate `feat/m7-*` branch. Keep M10 at its planned roadmap milestone.
 
-
 ## Owner review update — 2026-11-19
 
 - The interactive Chrome review of the current deployed Player/Physics Playground is complete and reported OK by the owner. See `docs/PROJECT_HANDOFF.md` and `docs/acceptance/M6_PHYSICS_INPUT.md`.
 - Real-device profiling remains the next open M6 gate. The repeatable capture procedure and results worksheet are in `docs/PHYSICS_DEVICE_PROFILE_TEMPLATE.md`; no hardware measurements or performance budgets are claimed yet.
-
 
 ## Closure record — 2026-11-19
 
