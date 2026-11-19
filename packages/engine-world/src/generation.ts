@@ -49,7 +49,9 @@ function hashSeed(value: string): number {
 export function createSeededChunkRandom(seed: WorldSeed, coordinate: ChunkCoordinate3): () => number {
   const validatedSeed = validateSeed(seed);
   const chunk = createChunkCoordinate(coordinate);
-  let state = hashSeed(\`\${typeof validatedSeed}:\${validatedSeed}|\${chunk.x},\${chunk.y},\${chunk.z}\`);
+  let state = hashSeed(
+    String(typeof validatedSeed) + ':' + String(validatedSeed) + '|' + chunk.x + ',' + chunk.y + ',' + chunk.z,
+  );
 
   return () => {
     state = (state + 0x6d2b79f5) >>> 0;
