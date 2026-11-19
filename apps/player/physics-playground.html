@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#111722" />
+    <title>Choreon — Physics Playground</title>
+  </head>
+  <body>
+    <div id="playground">
+      <header class="playground-bar">
+        <a class="brand" href="/">CHOREON</a>
+        <span class="bar-divider"></span>
+        <strong>PHYSICS PLAYGROUND</strong>
+        <span class="bar-spacer"></span>
+        <span id="renderer-state" class="state-chip">RENDERER STARTING</span>
+        <span id="physics-wasm" class="state-chip">PHYSICS LOADING</span>
+        <button id="pause" type="button" disabled>Pause</button>
+        <button id="step" type="button" disabled>Step</button>
+        <button id="raycast" type="button" disabled>Raycast</button>
+        <button id="reset-scene" type="button" disabled>Reset scene</button>
+      </header>
+      <main class="playground-main">
+        <canvas id="playground-canvas" aria-label="Physics simulation viewport"></canvas>
+        <section id="touch-hud" class="touch-hud" aria-label="Touch movement controls">
+          <div
+            id="move-joystick"
+            class="touch-joystick"
+            role="group"
+            aria-label="Movement joystick"
+            data-active="false"
+          >
+            <span class="touch-joystick-ring" aria-hidden="true"></span>
+            <span class="touch-joystick-knob" aria-hidden="true"></span>
+            <span class="touch-joystick-label" aria-hidden="true">MOVE</span>
+          </div>
+          <div class="touch-actions">
+            <button
+              id="camera-mode"
+              class="touch-camera"
+              type="button"
+              aria-label="Toggle camera orbit mode"
+              aria-pressed="false"
+              data-active="false"
+            >
+              CAMERA
+            </button>
+            <button class="touch-jump" type="button" data-control="Space" aria-label="Jump">
+              JUMP
+            </button>
+          </div>
+        </section>
+        <section class="help-panel">
+          <strong>Move the sphere</strong>
+          <span>W A S D or the joystick · Space or left mouse button to jump</span>
+          <span>Pause the simulation or advance one fixed step.</span>
+          <output id="raycast-result" aria-live="polite">Raycast not run</output>
+        </section>
+      </main>
+      <footer class="playground-footer">
+        <span id="playground-status" data-testid="playground-status">INITIALIZING</span>
+        <span>Fixed step · 60 Hz</span>
+        <span class="footer-spacer"></span>
+        <span id="player-position">PLAYER X 0.00 · Z 0.00</span>
+        <span id="body-count">0 bodies</span>
+      </footer>
+    </div>
+    <script type="module" src="/src/physics-playground.ts"></script>
+  </body>
+</html>

@@ -115,13 +115,13 @@ describe('EngineRuntime', () => {
     runtime.hierarchy.setParent(child, parent);
 
     const phases: string[] = [];
-    const fixedTimes: Array<[number, number]> = [];
+    const fixedTimes: Array<[number, number, number | undefined, number | undefined]> = [];
     runtime.scheduler.add({ phase: 'pre-update', update: () => phases.push('pre') });
     runtime.scheduler.add({
       phase: 'fixed-update',
-      update: ({ world, deltaTime, elapsedTime }) => {
+      update: ({ world, deltaTime, elapsedTime, fixedStepIndex, fixedStepCount }) => {
         phases.push('fixed');
-        fixedTimes.push([deltaTime, elapsedTime]);
+        fixedTimes.push([deltaTime, elapsedTime, fixedStepIndex, fixedStepCount]);
         world.get(parent, Transform)!.position = [
           world.get(parent, Transform)!.position[0] + 1,
           0,
@@ -143,6 +143,8 @@ describe('EngineRuntime', () => {
     expect(fixedTimes[0]?.[0]).toBeCloseTo(0.1);
     expect(fixedTimes[0]?.[1]).toBeCloseTo(0.1);
     expect(fixedTimes[1]?.[1]).toBeCloseTo(0.2);
+    expect(fixedTimes.map((entry) => entry[2])).toEqual([0, 1]);
+    expect(fixedTimes.map((entry) => entry[3])).toEqual([2, 2]);
     expect(Array.from(runtime.hierarchy.getWorldMatrix(child)!.slice(12, 15))).toEqual([4, 0, 0]);
     expect(frames).toEqual([2]);
   });

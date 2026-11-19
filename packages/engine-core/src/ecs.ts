@@ -150,6 +150,10 @@ export interface SystemContext {
   readonly world: World;
   readonly deltaTime: number;
   readonly elapsedTime: number;
+  /** Zero-based index of this fixed tick within the current rendered frame. */
+  readonly fixedStepIndex?: number;
+  /** Number of fixed ticks scheduled for the current rendered frame. */
+  readonly fixedStepCount?: number;
 }
 export interface WorldSystem {
   readonly phase: SystemPhase;
@@ -473,6 +477,8 @@ export class EngineRuntime {
         world: this.world,
         deltaTime: fixedDeltaTime,
         elapsedTime,
+        fixedStepIndex: step,
+        fixedStepCount: tick.fixedSteps,
       });
     }
 

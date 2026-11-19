@@ -1,6 +1,6 @@
 # Roadmap
 
-**Status:** M2–M5 complete. M5 exit evidence is recorded in [Execution Plan](EXECUTION_PLAN.md). The next planned milestone is M6 Physics & Input; AI authoring remains at its existing later milestone.
+**Status:** M2–M5 complete; M6 Physics & Input implementation is in progress on PR #87. The initial Fake/Rapier adapter conformance suite and configurable physics resource limits are implemented; M6 exit gates remain open. See [Execution Plan](EXECUTION_PLAN.md) and [Project Handoff](PROJECT_HANDOFF.md). AI authoring remains at its existing later milestone.
 
 | Milestone                                  | Deliverables                                                                                                                                                                                       | Exit gate                                                                                                                                                                                                                            |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

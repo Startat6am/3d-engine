@@ -518,8 +518,10 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     buffer: makeTriangleGlb(['AfterMissingBlob']),
   });
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
+  const openProjectError = page.getByText('Could not open project folder', { exact: true });
+  const previousOpenErrorCount = await openProjectError.count();
   await menu.getByRole('button', { name: 'Open Project Folder…' }).click();
-  await expect(page.getByText('Could not open project folder', { exact: true })).toBeVisible();
+  await expect.poll(() => openProjectError.count()).toBeGreaterThan(previousOpenErrorCount);
   await expect(page.getByText(/Project file not found:/)).toBeVisible();
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
 });

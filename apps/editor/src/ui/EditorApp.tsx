@@ -248,8 +248,12 @@ function decodeBase64(source: string): ArrayBuffer {
 
 export function EditorApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fpsRef = useRef<HTMLOutputElement>(null);
+  const renderedFrameCountRef = useRef(0);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
   const [entities, setEntities] = useState<SceneEntity[]>([initialEntity()]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
   const entitiesRef = useRef(entities);
   const history = useRef(new EditorHistory<SceneEntity[]>(100));
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -259,6 +263,7 @@ export function EditorApp() {
     history.current.commit(entitiesRef.current);
     entitiesRef.current = next;
     setEntities(next);
+    setIsDirty(true);
     setHistoryVersion((version) => version + 1);
   };
 
@@ -267,6 +272,7 @@ export function EditorApp() {
     if (!previous) return;
     entitiesRef.current = previous;
     setEntities(previous);
+    setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
       previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''),
@@ -278,6 +284,7 @@ export function EditorApp() {
     if (!next) return;
     entitiesRef.current = next;
     setEntities(next);
+    setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
       next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''),
@@ -308,6 +315,7 @@ export function EditorApp() {
   }, [redo, undo]);
   const [selectedId, setSelectedId] = useState('entity-1');
   const [rendererError, setRendererError] = useState('');
+  const [rendererStatus, setRendererStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const pushDiagnostic = useCallback((entry: Omit<DiagnosticEntry, 'id' | 'time'>) => {
@@ -379,6 +387,7 @@ export function EditorApp() {
     let disposed = false;
     let observer: ResizeObserver | null = null;
     let renderer: ThreeWebGLRendererAdapter | null = null;
+    let fpsTimer: number | null = null;
     void import('@engine/renderer')
       .then(({ ThreeWebGLRendererAdapter: Renderer }) => {
         if (disposed) return;
@@ -390,16 +399,30 @@ export function EditorApp() {
           const bounds = canvas.getBoundingClientRect();
           renderer.resize(bounds.width, bounds.height);
           renderer.render(renderSceneRef.current);
+          renderedFrameCountRef.current += 1;
         };
         observer = new ResizeObserver(resize);
         observer.observe(canvas);
         resize();
+        let lastFpsSample = performance.now();
+        fpsTimer = window.setInterval(() => {
+          const now = performance.now();
+          const elapsed = now - lastFpsSample;
+          if (fpsRef.current)
+            fpsRef.current.textContent = `FPS ${Math.round(
+              (renderedFrameCountRef.current * 1000) / elapsed,
+            )}`;
+          renderedFrameCountRef.current = 0;
+          lastFpsSample = now;
+        }, 500);
+        setRendererStatus('ready');
       })
       .catch((error: unknown) => {
         if (disposed) return;
         const message = error instanceof Error ? error.message : String(error);
         canvas.dataset.rendererError = message;
         setRendererError(message);
+        setRendererStatus('error');
         pushDiagnostic({
           level: 'error',
           source: 'Renderer',
@@ -410,6 +433,7 @@ export function EditorApp() {
       });
     return () => {
       disposed = true;
+      if (fpsTimer !== null) window.clearInterval(fpsTimer);
       observer?.disconnect();
       renderer?.dispose();
       rendererRef.current = null;
@@ -424,6 +448,7 @@ export function EditorApp() {
     const bounds = canvas.getBoundingClientRect();
     renderer.resize(bounds.width, bounds.height);
     renderer.render(renderScene);
+    renderedFrameCountRef.current += 1;
   }, [renderScene]);
 
   const addEntity = useCallback(
@@ -634,6 +659,8 @@ export function EditorApp() {
     anchor.download = `${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'world'}.world`;
     anchor.click();
     URL.revokeObjectURL(url);
+    setIsDirty(false);
+    setHasSaved(true);
   };
 
   const loadWorld = async (
@@ -832,6 +859,8 @@ export function EditorApp() {
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || sourceName.replace(/\.world$/i, ''));
       projectDirectoryRef.current = null;
+      setIsDirty(false);
+      setHasSaved(true);
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -858,6 +887,8 @@ export function EditorApp() {
       const directory = projectDirectoryRef.current ?? (await picker!({ mode: 'readwrite' }));
       projectDirectoryRef.current = directory;
       await saveDirectoryProject(new BrowserProjectFileStore(directory), createWorldDocument());
+      setIsDirty(false);
+      setHasSaved(true);
       pushDiagnostic({
         level: 'info',
         source: 'Project',
@@ -1301,7 +1332,7 @@ export function EditorApp() {
     <main className="editor-shell">
       <header className="topbar">
         <div className="brand-mark">◇</div>
-        <strong>UNIVERSAL ENGINE</strong>
+        <strong>CHOREON</strong>
         <details className="file-menu" style={{ position: 'relative' }}>
           <summary className="toolbar-button" style={{ cursor: 'pointer', listStyle: 'none' }}>
             File ▾
@@ -1366,7 +1397,10 @@ export function EditorApp() {
           className="world-name"
           aria-label="World name"
           value={worldName}
-          onChange={(event) => setWorldName(event.target.value)}
+          onChange={(event) => {
+            setWorldName(event.target.value);
+            setIsDirty(true);
+          }}
         />
         <button
           className="toolbar-button"
@@ -1416,7 +1450,12 @@ export function EditorApp() {
         </button>
         <span className="spacer" />
         <span className="status">
-          <i /> EDITOR · INTERACTIVE PREVIEW
+          <i className={`renderer-dot renderer-${rendererStatus}`} />
+          {rendererStatus === 'ready'
+            ? 'RENDERER ONLINE'
+            : rendererStatus === 'error'
+              ? 'RENDERER ERROR'
+              : 'RENDERER LOADING'}
         </span>
       </header>
       <div className="workspace">
@@ -1449,7 +1488,7 @@ export function EditorApp() {
             </div>
           ) : null}
           <div className="tree-row active">
-            ▣ <span>Untitled World</span>
+            ▣ <span>{worldName || 'Untitled World'}</span>
           </div>
           {entities.map((entity) => (
             <button
@@ -1460,11 +1499,12 @@ export function EditorApp() {
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          <div className="panel-foot">{entities.length} OBJECTS · SCENE 01</div>
+          <div className="panel-foot">{entities.length} OBJECTS</div>
         </aside>
         <section className="viewport">
           <div className="viewport-label">
-            SCENE VIEW <span>WEBGL2</span>
+            SCENE VIEW{' '}
+            <span>{rendererStatus === 'ready' ? 'WEBGL2' : rendererStatus.toUpperCase()}</span>
             <button onClick={resetCamera}>Reset Camera</button>
           </div>
           <div
@@ -1576,6 +1616,15 @@ export function EditorApp() {
             }}
             onWheel={onWheel}
           />
+          <output ref={fpsRef} className="viewport-fps" aria-label="Frames per second">
+            FPS --
+          </output>
+          {entities.length === 0 ? (
+            <div className="viewport-empty-state">
+              <strong>Empty scene</strong>
+              <span>Use + in Hierarchy to add a primitive, or File → Import GLB.</span>
+            </div>
+          ) : null}
           <div className="axis">
             X <b>Y</b> Z
           </div>
@@ -1624,19 +1673,18 @@ export function EditorApp() {
                   </div>
                 </div>
               ))}
-              <label>COMPONENTS</label>
-              <div className="component">
-                ◈ <span>Mesh Renderer</span>
-                <small>✓</small>
-              </div>
-              <div className="component">
-                ▧{' '}
+              <label>OBJECT SOURCE</label>
+              <div className="object-source">
                 <span>
                   {selected.primitive === 'GLB'
-                    ? 'Imported GLB Mesh'
-                    : `${selected.primitive} Geometry`}
+                    ? 'Imported GLB mesh'
+                    : `Built-in ${selected.primitive} primitive`}
                 </span>
-                <small>✓</small>
+                {selected.assetId ? (
+                  <code>{selected.assetId}</code>
+                ) : (
+                  <small>Generated geometry</small>
+                )}
               </div>
             </>
           ) : (
@@ -1644,7 +1692,6 @@ export function EditorApp() {
               Select an object in the Hierarchy or add a primitive to begin.
             </div>
           )}
-          <div className="panel-foot">FOUNDATION BUILD · 0.1.0</div>
         </aside>
       </div>
       {isDiagnosticsOpen ? (
@@ -1679,10 +1726,26 @@ export function EditorApp() {
         </section>
       ) : null}
       <footer className="bottombar">
-        <span>● READY</span>
-        <span>WebGL2 · Three.js adapter</span>
+        <span className={`renderer-state renderer-${rendererStatus}`}>
+          ●{' '}
+          {rendererStatus === 'ready'
+            ? 'RENDERER ONLINE'
+            : rendererStatus === 'error'
+              ? 'RENDERER ERROR'
+              : 'RENDERER LOADING'}
+        </span>
+        <span>
+          {rendererStatus === 'ready'
+            ? 'WebGL2 · Three.js adapter'
+            : rendererStatus === 'error'
+              ? 'Renderer unavailable'
+              : 'Renderer initializing'}
+        </span>
         <span className="spacer" />
-        {entities.length} objects in scene
+        <span className={isDirty ? 'save-state is-dirty' : 'save-state'}>
+          {isDirty ? 'UNSAVED CHANGES' : hasSaved ? 'SAVED' : 'NEW SCENE'}
+        </span>
+        <span>{entities.length} objects</span>
       </footer>
     </main>
   );

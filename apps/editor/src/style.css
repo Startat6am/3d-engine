@@ -35,10 +35,6 @@ body {
   font-size: 24px;
   color: #83b6ff;
 }
-.crumb {
-  color: #8a96a8;
-  letter-spacing: 0;
-}
 .spacer {
   flex: 1;
 }
@@ -56,6 +52,12 @@ body {
   border-radius: 50%;
   background: #6bd3a2;
   margin-right: 7px;
+}
+.status i.renderer-loading {
+  background: #e5b86a;
+}
+.status i.renderer-error {
+  background: #f18c8c;
 }
 .workspace {
   display: grid;
@@ -114,10 +116,6 @@ body {
   background: #26364b;
   color: #a9ccff;
 }
-.tree-row.muted {
-  padding-left: 34px;
-  color: #8290a3;
-}
 .panel-foot {
   position: absolute;
   bottom: 0;
@@ -156,6 +154,23 @@ body {
   width: 100%;
   height: 100%;
   display: block;
+}
+.viewport-fps {
+  position: absolute;
+  z-index: 2;
+  top: 56px;
+  right: 12px;
+  padding: 3px 6px;
+  border: 1px solid rgb(145 165 190 / 28%);
+  border-radius: 4px;
+  background: rgb(12 18 28 / 72%);
+  color: #aebed2;
+  font:
+    9px/1.2 'DM Mono',
+    monospace;
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 .axis {
   position: absolute;
@@ -200,47 +215,22 @@ body {
     monospace;
   letter-spacing: 0.1em;
 }
-.property {
-  display: flex;
-  justify-content: space-between;
-  padding: 9px 15px;
-  color: #aab5c4;
-  font-size: 11px;
-}
-.property code {
-  font:
-    10px 'DM Mono',
-    monospace;
-  color: #c6d1df;
-}
-.component {
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  padding: 11px 15px;
-  color: #bdc9d9;
-}
-.component small {
-  margin-left: auto;
-  color: #718096;
-}
-.add-component {
-  margin: 10px 15px;
-  padding: 8px;
-  width: calc(100% - 30px);
-  background: #202b3a;
-  border: 1px solid #34465c;
-  border-radius: 4px;
-  color: #a9c9f5;
-  font: 11px Manrope;
-}
 .bottombar {
   height: 32px;
   border-top: 1px solid #29313e;
   border-bottom: 0;
 }
-.bottombar span:first-child {
+.bottombar .renderer-state {
   color: #77d5a6;
+}
+.bottombar .renderer-state.renderer-loading {
+  color: #e5b86a;
+}
+.bottombar .renderer-state.renderer-error {
+  color: #f18c8c;
+}
+.bottombar .save-state.is-dirty {
+  color: #e5b86a;
 }
 @media (max-width: 900px) {
   .workspace {
@@ -255,24 +245,6 @@ button:focus-visible,
 input:focus-visible {
   outline: 2px solid #83b6ff;
   outline-offset: -2px;
-}
-.tree-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-  padding: 12px;
-}
-.tree-actions button,
-.component-menu button {
-  background: #202b3a;
-  border: 1px solid #34465c;
-  border-radius: 4px;
-  color: #a9c9f5;
-  padding: 7px 5px;
-  font:
-    10px 'DM Mono',
-    monospace;
-  cursor: pointer;
 }
 .panel-heading button {
   cursor: pointer;
@@ -310,24 +282,50 @@ input:focus-visible {
 .vector-field input:disabled {
   opacity: 0.55;
 }
-.component-menu {
-  display: grid;
-  gap: 5px;
-  margin: 0 15px 12px;
-}
-.component-menu button {
-  display: flex;
-  justify-content: space-between;
-  text-align: left;
-}
-.component-menu small {
-  color: #77869a;
-}
 .empty-inspector {
   padding: 18px 15px;
   color: #8290a3;
   line-height: 1.6;
   font-size: 11px;
+}
+.object-source {
+  display: grid;
+  gap: 5px;
+  padding: 11px 15px 16px;
+  color: #bdc9d9;
+  font-size: 11px;
+}
+.object-source small,
+.object-source code {
+  color: #77869a;
+  font:
+    9px 'DM Mono',
+    monospace;
+  overflow-wrap: anywhere;
+}
+.viewport-empty-state {
+  position: absolute;
+  z-index: 1;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  gap: 8px;
+  width: min(320px, calc(100% - 40px));
+  padding: 18px;
+  border: 1px solid #344052;
+  border-radius: 8px;
+  background: rgba(17, 23, 34, 0.88);
+  text-align: center;
+  pointer-events: none;
+}
+.viewport-empty-state strong {
+  color: #e6eaf1;
+  font-size: 13px;
+}
+.viewport-empty-state span {
+  color: #98a5b7;
+  font-size: 11px;
+  line-height: 1.5;
 }
 .error-text {
   color: #f18c8c !important;
@@ -376,12 +374,6 @@ input:focus-visible {
   font:
     12px Inter,
     sans-serif;
-}
-.world-error {
-  color: #ff9b9b;
-  padding: 10px 14px;
-  font-size: 10px;
-  line-height: 1.4;
 }
 
 .file-menu {
@@ -610,14 +602,6 @@ input:focus-visible {
     text-align: center;
   }
 
-  .component {
-    min-height: 42px;
-    padding: 10px 12px;
-  }
-
-  .add-component,
-  .component-menu button,
-  .tree-actions button,
   .toolbar-button {
     touch-action: manipulation;
   }

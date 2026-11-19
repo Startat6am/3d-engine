@@ -16,6 +16,12 @@
     },
     {
       "path": "../../packages/engine-renderer"
+    },
+    {
+      "path": "../../packages/engine-input"
+    },
+    {
+      "path": "../../packages/engine-physics"
     }
   ],
   "include": ["src"]
