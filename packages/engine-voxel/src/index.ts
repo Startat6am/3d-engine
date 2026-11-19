@@ -40,7 +40,8 @@ export type VoxelChunkErrorCode =
   | 'DUPLICATE_PALETTE_MATERIAL'
   | 'INVALID_CELL_VALUE'
   | 'INVALID_CELL_COORDINATE'
-  | 'REVISION_OVERFLOW';
+  | 'REVISION_OVERFLOW'
+  | 'INVALID_SERIALIZED_PAYLOAD';
 
 export class VoxelChunkError extends Error {
   constructor(
@@ -225,3 +226,47 @@ export {
   type VoxelMeshingErrorCode,
   type VoxelNeighborRevision,
 } from './meshing.js';
+
+
+/** Stable v1 payload: 4096 tightly packed little-endian Uint16 cell indexes. */
+export const VOXEL_CHUNK_PAYLOAD_VERSION = 1;
+export const VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH = CHUNK_CELL_COUNT * 2;
+
+export interface VoxelChunkPayloadMetadata {
+  readonly coordinate: ChunkCoordinate3;
+  readonly revision: number;
+  readonly palette: readonly VoxelPaletteEntry[];
+}
+
+export function encodeVoxelChunkPayload(snapshot: VoxelChunkSnapshot): Uint8Array {
+  const cells = snapshot.copyCells();
+  const payload = new Uint8Array(VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH);
+  const view = new DataView(payload.buffer);
+  for (let index = 0; index < cells.length; index++) {
+    view.setUint16(index * 2, cells[index]!, true);
+  }
+  return payload;
+}
+
+export function decodeVoxelChunkPayload(
+  metadata: VoxelChunkPayloadMetadata,
+  payload: Uint8Array,
+): VoxelChunkSnapshot {
+  if (!(payload instanceof Uint8Array) || payload.byteLength !== VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH) {
+    throw new VoxelChunkError(
+      'INVALID_SERIALIZED_PAYLOAD',
+      `Voxel chunk payload must contain exactly ${VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH} bytes`,
+    );
+  }
+  const cells = new Uint16Array(CHUNK_CELL_COUNT);
+  const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  for (let index = 0; index < cells.length; index++) {
+    cells[index] = view.getUint16(index * 2, true);
+  }
+  return createVoxelChunkSnapshot({
+    coordinate: metadata.coordinate,
+    revision: metadata.revision,
+    palette: metadata.palette,
+    cells,
+  });
+}

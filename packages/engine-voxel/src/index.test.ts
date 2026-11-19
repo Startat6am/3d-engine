@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { VoxelChunkError, createVoxelChunkSnapshot, editVoxelChunk } from './index.js';
+import {
+  VoxelChunkError,
+  createVoxelChunkSnapshot,
+  decodeVoxelChunkPayload,
+  editVoxelChunk,
+  encodeVoxelChunkPayload,
+  VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH,
+} from './index.js';
 
 const coordinate = { x: -1, y: 0, z: 2 };
 const palette = [
@@ -129,6 +136,44 @@ describe('voxel chunk snapshots', () => {
     );
     expect(() => editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 1 }])).toThrow(
       VoxelChunkError,
+    );
+  });
+});
+
+
+describe('voxel chunk payload codec', () => {
+  it('round-trips chunk cells with stable little-endian bytes', () => {
+    const cells = emptyCells();
+    cells[0] = 1;
+    cells[4095] = 2;
+    const snapshot = createVoxelChunkSnapshot({ coordinate, revision: 17, palette, cells });
+    const payload = encodeVoxelChunkPayload(snapshot);
+    expect(payload.byteLength).toBe(VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH);
+    expect([...payload.slice(0, 2)]).toEqual([1, 0]);
+    expect([...payload.slice(-2)]).toEqual([2, 0]);
+    const decoded = decodeVoxelChunkPayload(snapshot, payload);
+    expect(decoded.coordinate).toEqual(coordinate);
+    expect(decoded.revision).toBe(17);
+    expect(decoded.palette).toEqual(palette);
+    expect(decoded.copyCells()).toEqual(cells);
+  });
+
+  it('rejects truncated or oversized payloads', () => {
+    const snapshot = createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells() });
+    expect(() => decodeVoxelChunkPayload(snapshot, new Uint8Array(10))).toThrow(
+      expect.objectContaining({ code: 'INVALID_SERIALIZED_PAYLOAD' }),
+    );
+    expect(() =>
+      decodeVoxelChunkPayload(snapshot, new Uint8Array(VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH + 1)),
+    ).toThrow(expect.objectContaining({ code: 'INVALID_SERIALIZED_PAYLOAD' }));
+  });
+
+  it('rejects decoded palette indexes that are out of range', () => {
+    const snapshot = createVoxelChunkSnapshot({ coordinate, palette, cells: emptyCells() });
+    const payload = new Uint8Array(VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH);
+    payload[0] = 3;
+    expect(() => decodeVoxelChunkPayload(snapshot, payload)).toThrow(
+      expect.objectContaining({ code: 'INVALID_CELL_VALUE' }),
     );
   });
 });
