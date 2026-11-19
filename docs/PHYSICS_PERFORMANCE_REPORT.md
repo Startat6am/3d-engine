@@ -1,7 +1,7 @@
-# M6 Physics Performance Report — preliminary
+# Physics Performance Report — M6 baseline and deferred profiling
 
-**Date:** 2026-11-16  
-**Status:** preliminary Node/Rapier microbenchmark; not an M6 performance acceptance sign-off  
+**Updated:** 2026-11-19  
+**Status:** diagnostic baseline only. M6 functional milestone is closed by owner direction; physical-device performance acceptance is explicitly deferred.  
 **Benchmark:** [`packages/engine-physics/bench/physics-performance.mjs`](../packages/engine-physics/bench/physics-performance.mjs)
 
 ## Environment
@@ -165,4 +165,9 @@ The browser profile is supplemental evidence only; real-device/desktop profiling
 - The owner completed an interactive Chrome review of the current deployed Physics Playground and reported no issues. This closes the visual/runtime review item for that reviewed staging build only; it is not a performance result.
 - A repeatable capture worksheet is now maintained in [M6 Real-Device Physics Profile Worksheet](PHYSICS_DEVICE_PROFILE_TEMPLATE.md). It specifies the exact local dev-only browser route (`pnpm dev:player` → `/physics-benchmark.html`), pinned workspace build prerequisite, device/browser/power metadata, three independent runs per device, raw JSON retention, full-Playground observation, and sign-off requirements.
 - The next required measurement is three runs on a named desktop and three runs on at least one named target device, using the same evaluated commit. Preserve raw JSON; do not infer WASM linear-memory size from JS heap. The current benchmark explicitly reports WASM linear memory as unavailable through the public Rapier API.
-- No physical-device measurements or owner-approved performance budgets have been added by this documentation update. The M6 performance gate remains open until hardware evidence is recorded and reviewed.
+- No physical-device measurements or owner-approved performance budgets are available. By owner direction, M6 functional closure proceeds without them; hardware profiling remains a deferred follow-up and is not represented as passed.
+
+
+## M6 closure classification — 2026-11-19
+
+M6 is closed as a functional implementation/integration milestone following the owner's explicit instruction. This report remains a diagnostic baseline, not a hardware performance sign-off. The owner has no nearby computer for local device testing, so the project does not claim desktop/target-device measurements, full rendered-frame/GPU timings, thermal behavior, controlled WASM linear-memory/allocation data, or approved numeric budgets. Revisit those measurements when suitable hardware is available. Do not infer WASM memory from JavaScript heap snapshots or promote shared-runner/headless timings to device guarantees.
