@@ -161,9 +161,6 @@ export class VoxelChunkSnapshot {
   }
 
   withEdits(edits: readonly VoxelCellEdit[]): VoxelEditResult {
-    if (this.revision === Number.MAX_SAFE_INTEGER && edits.length > 0) {
-      throw new VoxelChunkError('REVISION_OVERFLOW', 'Chunk revision cannot be incremented safely');
-    }
     const nextCells = this.#cells.slice();
     let minX = 16, minY = 16, minZ = 16;
     let maxX = -1, maxY = -1, maxZ = -1;

@@ -127,6 +127,9 @@ describe('voxel chunk snapshots', () => {
       cells: emptyCells(),
       revision: Number.MAX_SAFE_INTEGER,
     });
+    expect(editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 0 }]).snapshot).toBe(
+      maxRevision,
+    );
     expect(() =>
       editVoxelChunk(maxRevision, [{ x: 0, y: 0, z: 0, value: 1 }]),
     ).toThrow(VoxelChunkError);
