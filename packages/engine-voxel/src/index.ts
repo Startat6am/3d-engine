@@ -251,10 +251,7 @@ export function decodeVoxelChunkPayload(
   metadata: VoxelChunkPayloadMetadata,
   payload: Uint8Array,
 ): VoxelChunkSnapshot {
-  if (
-    !(payload instanceof Uint8Array) ||
-    payload.byteLength !== VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH
-  ) {
+  if (!(payload instanceof Uint8Array) || payload.byteLength !== VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH) {
     throw new VoxelChunkError(
       'INVALID_SERIALIZED_PAYLOAD',
       `Voxel chunk payload must contain exactly ${VOXEL_CHUNK_PAYLOAD_BYTE_LENGTH} bytes`,
