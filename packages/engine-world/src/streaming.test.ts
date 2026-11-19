@@ -184,6 +184,29 @@ describe('bounded world chunk scheduler', () => {
     expect(scheduler.residentCount).toBe(0);
   });
 
+  it('keeps residency bounded across repeated load and explicit eviction cycles', async () => {
+    const release = vi.fn();
+    const scheduler = new WorldChunkScheduler<string>({
+      limits: { ...limits, maxResidentChunks: 1 },
+      releaseResident: release,
+    });
+
+    for (let cycle = 0; cycle < 40; cycle++) {
+      const coordinate = { x: cycle, y: -cycle, z: 0 };
+      await scheduler.request({
+        coordinate,
+        revision: cycle,
+        run: async () => result(`cycle-${cycle}`),
+      });
+      expect(scheduler.residentCount).toBe(1);
+      expect(scheduler.evict(coordinate)).toBe(true);
+      expect(scheduler.residentCount).toBe(0);
+    }
+
+    scheduler.dispose();
+    expect(release).toHaveBeenCalledTimes(40);
+  });
+
   it('disposes idempotently, aborts work, releases residents and rejects future requests', async () => {
     const release = vi.fn();
     const scheduler = new WorldChunkScheduler<string>({ limits, releaseResident: release });
