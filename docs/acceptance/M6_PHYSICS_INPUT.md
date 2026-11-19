@@ -127,13 +127,11 @@ Record PR/commit links, CI run IDs, browser/runtime versions, test counts, bench
 - Exact-head automated headless Chromium 158 / SwiftShader smoke: Player root and Playground return HTTP 200; WebGL2 and Rapier WASM report READY; WASM asset returns 200 with `application/wasm` and CORS `*`; five bodies initialize; keyboard movement, raycast hit, pause, one-step advancement, and reset work. Mobile 360×780 CDP touch smoke confirms forward movement, pointer release, jump response (Y 0.500→0.663 at ~50 ms), visible touch HUD, and no horizontal overflow. No page or console errors were observed.
 - Deployed smoke remains automated headless/software-renderer evidence. Real physical device/GPU performance, controlled WASM memory/allocation analysis, interactive owner visual review, static-only triangle-mesh scope acceptance, and explicit owner M6 sign-off remain open.
 
-
 ## Owner review update — 2026-11-19
 
 - The owner checked the current deployed Physics Playground in normal Chrome and reported: "Все проверил, все ок." Record the public staging visual/runtime review as complete for the reviewed build. The separate CSS-only camera-toggle sizing/repositioning follow-up was included in the reviewed staging deployment.
 - This is not evidence of a physical-device performance profile, controlled WASM-memory/allocation measurement, approved performance budgets, static-only triangle-mesh scope acceptance, or final M6 sign-off.
 - A repeatable real-device capture worksheet is now available at [PHYSICS_DEVICE_PROFILE_TEMPLATE.md](../PHYSICS_DEVICE_PROFILE_TEMPLATE.md). It defines the environment metadata, three-run capture, raw JSON retention, full-Playground observation, and sign-off checklist. No physical-device measurements are claimed yet.
-
 
 ## M6 closure decision — 2026-11-19
 
