@@ -1,78 +1,83 @@
-Checking formatting...
-All matched files use Prettier code style!
-
-# Project Handoff — M6 Physics/Input
+# Project Handoff — Choreon 3D Engine
 
 Updated: 2026-11-19
 
-## Current state
+## Current authoritative snapshot
 
-- Repository: `Startat6am/3d-engine`
-- PR: [#87 — feat: start M6 physics, input, and editor UX](https://github.com/Startat6am/3d-engine/pull/87)
-- Branch: `feat/m6-physics-input-core`
-- **M6 functional milestone: CLOSED by owner direction on 2026-11-19.** The owner explicitly instructed us to close M6 and proceed without requiring access to a local computer.
-- PR #87 remains open/Draft pending exact-head CI review and normal merge governance; milestone closure is recorded separately from PR merge.
-- M2–M5 remain complete. M7 may begin from a separate branch; M10 remains in its planned later milestone.
+- Repository: `Startat6am/3d-engine`; default branch: `main`.
+- M6 is integrated in `main` through squash merge `54def10255ca8fad661e0077b15c3332d6a390f3` (PR #87).
+- M6 functional implementation is closed. Exact-head GitHub Actions [run #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
+- M7 World & Voxels is active. The initial `@engine/world` coordinate foundation passed exact-head GitHub Actions [run #508](https://github.com/Startat6am/3d-engine/actions/runs/44465317676) on the original stacked head `99c2de59696f706672588b9ccd0e1c050ce921e3`. A clean M7 branch based directly on the new `main` is being prepared because M6 was squash-merged.
+- PR #86 is redundant: its M6 planning docs are included in PR #87's merged tree. Close it as superseded.
+- PR #88 (desktop camera controls) remains separate and must be reviewed/rebased independently; it was based on an earlier M6 commit and diverged.
+- PR #89 is the original stacked M7 draft. Do not merge it against the new `main`; replace it with a main-based M7 PR.
 
-## Latest code and verification
+## Milestone status
 
-- Latest application/code head covered by full CI: `0bd6a6ed9889c60a1d4865283b03f66850e73084` (subsequent branch commits are documentation-only) (`docs(physics): require exact-head browser benchmark CI`).
-- GitHub Actions run [#439](https://github.com/Startat6am/3d-engine/actions/runs/44321353518) passed on this exact head. It completed frozen install, format, lint, typecheck, 180/180 Vitest tests, package/app builds, both GLB stress benchmarks, Chromium installation, and **23/23 Playwright Chromium E2E tests**.
-- The 23-test CI suite includes the production Rapier-WASM browser benchmark, Physics Playground controls, Editor mobile behavior, browser JS/WebGL resource lifecycle measurement, GLB asset lifecycle, and Player shutdown/resource cleanup.
-- Independent Node.js 22.23.5 / pnpm 12.18.0 verification also passed `pnpm check` (180/180 Vitest, formatting, lint, typecheck, package and Editor/Player production builds); the complete local Playwright Chromium suite passed 23/23.
-- PR remains open and Draft; passing exact-head CI does not replace the outstanding real-device/performance and owner acceptance gates.
+- M2–M5: complete.
+- M6 Physics/Input: functionally closed by owner direction on 2026-11-19.
+- M7 World & Voxels: active; chunk-coordinate foundation implemented; payload storage/palette is next.
+- M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
-## Implemented M6 scope
+## M6 implementation and accepted limitations
 
-- `@engine/physics`: engine-owned `PhysicsWorld` contract and Rapier 0.21.0 adapter; fixed-tick integration; body/collider lifecycle; events, raycasts, force/impulse; pause and single-step; resource limits; opt-in bounded static-only triangle meshes.
-- Character controller: grounded state, slope limits, autostep, snap-to-ground and collision results, with integration/lifecycle coverage.
-- `@engine/input`: semantic actions, prioritized contexts, immutable fixed-tick snapshots, keyboard/mouse/gamepad adapters, transient mouse input, and focus/visibility/disconnect neutralization.
-- Editor UX cleanup: truthful renderer/save status, real empty-scene state, removal of decorative component placeholders.
-- Player Physics Playground: Rapier WASM, gravity/collisions, dynamic and kinematic bodies, raycast, keyboard and touch-HUD movement/jump, pause/resume and single-step. Mouse jump and touch-HUD movement/jump are verified by Chromium E2E.
-- Player Physics Playground mobile controls follow-up (2026-11-18): replace the four-button touch D-pad with a circular analog virtual joystick (radial clamp, pointer capture/cancel, release on blur/visibility loss) while retaining the separate jump button. The joystick feeds the existing semantic Move action through the touch adapter. Movement speed is now `1.0` (previously `0.75`, +`0.25`); jump impulse is now `1.2 * sqrt(2.5)` (approximately `1.90`); this targets 2.5× jump height because ballistic apex height scales with impulse squared. The updated Physics Playground Chromium E2E passes, the full Playwright E2E suite passes, and `pnpm check` passes in the continuation sandbox (Node.js 25.9.0; project CI remains the canonical Node.js 22 verification). Exact-head GitHub Actions run [#477](https://github.com/Startat6am/3d-engine/actions/runs/44372351354) passed on commit `1c8e61fd853280011b6218feabd096b97fa8316a`, including the full Node.js 22 CI workflow.
-- Player Physics Playground camera-orbit follow-up (2026-11-18): add a translucent toggle button beside the mobile jump control. When enabled, drags across the canvas orbit the camera horizontally through a full 360° and vertically within a safe elevation range; the camera follows the player while orbit mode is active. The toggle has an accessible pressed state and active styling; pointer capture/cancel, blur and visibility loss release the active drag. Automated coverage checks the toggle and confirms camera drags do not move the player. Build and typecheck pass; full browser E2E remains pending in this sandbox because its Chromium runtime lacks `libglib-2.0.so.0`; CI on the pushed exact head is the canonical browser verification.
+Implemented:
+- `@engine/physics`: engine-owned PhysicsWorld API, Rapier 0.21.0 adapter, fixed-tick integration, rigid bodies/colliders, events, raycasts, character controller, pause/single-step, resource limits and opt-in bounded static-only triangle meshes.
+- `@engine/input`: semantic action maps/contexts, fixed-tick snapshots, keyboard/mouse/gamepad adapters, transient input handling and focus/visibility/disconnect neutralization.
+- Player Physics Playground with Rapier WASM, collisions, raycast, keyboard/touch movement, virtual joystick, jump, pause/resume, single-step and camera orbit.
+- Editor UX cleanup: truthful renderer/save status, actionable empty-scene state and removal of decorative/non-functional placeholders.
+- M6 contracts, ADRs, acceptance criteria, performance report and real-device profiling worksheet.
 
-## Player staging deployment
+Verification:
+- GitHub Actions run #506 passed on exact M6 PR head `44689fb4cbe1ed38fb53842b18d193abd9bf8b2e`: install, Prettier, ESLint, TypeScript, Vitest, package/app builds, GLB stress benchmarks and Playwright Chromium E2E.
+- Owner reviewed the deployed Player/Physics Playground in normal Chrome on 2026-11-19 and reported no issues.
 
-- Separate Vercel project `3d-engine-player` builds from `apps/player`; the existing Editor project is unchanged.
-- Current branch deployment alias: [Player](https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/) · [Physics Playground](https://3d-engine-player-git-feat-m6-physics-input-core-callback5.vercel.app/physics-playground.html).
-- Exact deployment inspected: [`3d-engine-player-28gv19fj3-callback5.vercel.app`](https://3d-engine-player-28gv19fj3-callback5.vercel.app/physics-playground.html), Vercel deployment `dpl_HzcPXyNrZZGkNhchJbgGr88xfdAa`, state READY, built from exact PR head `0bd6a6ed9889c60a1d4865283b03f66850e73084`.
-- **Important alias correction:** the older generic `3d-engine-player-callback5.vercel.app` alias still resolves to the earlier `0260d980269b39ad673b2e8c1f33a56bd401546a` deployment. Do not use it as evidence for the latest branch head; use the branch alias or exact deployment URL above.
-- Automated headless Chromium 158 / SwiftShader smoke against the exact latest deployment confirmed root and Playground HTTP 200, `WEBGL2 READY`, `WASM READY`, five bodies, and no page/console errors. The Rapier WASM request returned HTTP 200 with `Content-Type: application/wasm` and `Access-Control-Allow-Origin: *`.
-- Desktop interaction verified: keyboard movement, raycast hit, pause stability, exactly one requested single-step (the player's Y position changed from 2.679 to 2.686 after reset/pause/step), and scene reset.
-- Mobile-sized 360×780 interaction verified with real CDP touch events: touch-HUD forward movement, pointer release (`data-pressed=false`), jump response (Y 0.500 to 0.663 at approximately 50 ms), visible touch controls, and no horizontal overflow.
-- This is automated headless/software-renderer evidence, not a real physical GPU/device benchmark or an interactive owner visual review. It does not close the real-device performance, physical gamepad, or owner sign-off gates.
-- Deployment is staging, not Production; no production domain promotion was performed.
+Explicitly deferred; do not describe as passed:
+- Physical desktop/target-device profiling.
+- Controlled WASM-memory/allocation and GPU/frame-time profiling; numeric performance budgets.
+- Physical gamepad verification.
+- Dynamic/kinematic triangle meshes and automatic mesh cooking.
+- Firefox/WebKit and real mobile-browser compatibility. M6 browser acceptance is Chromium; mobile-sized Chromium touch checks are responsive/input coverage only.
 
-## Deferred follow-ups (non-blocking for M6 closure)
+## M7 current implementation
 
-1. Complete interactive owner review of the current deployed Player/Playground in a normal Chrome session, including visual appearance and runtime fallback/error behavior. Automated exact-head headless Chromium smoke is now complete; this does not count as owner visual sign-off.
-2. Repeat the browser physics profile on named desktop hardware and at least one target device; complete controlled WASM-memory/allocation measurements and agree performance budgets. The current headless SwiftShader profile is supplemental only.
-3. Automated exact-head Chromium input/browser evidence is complete (run #439, 23/23); physical gamepad testing is optional separate evidence and is not claimed by the simulated adapter tests.
-4. Complete final visual review, confirm owner acceptance of the static-only triangle-mesh scope, and obtain explicit M6 owner sign-off.
-5. Re-run full CI on any subsequent code changes; run #477 passed the prior joystick head. The camera-orbit follow-up requires a new exact-head CI run.
+- `@engine/world` is registered in the root TypeScript project graph.
+- Implemented immutable signed chunk coordinates, canonical `x,y,z` keys, and world-position to chunk/local-cell mapping with explicit voxel size and floor semantics for negative coordinates.
+- Seven coordinate tests cover positive/negative positions, exact boundaries, scale, key round-trip and invalid values.
+- Not implemented yet: world settings/lifecycle, voxel cell storage/palette, payload schema/validation, meshing, streaming scheduler, generators, serialization adapter, static collision generation, Editor/Player acceptance scene.
+- Contract: [VOXEL_WORLD_SPEC.md](VOXEL_WORLD_SPEC.md). Execution tracking: [M7_EXECUTION_PLAN.md](M7_EXECUTION_PLAN.md).
 
-## Constraints
+## M7 architecture decisions and next work
 
-- M6 browser acceptance targets Chrome/Chromium only. Firefox/WebKit and mobile-browser compatibility are deferred; Chromium mobile viewport checks are responsive-layout tests only.
-- Dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred.
-- Keep the standard non-SIMD Rapier browser build.
-- Do not claim a memory ceiling from the preliminary shared-VM Node benchmark.
-- Do not describe deferred hardware profiling as completed or infer WASM memory from JS heap measurements.
-- M7 work is permitted on a separate branch. Keep M10 deferred to its roadmap milestone.
+- [ADR 0005 — World/Voxel package boundaries](ADR/0005-world-voxel-package-boundaries.md)
+- [ADR 0006 — Chunk coordinates and dimensions](ADR/0006-chunk-coordinates.md)
+- [ADR 0007 — Dense cell storage and palette](ADR/0007-voxel-cell-storage.md)
+- [ADR 0008 — CPU meshing and chunk borders](ADR/0008-voxel-meshing.md)
+- [ADR 0009 — Bounded streaming lifecycle](ADR/0009-world-streaming.md)
+- [ADR 0010 — Persistence and asset blobs](ADR/0010-voxel-serialization.md)
+- [ADR 0011 — Static voxel collision](ADR/0011-voxel-static-collision.md)
 
-## Owner review and real-device profiling handoff — 2026-11-19
+Next sequence:
+1. Validate decisions against public APIs in geometry, assets, serialization, Editor ProjectAssetStore and physics.
+2. Implement validated world settings, immutable chunk snapshots, dense Uint16 cell payloads and palette references with stable errors.
+3. Implement deterministic face-culling CPU meshing against immutable chunk/neighbor snapshots.
+4. Add revision invalidation and cancellation before streaming concurrency.
+5. Add bounded streaming/generator APIs, persistence adapter and mixed Player/Editor acceptance scene.
 
-- Owner completed an interactive review of the current deployed Player/Physics Playground in normal Chrome and reported all checks OK. Record the visual/runtime review gate as complete for the reviewed staging build. This does not claim physical-device performance, memory/allocation acceptance, static-only triangle-mesh scope acceptance, or final M6 sign-off.
-- The review included the camera-toggle CSS follow-up deployed from branch `fix/m6-desktop-camera-controls`, commit `1e079b68002c1c7a8f46c188a8ad52dfe00203f4`, Vercel deployment `dpl_DqCD2PhsFQ1ZMezBXHoXusm1hVvP` (READY). The camera logic/zoom remains intentionally unchanged and deferred.
-- Added [M6 Real-Device Physics Profile Worksheet](PHYSICS_DEVICE_PROFILE_TEMPLATE.md), commit `adece673ecc710fc7ca2d50b83537c270e1fc4a0`. It documents reproducible commands, environment capture, three runs per device, raw browser JSON, full-Playground observation, and sign-off.
-- Updated [M6 acceptance](acceptance/M6_PHYSICS_INPUT.md), commit `86d20de5a5b7b30b6f2fdfd9864b1b9fef88da8a`, and [physics performance report](PHYSICS_PERFORMANCE_REPORT.md), commit `40a2e3ec2ad248433fe86e178604a2638b09e7fb`. No physical-device numbers or performance budgets are fabricated; those gates remain open.
-- Next: collect three benchmark runs on a named desktop and three on at least one named target device at the same code commit, preserve raw JSON and browser/hardware metadata, then review full-Playground frame behavior. Only after reviewing those results should performance budgets be proposed for owner approval.
+Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
 
-## M6 closure decision — 2026-11-19
+## Quality gates
 
-- Owner instruction: “Пиши доки, закрывай м6” (document the work and close M6). The owner also stated there is no computer nearby, so local hardware profiling is not feasible.
-- Decision: close M6 as a **functional implementation and integration milestone**, based on the implemented physics/input/editor/playground scope, automated tests, deployed Playground, and owner visual review reported OK on 2026-11-19.
-- Explicit exception: physical-device/desktop performance, controlled WASM-memory/allocation, full GPU/frame-time profiling, and physical gamepad checks are deferred follow-ups. They are not marked passed, no budgets are invented, and the current synthetic/headless results remain diagnostic only.
-- Scope boundary: static-only triangle meshes remain the supported M6 capability; dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred. Camera follow/free-look/zoom redesign remains deferred by prior product discussion.
-- M7 may start on a new `feat/m7-*` branch. Do not mix M7 implementation into PR #87. PR #87 remains open/Draft until its latest CI result and merge decision are reviewed.
+Requirements: Node.js 22.12+ and pnpm 12.18.0.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm e2e
+```
+
+Every implementation slice must update its owning spec, M7 execution plan and this handoff in the same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test counts, hardware measurements, deployment state or acceptance.
