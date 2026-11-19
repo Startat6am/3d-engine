@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   createVoxelChunkSnapshot,
+  isVoxelMeshResultCurrent,
   meshVoxelChunk,
   VoxelMeshingError,
   type VoxelPaletteEntry,
@@ -21,11 +22,13 @@ function snapshot(
   chunkCoordinate = coordinate,
   entries: readonly { x: number; y: number; z: number; value: number }[] = [],
   palette: readonly VoxelPaletteEntry[] = stonePalette,
+  revision = 0,
 ) {
   return createVoxelChunkSnapshot({
     coordinate: chunkCoordinate,
     palette,
     cells: cellsWith(entries),
+    revision,
   });
 }
 
@@ -147,6 +150,36 @@ describe('voxel CPU meshing', () => {
     const result = meshVoxelChunk(full);
     expect(faceCount(result)).toBe(6 * 16 * 16);
     expect(result.parts[0]!.geometry.indices).toHaveLength(6 * 16 * 16 * 6);
+  });
+
+  it('accepts a mesh only while its source and neighbor revision tokens remain current', () => {
+    const source = snapshot(coordinate, [{ x: 15, y: 8, z: 8, value: 1 }]);
+    const positiveX = snapshot({ x: 1, y: 0, z: 0 }, [{ x: 0, y: 8, z: 8, value: 1 }]);
+    const neighbors = { positiveX };
+    const result = meshVoxelChunk(source, neighbors);
+
+    expect(isVoxelMeshResultCurrent(result, source, neighbors)).toBe(true);
+    expect(
+      isVoxelMeshResultCurrent(result, snapshot(coordinate, [], stonePalette, 1), neighbors),
+    ).toBe(false);
+    expect(isVoxelMeshResultCurrent(result, source, {})).toBe(false);
+    expect(
+      isVoxelMeshResultCurrent(result, source, {
+        positiveX: snapshot({ x: 1, y: 0, z: 0 }, [], stonePalette, 1),
+      }),
+    ).toBe(false);
+    expect(
+      isVoxelMeshResultCurrent(result, source, {
+        positiveX: snapshot({ x: 2, y: 0, z: 0 }, [], stonePalette),
+      }),
+    ).toBe(false);
+  });
+
+  it('invalidates provisional meshes when a previously missing neighbor arrives', () => {
+    const source = snapshot(coordinate, [{ x: 15, y: 8, z: 8, value: 1 }]);
+    const provisional = meshVoxelChunk(source);
+    const neighbor = snapshot({ x: 1, y: 0, z: 0 });
+    expect(isVoxelMeshResultCurrent(provisional, source, { positiveX: neighbor })).toBe(false);
   });
 
   it('rejects non-finite and non-positive voxel scales', () => {

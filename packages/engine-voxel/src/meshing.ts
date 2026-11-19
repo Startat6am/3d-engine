@@ -227,6 +227,35 @@ function addFace(
   part.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
+/**
+ * Return false when a completed mesh no longer matches its source chunk or any
+ * of the six neighbor availability/revision tokens captured during meshing.
+ */
+export function isVoxelMeshResultCurrent(
+  result: VoxelMeshResult,
+  source: VoxelChunkSnapshot,
+  neighbors: VoxelChunkNeighbors = {},
+): boolean {
+  if (
+    result.sourceCoordinate.x !== source.coordinate.x ||
+    result.sourceCoordinate.y !== source.coordinate.y ||
+    result.sourceCoordinate.z !== source.coordinate.z ||
+    result.sourceRevision !== source.revision
+  ) {
+    return false;
+  }
+
+  try {
+    const currentNeighbors = validateNeighbors(source.coordinate, neighbors);
+    return result.neighborRevisions.every((dependency) => {
+      const current = currentNeighbors.find((item) => item.direction === dependency.direction);
+      return current?.revision === dependency.revision;
+    });
+  } catch {
+    return false;
+  }
+}
+
 /** Build deterministic exposed-face geometry from an immutable chunk and its six neighbors. */
 export function meshVoxelChunk(
   snapshot: VoxelChunkSnapshot,
