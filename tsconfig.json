@@ -21,6 +21,9 @@
     },
     {
       "path": "apps/player"
+    },
+    {
+      "path": "packages/engine-world"
     }
   ]
 }

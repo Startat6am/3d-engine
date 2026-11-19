@@ -51,6 +51,8 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [Physics](docs/PHYSICS_SPEC.md)                      | Physics integration contract                                    |
 | [Input](docs/INPUT_SPEC.md)                          | Device-independent input mapping and fixed-tick snapshots       |
 | [M6 acceptance](docs/acceptance/M6_PHYSICS_INPUT.md) | Physics, input, editor UX and CI exit gates                     |
+| [M7 execution plan](docs/M7_EXECUTION_PLAN.md)       | World and voxel milestone sequencing and acceptance             |
+| [World/voxel spec](docs/VOXEL_WORLD_SPEC.md)         | Chunk, voxel, meshing, streaming and generation contracts       |
 | [Editor](docs/EDITOR_SPEC.md)                        | Authoring application                                           |
 | [Runtime](docs/RUNTIME_SPEC.md)                      | Player lifecycle and frame scheduling                           |
 | [AI agent authoring](docs/AI_AGENT_SPEC.md)          | Prompt-to-object/world workflow, validation and approval        |
@@ -59,7 +61,7 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Status
 
-M2–M5 are complete. M6 Physics & Input is in progress: initial `@engine/physics` and `@engine/input` packages, fixed-tick integration, and Editor UX cleanup are under development; acceptance gates remain open. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at its later roadmap milestone and is not being accelerated.
+M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels has started its contract/architecture phase on `feat/m7-world-voxels`; see the M7 execution plan and voxel/world specification. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
 
 ## Deployment
 

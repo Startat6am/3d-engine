@@ -76,3 +76,27 @@ Updated: 2026-11-19
 - Explicit exception: physical-device/desktop performance, controlled WASM-memory/allocation, full GPU/frame-time profiling, and physical gamepad checks are deferred follow-ups. They are not marked passed, no budgets are invented, and the current synthetic/headless results remain diagnostic only.
 - Scope boundary: static-only triangle meshes remain the supported M6 capability; dynamic/kinematic triangle meshes and automatic mesh cooking remain deferred. Camera follow/free-look/zoom redesign remains deferred by prior product discussion.
 - M7 may start on a new `feat/m7-*` branch. Do not mix M7 implementation into PR #87. PR #87 remains open/Draft until its latest CI result and merge decision are reviewed.
+
+## M7 start and parent-branch CI update — 2026-11-19
+
+- Active work has moved to branch `feat/m7-world-voxels`, created from the M6 branch head `6d094e495be7e1c23c4cf5c1619c6a708a87d081`. This is intentionally a stacked branch: M7 consumes the M6 physics/input contracts while PR #87 remains separate. Do not merge M7 changes into PR #87.
+- Roadmap M7 is **World & Voxels**, not AI authoring. AI authoring remains M10.
+- M7 contract baseline: [World and Voxel Subsystem Specification](VOXEL_WORLD_SPEC.md). Execution tracking: [M7 Execution Plan](M7_EXECUTION_PLAN.md).
+- Repository inventory at M7 start: no engine-world or voxel package exists yet. Existing integration surfaces are engine-core, engine-geometry (CPU MeshData), engine-renderer, engine-assets, engine-serialization (versioned world envelope and project asset store), engine-physics, and engine-input.
+- Current phase is contract/architecture only. No M7 runtime package or voxel implementation is claimed yet. Required ADRs and schema decisions precede implementation.
+- Parent M6 exact-head run [#495](https://github.com/Startat6am/3d-engine/actions/runs/44456164881) completed with failure at `pnpm format:check`: Prettier flagged `docs/acceptance/M6_PHYSICS_INPUT.md`, `docs/EXECUTION_PLAN.md`, `docs/PHYSICS_DEVICE_PROFILE_TEMPLATE.md`, `docs/PHYSICS_PERFORMANCE_REPORT.md`, and `docs/PROJECT_HANDOFF.md`. Lint, typecheck, tests, builds, and E2E were skipped. This must be corrected on the M6 parent branch and exact-head CI rerun before merging the branch stack.
+- The CI failure is a documentation-formatting issue; it is not evidence that M6 runtime tests failed, because those steps did not execute on run #495. Earlier passing exact-code-head CI remains historical evidence only.
+
+## M7 first runtime slice — 2026-11-19
+
+- Added the initial `@engine/world` workspace package and registered it in the root TypeScript project-reference graph.
+- Implemented safe signed chunk coordinates, canonical coordinate keys, and world-position to chunk/local-cell mapping with explicit voxel size and floor-based handling of negative positions.
+- Added tests for positive/negative coordinates, exact boundaries, voxel-size scaling, key round-trips, unsafe values, and stable error codes. These tests are authored but not yet executed in CI; do not mark the slice verified until a green exact-head run exists.
+- No voxel payload storage, mesher, streaming scheduler, generator, serialization adapter, or Editor/Player integration is implemented yet. Those remain later M7 phases after the ADRs and schema decisions.
+- Current M7 branch head is recorded in GitHub; next engineering step is to review the coordinate API against actual geometry/serialization contracts, then add ADR-backed chunk settings and voxel payload validation.
+
+## M7 local verification — 2026-11-19
+
+- In the remote development box, Node.js 22.23.5 and pnpm 12.18.0: `pnpm check` passed, including Prettier, ESLint, TypeScript project-reference checks, all package/app builds, and 189/189 Vitest tests (14/14 files). The seven new world-coordinate tests passed.
+- The Playwright Chromium binary downloaded, but all 23 E2E tests were blocked before page launch because the box image lacks the system library `libglib-2.0.so.0`. This is an environment prerequisite failure, not an assertion failure. GitHub Actions on the exact PR head remains the canonical E2E verification.
+- The local Prettier pass also corrected the five M6 documentation files that caused parent run #495 to stop, plus README, ROADMAP, and the new world package source formatting.
