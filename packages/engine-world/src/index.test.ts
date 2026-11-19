@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CHUNK_CELL_COUNT,
+  createWorldSettings,
+  DEFAULT_CHUNK_DIMENSIONS,
   chunkCoordinateKey,
   createChunkCoordinate,
   parseChunkCoordinateKey,
@@ -21,6 +24,16 @@ function expectWorldError(run: () => unknown, code: string): void {
 }
 
 describe('world chunk coordinates', () => {
+  it('creates validated immutable world settings with fixed v1 chunk dimensions', () => {
+    const settings = createWorldSettings(0.25);
+    expect(settings.voxelSize).toBe(0.25);
+    expect(settings.chunkDimensions).toEqual({ x: 16, y: 16, z: 16 });
+    expect(settings.chunkDimensions).toBe(DEFAULT_CHUNK_DIMENSIONS);
+    expect(CHUNK_CELL_COUNT).toBe(4096);
+    expect(Object.isFrozen(settings)).toBe(true);
+    expect(() => createWorldSettings(0)).toThrow(WorldCoordinateError);
+    expect(() => createWorldSettings(Number.NaN)).toThrow(WorldCoordinateError);
+  });
   it('maps positive world positions to chunk and local cell coordinates', () => {
     expect(worldPointToChunkAddress({ x: 17.25, y: 2, z: 31.99 }, 1, dimensions)).toEqual({
       chunk: { x: 1, y: 0, z: 1 },

@@ -1,3 +1,22 @@
+export const DEFAULT_CHUNK_DIMENSIONS: ChunkDimensions3 = Object.freeze({ x: 16, y: 16, z: 16 });
+export const DEFAULT_WORLD_VOXEL_SIZE = 1;
+export const CHUNK_CELL_COUNT = 16 * 16 * 16;
+
+export interface WorldSettings {
+  readonly voxelSize: number;
+  readonly chunkDimensions: ChunkDimensions3;
+}
+
+export function createWorldSettings(voxelSize = DEFAULT_WORLD_VOXEL_SIZE): WorldSettings {
+  if (!Number.isFinite(voxelSize) || voxelSize <= 0) {
+    throw new WorldCoordinateError(
+      'INVALID_WORLD_SETTINGS',
+      'World voxel size must be a finite positive number',
+    );
+  }
+  return Object.freeze({ voxelSize, chunkDimensions: DEFAULT_CHUNK_DIMENSIONS });
+}
+
 export interface WorldPoint3 {
   readonly x: number;
   readonly y: number;
@@ -29,6 +48,7 @@ export interface ChunkAddress3 {
 }
 
 export type WorldCoordinateErrorCode =
+  | 'INVALID_WORLD_SETTINGS'
   | 'INVALID_VOXEL_SIZE'
   | 'INVALID_CHUNK_DIMENSIONS'
   | 'NON_FINITE_WORLD_POSITION'
