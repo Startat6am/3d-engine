@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — coordinate foundation verified; Phase 0 decisions recorded; Phase 1 payload/storage is next.  
+**Status:** ACTIVE — world/chunk core and baseline CPU meshing implemented; bounded streaming and stale-result lifecycle are next.  
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-19
@@ -22,19 +22,19 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Add `@engine/world` and register it in the root TypeScript project graph.
 - [x] Add immutable signed chunk coordinates, canonical coordinate keys and floor-based world-to-chunk mapping.
 - [x] Test positive/negative positions, exact boundaries, voxel-size scaling, key round-trip and stable validation errors.
-- [ ] Add validated world settings and fixed 16³ chunk configuration.
-- [ ] Add immutable dense Uint16 cell snapshots, palette references and payload validation.
-- [ ] Add stable error codes, edit revisions and changed-region reporting.
-- [x] Initial coordinate slice: remote Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 189/189 Vitest tests.
+- [x] Add validated world settings and fixed 16³ chunk configuration.
+- [x] Add immutable dense Uint16 cell snapshots, palette references and payload validation.
+- [x] Add stable error codes, edit revisions and changed-region reporting.
+- [x] Current local verification: Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 210/210 Vitest tests, including 20 world/voxel tests. Chromium E2E passed 23/23 on the preceding storage-only head; the final meshing head must rerun E2E and exact-head CI.
 - [x] Original stacked M7 exact-head GitHub Actions run [#508](https://github.com/Startat6am/3d-engine/actions/runs/44465317676) passed the full CI workflow, including Chromium E2E. The clean main-based branch must run CI again.
 
 ## Phase 2 — CPU meshing
 
-- [ ] Implement deterministic exposed-face meshing against immutable chunk/neighbor snapshots.
-- [ ] Emit `@engine/geometry` MeshData-compatible parts; no renderer/backend imports.
-- [ ] Define provisional missing-neighbor faces and invalidate on neighbor arrival/removal.
-- [ ] Reject stale results by chunk and neighbor revisions; support cancellation.
-- [ ] Test empty/full/checkerboard/material-boundary and adjacent-chunk fixtures, normals, winding, indices and scale.
+- [x] Implement deterministic exposed-face meshing against immutable chunk/neighbor snapshots.
+- [x] Emit `@engine/geometry` MeshData-compatible parts; no renderer/backend imports.
+- [x] Define provisional missing-neighbor faces and record neighbor revision/availability tokens.
+- [ ] Add stale-result rejection by chunk and neighbor revisions plus cancellation orchestration.
+- [x] Test empty/full, material boundaries, adjacent cells/chunks, normals, winding, indices and scale.
 
 ## Phase 3 — streaming and procedural hooks
 

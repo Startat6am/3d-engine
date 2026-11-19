@@ -63,16 +63,12 @@ Explicitly deferred; do not describe as passed:
 
 ## M7 current implementation
 
-- `@engine/world` is registered in the root TypeScript project graph.
-- Implemented immutable signed chunk coordinates, canonical `x,y,z` keys, and world-position to
-  chunk/local-cell mapping with explicit voxel size and floor semantics for negative coordinates.
-- Seven coordinate tests cover positive/negative positions, exact boundaries, scale, key round-trip
-  and invalid values.
-- Not implemented yet: world settings/lifecycle, voxel cell storage/palette, payload
-  schema/validation, meshing, streaming scheduler, generators, serialization adapter, static
-  collision generation, Editor/Player acceptance scene.
-- Contract: [VOXEL_WORLD_SPEC.md](VOXEL_WORLD_SPEC.md). Execution tracking:
-  [M7_EXECUTION_PLAN.md](M7_EXECUTION_PLAN.md).
+- `@engine/world` is registered in the root TypeScript project graph. It provides signed safe-integer chunk coordinates, canonical keys, floor-based world-position mapping, and validated world settings with 16³ chunk dimensions.
+- `@engine/voxel` is a separate package. It provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits, and inclusive changed bounds.
+- CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal faces and loaded-neighbor faces, records all six neighbor revision/availability tokens, and marks missing-neighbor boundary faces provisional.
+- Tests cover coordinates/settings, immutable storage, palette validation, edit revisions, empty/full chunks, material splits, adjacent cells/chunks, normals/winding, scaling, provisional borders and invalid neighbors.
+- Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 210/210 Vitest tests. Chromium E2E passed 23/23 on the preceding storage-only head; the meshing head requires a fresh E2E run and exact-head GitHub Actions result before merge.
+- Not implemented yet: stale mesh-result rejection/cancellation orchestration, bounded streaming, generators, persisted voxel extension/binary asset adapter, static collision generation, and Editor/Player voxel acceptance scene.
 
 ## M7 architecture decisions and next work
 

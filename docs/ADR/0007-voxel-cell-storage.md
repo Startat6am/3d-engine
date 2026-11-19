@@ -1,6 +1,6 @@
 # ADR 0007: Dense voxel cell storage and palette
 
-**Status:** Accepted initial representation; benchmark-gated for future replacement  
+**Status:** Accepted and implemented as the M7 initial representation; benchmark-gated for future replacement  
 **Date:** 2026-11-19
 
 ## Decision

@@ -61,7 +61,7 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Status
 
-M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels is active: the `@engine/world` coordinate foundation is implemented and verified; voxel storage/palette and CPU meshing are next. See the M7 execution plan, voxel/world specification, and ADRs 0005–0011. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
+M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels is active: `@engine/world` coordinates/settings and `@engine/voxel` immutable chunk storage, palette validation, and baseline CPU meshing are implemented. Bounded streaming, persistence, and runtime integration remain ahead. See the M7 execution plan, voxel/world specification, ADRs 0005–0011, and project handoff. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
 
 ## Deployment
 

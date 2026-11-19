@@ -1,6 +1,6 @@
 # ADR 0008: Deterministic CPU voxel meshing and chunk borders
 
-**Status:** Accepted M7 baseline  
+**Status:** Accepted and implemented M7 baseline  
 **Date:** 2026-11-19
 
 ## Decision
@@ -14,6 +14,10 @@
 - Results carry source chunk revision and six neighbor revision/availability tokens. Discard results if any token is stale at publication time.
 - Emit deterministic positions, outward normals, consistent triangle winding and valid Uint32 indices. Scale geometry by world voxel size.
 - Empty chunks return an empty result without allocating vertex/index buffers.
+
+## Implementation status
+
+The current `@engine/voxel` mesher implements exposed-face culling, deterministic material-part ordering, outward normals/winding, UVs, voxel-size scaling, intra-chunk and loaded-neighbor culling, and neighbor revision tokens. Tests cover empty/full chunks, adjacent cells/chunks, multiple materials, provisional boundaries, invalid neighbors and face winding. Stale-result rejection and cancellation orchestration remain open.
 
 ## Consequences
 
