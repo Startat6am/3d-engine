@@ -1,8 +1,8 @@
 # M6 Real-Device Physics Profile Worksheet
 
-**Status:** protocol ready; no physical-device measurements recorded yet.  
+**Status:** deferred follow-up; no physical-device measurements recorded. M6 functional closure does not depend on this worksheet.  
 **Owner review:** the current deployed Physics Playground received an interactive Chrome review on 2026-11-19; the owner reported that everything was OK.  
-**Purpose:** collect repeatable, comparable measurements on named hardware before approving M6 performance budgets.
+**Purpose:** collect repeatable, comparable measurements on named hardware for a future performance-budget review; this worksheet is not a blocker to the owner-directed M6 functional closure.
 
 ## Scope and evidence boundary
 
@@ -95,7 +95,7 @@ Add one row per independent run; do not average away outliers before recording r
 - If memory stability is in question, add a separately designed repeated create/simulate/dispose test and browser/OS memory evidence. Do not claim a WASM memory ceiling from JS heap snapshots.
 - Any engine/physics code change after the measured commit invalidates the profile for that new head; rerun the relevant scenarios.
 
-## Sign-off
+## Future profiling sign-off (deferred; not an M6 exit gate)
 
 - [ ] Named desktop profile recorded (3 runs).
 - [ ] Named target-device profile recorded (3 runs).
