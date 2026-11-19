@@ -22,8 +22,9 @@ Updated: 2026-11-19
 - M6 Physics/Input: functionally closed by owner direction on 2026-11-19.
 - M7 World & Voxels: active; coordinates/settings, immutable chunk storage/palette validation,
   deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and a
-  bounded chunk scheduler are implemented. Seeded generation is next; persistence, static collision,
-  and Editor/Player integration remain pending.
+  bounded chunk scheduler, deterministic seeded generation, and repeated load/eviction lifecycle stress
+  coverage are implemented. The content-addressed project storage adapter has been extracted into
+  `@engine/project-storage`; voxel extension serialization and Editor/Player integration remain pending.
 - M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
   started. AI authoring remains M10; do not reorder the roadmap.
 
@@ -65,7 +66,7 @@ Explicitly deferred; do not describe as passed:
 - `@engine/voxel` provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits and inclusive changed bounds.
 - CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal and loaded-neighbor faces, records six neighbor revision/availability tokens and marks missing-neighbor boundary faces provisional.
 - `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal` and rejects with `MESHING_ABORTED`; partial geometry is never returned. The synchronous mesher remains the deterministic baseline.
-- Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passes with 230/230 Vitest tests; Chromium E2E passes 23/23 after the seeded generator hooks. Exact-head GitHub Actions remains the merge gate.
+- Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passes with 230/230 Vitest tests; Chromium E2E passes 23/23 after the shared project-storage extraction. Exact-head GitHub Actions remains the merge gate; latest completed PR head `f5ee5d9` passed.
 - Not implemented yet: repeated end-to-end lifecycle stress coverage, persisted voxel extension/binary asset adapter, static collision generation and Editor/Player voxel acceptance scene.
 
 Next sequence:

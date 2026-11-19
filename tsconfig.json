@@ -27,6 +27,9 @@
     },
     {
       "path": "packages/engine-voxel"
+    },
+    {
+      "path": "packages/engine-project-storage"
     }
   ]
 }

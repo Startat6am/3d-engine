@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative meshing cancellation, and the bounded chunk scheduler and deterministic seeded generator hooks are implemented; repeated load/eviction lifecycle stress coverage is implemented; persistence is next.  
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative meshing cancellation, and the bounded chunk scheduler and deterministic seeded generator hooks are implemented; repeated load/eviction lifecycle stress coverage and the shared `@engine/project-storage` package extraction are implemented; voxel extension serialization and integration tests are next.
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-19
@@ -15,7 +15,8 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Inspect core, geometry, assets, serialization, physics, Editor project storage and subsystem contracts.
 - [x] Publish `VOXEL_WORLD_SPEC.md`.
 - [x] Record package boundaries, coordinates, storage/palette, meshing/borders, streaming, persistence and static-collision decisions in ADRs 0005–0011.
-- [ ] Validate the persisted chunk extension and shared binary-asset adapter with integration tests before Editor/Player wiring.
+- [x] Extract the content-addressed project file and asset store into shared `@engine/project-storage`, retaining the Editor compatibility re-export.
+- [ ] Define and validate the versioned voxel chunk extension and integrate it with shared binary asset persistence before Editor/Player wiring.
 
 ## Phase 1 — world/chunk core
 
@@ -25,7 +26,7 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Add validated world settings and fixed 16³ chunk configuration.
 - [x] Add immutable dense Uint16 cell snapshots, palette references and payload validation.
 - [x] Add stable error codes, edit revisions and changed-region reporting.
-- [x] Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 230/230 Vitest tests after the seeded generator hooks; Chromium E2E passed 23/23. Exact-head CI for this M7 slice is required before merge.
+- [x] Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 230/230 Vitest tests after the shared project-storage extraction; Chromium E2E passed 23/23. Exact-head CI for this M7 slice is required before merge.
 - [x] Original stacked M7 exact-head GitHub Actions run [#508](https://github.com/Startat6am/3d-engine/actions/runs/44465317676) passed the full CI workflow, including Chromium E2E. The clean main-based branch must run CI again.
 
 ## Phase 2 — CPU meshing
