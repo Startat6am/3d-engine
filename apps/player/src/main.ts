@@ -108,6 +108,7 @@ const sampleEntities = [
   addRenderable([0, 0, 0], createUvSphereGeometry(0.5, 24, 16), 0xf59e0b, [0.9, 0.9, 0.9]),
   addRenderable([1.25, 0, 0], createCylinderGeometry(), 0x34d399, [0.8, 0.9, 0.8]),
 ];
+const activeProjectEntities: Array<ReturnType<typeof runtime.world.createEntity>> = [];
 
 function prepareWorldEntities(document: WorldDocument) {
   const prepared: Array<{
@@ -236,17 +237,23 @@ async function openProjectFolder(): Promise<void> {
 
     // Commit the replacement only after every referenced blob and mesh has been prepared.
     for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+    for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
+    activeProjectEntities.length = 0;
     for (const entity of world.prepared) {
-      addMeshRenderable(
-        entity.position,
-        entity.geometry,
-        entity.material,
-        entity.rotation,
-        entity.scale,
+      activeProjectEntities.push(
+        addMeshRenderable(
+          entity.position,
+          entity.geometry,
+          entity.material,
+          entity.rotation,
+          entity.scale,
+        ),
       );
     }
     for (const object of voxelObjects) {
-      addMeshRenderable(object.position, object.geometry, object.material);
+      activeProjectEntities.push(
+        addMeshRenderable(object.position, object.geometry, object.material),
+      );
     }
     const chunkBounds = project.chunks.flatMap((chunk) => {
       const origin = [
