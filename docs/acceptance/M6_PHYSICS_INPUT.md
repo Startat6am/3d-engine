@@ -3,7 +3,7 @@ All matched files use Prettier code style!
 
 # M6 — Physics & Input Acceptance
 
-**Status:** implementation in progress; no M6 acceptance gate is claimed complete.  
+**Status:** CLOSED — owner-directed functional milestone closure on 2026-11-19, with explicit hardware-profiling deferral.  
 **Milestone order:** M6 follows M5 and precedes M7. M10 AI authoring remains deferred.
 
 ## Browser target and acceptance boundary
@@ -13,7 +13,7 @@ All matched files use Prettier code style!
 - A separate non-production Vercel project publishes the Player artifact at the public staging alias `https://3d-engine-player-callback5.vercel.app/`; the Playground is `/physics-playground.html`. Vercel SSO protection is disabled for this Player project only. The Player root, Playground HTML, JS module and Rapier WASM asset returned HTTP 200; WASM MIME (`application/wasm`), CORS and cache behavior were verified. CI Chromium E2E verifies local runtime initialization and interaction; real-device review of the public deployment remains open.
 - Physical gamepad behavior is not inferred from simulated adapter tests; record a real-device result only if hardware is actually tested.
 
-This document is the M6 exit checklist. A gate passes only with implementation, automated evidence, documented limitations, and a verified browser example where specified.
+This document records the M6 exit evidence and closure decision. Unchecked historical checklist items below are classified in the closure note: implemented behavior with evidence, accepted scope exclusions, or explicitly deferred hardware profiling. They must not be represented as measured/passed where evidence is absent.
 
 ## M6.0 — Contract and compatibility spike
 
@@ -133,3 +133,29 @@ Record PR/commit links, CI run IDs, browser/runtime versions, test counts, bench
 - The owner checked the current deployed Physics Playground in normal Chrome and reported: "Все проверил, все ок." Record the public staging visual/runtime review as complete for the reviewed build. The separate CSS-only camera-toggle sizing/repositioning follow-up was included in the reviewed staging deployment.
 - This is not evidence of a physical-device performance profile, controlled WASM-memory/allocation measurement, approved performance budgets, static-only triangle-mesh scope acceptance, or final M6 sign-off.
 - A repeatable real-device capture worksheet is now available at [PHYSICS_DEVICE_PROFILE_TEMPLATE.md](../PHYSICS_DEVICE_PROFILE_TEMPLATE.md). It defines the environment metadata, three-run capture, raw JSON retention, full-Playground observation, and sign-off checklist. No physical-device measurements are claimed yet.
+
+
+## M6 closure decision — 2026-11-19
+
+**Accepted by owner direction:** close M6 as a functional implementation/integration milestone and proceed to M7 on a separate branch. The owner stated that no computer is nearby, making physical-device profiling unavailable at this time.
+
+### Evidence accepted for functional closure
+
+- PhysicsWorld/Rapier adapter, fixed-tick integration, rigid-body/collider lifecycle, collision events, raycasts, force/impulse, pause/single-step, resource bounds, and opt-in static-only triangle meshes are implemented with automated coverage.
+- Character controller and semantic input packages are implemented with conformance/integration coverage, including focus/visibility/disconnect neutralization.
+- Editor UX cleanup and Player Physics Playground are implemented. Owner visually reviewed the current deployed Playground in normal Chrome on 2026-11-19 and reported everything OK.
+- Exact-head CI evidence recorded above includes run #477 for the joystick follow-up (Node 22 full pipeline); earlier run #439 covers 23/23 Playwright Chromium E2E on its exact head. Do not misattribute either run to later commits.
+
+### Explicitly deferred; not claimed as passed
+
+- No named physical desktop or target-device profile has been collected. No physical GPU/frame-time or thermal profile is claimed.
+- Controlled WASM linear-memory high-water mark, allocation volume, GC pressure, and physical process/GPU memory are not measured by the current harness. JS heap snapshots are not substitutes.
+- No owner-approved numeric performance budgets are claimed. Existing Node and headless SwiftShader numbers are synthetic/shared-runner diagnostic baselines only.
+- Physical gamepad testing is optional separate evidence; simulated Gamepad API adapter tests are not hardware verification.
+- Camera follow/free-look behavior and zoom redesign remain deferred by the prior product discussion.
+
+### Scope accepted for M6
+
+- Static-only triangle-mesh colliders are the supported scope. Dynamic/kinematic triangle meshes and automatic mesh cooking remain excluded.
+- Chrome/Chromium is the mandatory browser target. Firefox/WebKit and real mobile-browser compatibility remain deferred.
+- These deferrals are recorded as known limitations and follow-up work, not hidden as completed tests. M7 may proceed on a separate branch. PR #87 remains subject to latest-head CI and normal merge review.
