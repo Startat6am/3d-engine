@@ -212,3 +212,14 @@ export function editVoxelChunk(
 ): VoxelEditResult {
   return snapshot.withEdits(edits);
 }
+
+export {
+  meshVoxelChunk,
+  VoxelMeshingError,
+  type VoxelChunkNeighbors,
+  type VoxelFaceDirection,
+  type VoxelMeshPart,
+  type VoxelMeshResult,
+  type VoxelMeshingErrorCode,
+  type VoxelNeighborRevision,
+} from './meshing.js';
