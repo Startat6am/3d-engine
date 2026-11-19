@@ -16,7 +16,7 @@
 
 ## Implementation status
 
-`@engine/world` now exposes `WorldChunkScheduler<T>` with caller-supplied positive limits for concurrent jobs, queued jobs, resident chunks and per-chunk payload bytes. It deduplicates by coordinate/revision, orders queued work by priority with FIFO ties, propagates `AbortSignal`, rejects stale revision completions, enforces explicit eviction, releases resident values through a caller callback, and disposes idempotently. Resident capacity is never resolved through hidden LRU eviction. Generator integration, broader world lifecycle stress tests and production defaults remain open.
+`@engine/world` now exposes `WorldChunkScheduler<T>` with caller-supplied positive limits for concurrent jobs, queued jobs, resident chunks and per-chunk payload bytes. It deduplicates by coordinate/revision, orders queued work by priority with FIFO ties, propagates `AbortSignal`, rejects stale revision completions, enforces explicit eviction, releases resident values through a caller callback, and disposes idempotently. Resident capacity is never resolved through hidden LRU eviction. A deterministic generator hook supplies a stable PRNG stream scoped to the seed and signed chunk coordinate, plus the job AbortSignal. Broader world lifecycle stress tests and production defaults remain open.
 
 ## Consequences
 

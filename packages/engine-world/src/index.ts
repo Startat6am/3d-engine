@@ -176,3 +176,13 @@ export {
   type WorldStreamingErrorCode,
   type WorldStreamingLimits,
 } from './streaming.js';
+
+export {
+  createChunkGenerationContext,
+  createSeededChunkRandom,
+  WorldGenerationError,
+  type WorldChunkGenerationContext,
+  type WorldChunkGenerator,
+  type WorldGenerationErrorCode,
+  type WorldSeed,
+} from './generation.js';

@@ -1,6 +1,6 @@
 # World and Voxel Subsystem Specification
 
-**Status:** M7 contract baseline; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and bounded chunk scheduling are implemented. Seeded generation, persistence and runtime integration remain pending.
+**Status:** M7 contract baseline; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, and deterministic seeded generator hooks are implemented. Lifecycle stress tests, persistence and runtime integration remain pending.
 **Milestone:** 7 — World & Voxels.
 
 ## Purpose and boundaries
@@ -26,7 +26,8 @@ The voxel subsystem is a geometry provider. It must not introduce voxel-specific
 - CPU meshing: deterministic exposed-face culling, one `MeshData` part per palette index, outward normals/consistent winding, UVs, voxel-size scaling, intra-chunk and six-neighbor culling, neighbor revision tokens, and provisional boundary faces when a neighbor is unavailable.
 - Meshing cancellation: `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal`, and rejects with `MESHING_ABORTED` before returning any result; partial geometry remains private.
 - World streaming: `WorldChunkScheduler<T>` bounds concurrency, queue depth, resident count and per-chunk payload bytes; it deduplicates coordinate/revision requests, orders by priority, propagates cancellation, rejects stale completions, and exposes explicit eviction/disposal.
-- Not yet implemented: seeded generators, persisted chunk blobs, static collision generation, and Editor/Player integration.
+- Procedural hook: `createChunkGenerationContext` combines a validated seed, signed chunk coordinate, AbortSignal and deterministic coordinate-scoped PRNG.
+- Not yet implemented: broader lifecycle stress tests, persisted chunk blobs, static collision generation, and Editor/Player integration.
 
 ## Coordinate and identity model
 
