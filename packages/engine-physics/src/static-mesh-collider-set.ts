@@ -52,6 +52,48 @@ export class StaticMeshColliderSet {
     for (const [key, input] of desired) {
       const previous = this.#records.get(key);
       if (previous?.revision === input.revision) continue;
+
       const body = this.#physics.createBody(input.entity, {
         type: 'static',
-        position: input.pos...[truncated]
+        position: input.position,
+      });
+      let collider: PhysicsColliderHandle;
+      try {
+        collider = this.#physics.createCollider(body, {
+          shape: { type: 'triangle-mesh', vertices: input.vertices, indices: input.indices },
+          ...(input.friction === undefined ? {} : { friction: input.friction }),
+          ...(input.restitution === undefined ? {} : { restitution: input.restitution }),
+        });
+      } catch (error) {
+        this.#physics.removeBody(body);
+        throw error;
+      }
+
+      this.#records.set(key, { revision: input.revision, body, collider });
+      if (previous) this.#removeRecord(previous);
+    }
+
+    for (const [key, record] of this.#records) {
+      if (!desired.has(key)) {
+        this.#removeRecord(record);
+        this.#records.delete(key);
+      }
+    }
+  }
+
+  dispose(): void {
+    if (this.#disposed) return;
+    for (const record of this.#records.values()) this.#removeRecord(record);
+    this.#records.clear();
+    this.#disposed = true;
+  }
+
+  #removeRecord(record: StaticMeshColliderRecord): void {
+    this.#physics.removeCollider(record.collider);
+    this.#physics.removeBody(record.body);
+  }
+
+  #assertActive(): void {
+    if (this.#disposed) throw new Error('StaticMeshColliderSet has been disposed');
+  }
+}
