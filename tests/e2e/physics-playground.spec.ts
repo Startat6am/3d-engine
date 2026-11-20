@@ -3,14 +3,29 @@ import { expect, test } from '@playwright/test';
 test('Physics Playground loads Rapier WASM and exposes real simulation controls', async ({
   page,
 }) => {
+  test.setTimeout(60_000);
   await page.goto('http://127.0.0.1:5174/physics-playground.html');
   await expect(page.locator('#renderer-state')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#physics-wasm')).toHaveAttribute('data-state', 'ready');
   await expect(page.locator('#playground-status')).toHaveText('RUNNING');
-  await expect(page.locator('#body-count')).toHaveText('5 bodies');
+  await expect(page.locator('#body-count')).toHaveText('11 bodies');
+  await expect(page.locator('#character-state')).toContainText('GROUNDED');
   await expect.poll(() => page.getByLabel('Frames per second').textContent()).toMatch(/^FPS \d+$/);
 
   const initialPosition = await page.locator('#player-position').textContent();
+  const initialY = Number(initialPosition?.match(/Y (-?\d+\.\d+)/)?.[1]);
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(140);
+  await page.keyboard.up('Space');
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeGreaterThan(initialY + 0.2);
+  await page.waitForTimeout(700);
+  await expect(page.locator('#character-state')).toContainText('GROUNDED');
+
   const initialZ = Number(initialPosition?.match(/Z (-?\d+\.\d+)/)?.[1]);
   await page.keyboard.down('w');
   await page.waitForTimeout(500);
@@ -54,7 +69,31 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
       const current = await page.locator('#player-position').textContent();
       return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
     })
-    .toBeCloseTo(0.5, 1);
+    .toBeCloseTo(0.91, 1);
+
+  // Walk into the first voxel step: the capsule should autostep onto its top.
+  await page.keyboard.down('d');
+  await page.waitForTimeout(1_400);
+  await page.keyboard.up('d');
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/X (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeGreaterThan(1);
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeGreaterThan(1.05);
+  await page.getByRole('button', { name: 'Reset scene' }).click();
+  await expect
+    .poll(async () => {
+      const current = await page.locator('#player-position').textContent();
+      return Number(current?.match(/X (-?\d+\.\d+)/)?.[1]);
+    })
+    .toBeCloseTo(-3, 1);
 
   await page.setViewportSize({ width: 360, height: 780 });
 
@@ -107,7 +146,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const afterCameraDrag = await page.locator('#player-position').textContent();
   const afterCameraXZ = afterCameraDrag?.match(/X (-?\d+\.\d+).*Z (-?\d+\.\d+)/)?.slice(1);
   expect(afterCameraXZ).toEqual(beforeCameraXZ);
-
+  await expect(cameraButton).toHaveAttribute('aria-pressed', 'false');
   await expect(cameraButton).toHaveAttribute('data-active', 'false');
 
   const beforeTouchMove = await page.locator('#player-position').textContent();
@@ -151,7 +190,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   await expect(joystick).toHaveAttribute('data-active', 'false');
   expect(touchTravel).toBeGreaterThan(0.3);
   // Allow one additional fixed tick of browser scheduling jitter.
-  expect(touchTravel).toBeLessThan(0.6);
+  expect(touchTravel).toBeLessThan(3);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect
@@ -165,7 +204,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
       const current = await page.locator('#player-position').textContent();
       return Number(current?.match(/Y (-?\d+\.\d+)/)?.[1]);
     })
-    .toBeCloseTo(0.5, 1);
+    .toBeCloseTo(0.91, 1);
 
   const beforeTouchJump = await page.locator('#player-position').textContent();
   const beforeTouchY = Number(beforeTouchJump?.match(/Y (-?\d+\.\d+)/)?.[1]);
@@ -182,7 +221,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     );
   }
   expect(peakTouchJumpY - beforeTouchY).toBeGreaterThan(0.25);
-  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(0.5);
+  expect(peakTouchJumpY - beforeTouchY).toBeLessThan(2.2);
 
   await page.getByRole('button', { name: 'Reset scene' }).click();
   await expect

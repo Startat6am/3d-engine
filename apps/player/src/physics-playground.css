@@ -128,6 +128,16 @@ body {
   border-bottom: 0;
   color: #8e9db1;
 }
+#character-state {
+  display: block;
+  color: #9fe3bd;
+  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.04em;
+}
+#character-state[data-state='airborne'] {
+  color: #f5c77e;
+}
+
 #playground-status {
   color: #7bd8a8;
 }

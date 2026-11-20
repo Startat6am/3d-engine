@@ -1,5 +1,15 @@
 # Player Physics Playground
 
+The Player physics playground is a self-contained character and collision test course. It starts with a capsule character and a block-built voxel-style obstacle course; no project import is required.
+
+## Character controller
+
+- Move with **W/A/S/D** or the on-screen movement joystick. Use **Space** or the on-screen **JUMP** button to jump.
+- The player uses a Rapier kinematic capsule (0.35 m radius, 0.55 m half-height) and the physics character-controller API. Gravity and jump velocity are integrated at the fixed 60 Hz simulation step.
+- The obstacle course includes four consecutive 0.30 m rises, plus raised blocks and columns for testing top, side, and corner contacts.
+- Autostep is enabled with a 0.34 m maximum step height and 0.22 m minimum width. The controller also uses slope limits and a short snap-to-ground distance.
+- The character readout reports grounded/airborne state, horizontal speed, and the current contact count. Reset scene returns the character to its spawn point.
+
 The Player physics playground provides a touch-friendly camera-orbit control for inspecting the physics scene.
 
 ## Camera orbit control
