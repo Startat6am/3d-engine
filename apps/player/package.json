@@ -19,7 +19,8 @@
     "@engine/project-storage": "workspace:*",
     "@engine/renderer": "workspace:*",
     "@engine/serialization": "workspace:*",
-    "@engine/voxel": "workspace:*"
+    "@engine/voxel": "workspace:*",
+    "@engine/world": "workspace:*"
   },
   "devDependencies": {
     "vite": "7.3.8"
