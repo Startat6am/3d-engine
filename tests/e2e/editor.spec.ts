@@ -190,7 +190,8 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   const menu = page.locator('#hierarchy-add-menu');
   await menu.getByRole('button', { name: /Voxel chunk/ }).click();
 
-  await expect(page.getByText(/1 OBJECTS · 1 VOXEL CHUNKS/)).toBeVisible();
+  await expect(page.getByText('1 OBJECTS', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
   await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
   await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
