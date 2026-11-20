@@ -1,11 +1,19 @@
 # Voxel Collision Demo
 
-A native Choreon directory project with four adjacent 16×16×16 voxel chunks. It contains a layered ground slab, raised platforms, and stepped obstacles. Voxel size is 1 world unit.
+A native Choreon voxel-world project for testing chunk rendering and static collision.
 
-## Use it in Player
+## Scene layout
 
-1. Download and unzip `voxel-collision-demo.zip`.
-2. In Player, choose **Open project** and select the extracted `voxel-collision-demo` folder.
-3. The loaded status should report **4 static voxel colliders**.
+- Four adjacent 16×16×16 chunks forming a continuous 32×32 ground platform.
+- Y is the vertical axis: two stone foundation layers, a dirt layer, and a grass surface.
+- A stepped raised platform near the center, plus two small test columns.
+- Voxel size: 1 world unit.
 
-The current Player integrates static voxel terrain into Rapier, but does not yet include a controllable character. This sample checks project loading and static collider creation, not character movement.
+## Open
+
+1. Extract this folder.
+2. In Player choose **Open project folder**.
+3. Select the voxel-collision-demo directory.
+4. The status should report **Voxel Collision Playground**, 4 voxel chunks, and 4 static voxel colliders.
+
+The Player currently creates static terrain colliders; it does not yet include a controllable character.
