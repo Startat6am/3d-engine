@@ -15,5 +15,71 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Inspect core, geometry, assets, serialization, physics, Editor project storage and subsystem contracts.
 - [x] Publish `VOXEL_WORLD_SPEC.md`.
 - [x] Record package boundaries, coordinates, storage/palette, meshing/borders, streaming, persistence and static-collision decisions in ADRs 0005â€“0011.
-- [x] Extract the content-addresse¶»§q«^u…åİÉ¥¡Ğ½Ù•É…”™½È‘¥Ñ½ÈÍ…Ù”ƒŠHA±…å•È™½±‘•È½Á•¸İ¥Ñ „Ñ•áÑÕÉ•1…¹Ù•É¥™ä„‰É½İÍ•È¥µ…”ÕÁ±½…¸(´lt‘„µ¥á•Ù½á•°€¬½¹Ù•¹Ñ¥½¹…°µ•Í …•ÁÑ…¹”İ½É±¥¸A±…å•È…¹‘¥Ñ½È°¥¹±Õ‘¥¹œÙ¥Í¥‰±”¡Õ¹¬É•¹‘•É¥¹œ…¹É½Õ¹µÑÉ¥ÀÙ…±¥‘…Ñ¥½¸¸((ŒŒA¡…Í”€ÔƒŠPÙ•É¥™¥…Ñ¥½¸…¹±½Í•½ÕĞ((´ltIÕ¸™½Éµ…Ğ°±¥¹Ğ°ÑåÁ•¡•¬°Õ¹¥Ğ½½¹ÑÉ…ĞÑ•ÍÑÌ°Á…­…”½…ÁÀ‰Õ¥±‘Ì°1‰•¹¡µ…É­Ì…¹A±…åİÉ¥¡Ğ¡É½µ¥Õ´É¸(´lt‘Ù½á•°½ÉÉ•Ñ¹•ÍÌ°ÍÑÉ•…µ¥¹œ°±¥™•å±”…¹Á•É™½Éµ…¹”‰•¹¡µ…É­Ìİ¥Ñ É…Ü½ÕÑÁÕĞ¸(´ltI•½É•á…Ğ½µµ¥Ğ°$ÉÕ¸°9½‘”½‰É½İÍ•ÈÙ•ÉÍ¥½¹Ì°¡Õ¹¬‘¥µ•¹Í¥½¹Ì°Ù½á•°½Õ¹ÑÌ°©½ˆ±¥µ¥ÑÌ…¹µ•…ÍÕÉ•É•Í½ÕÉ”‘…Ñ„¸(´lt=‰Ñ…¥¸½İ¹•È…•ÁÑ…¹”½˜4ÜÍ½Á”…¹µ•…ÍÕÉ••á¥Ğ…Ñ•Ì‰•™½É”±½Í¥¹œ4Ü¸((ŒŒáÁ±¥¥Ğ•á±ÕÍ¥½¹Ì((´$½ÁÉ½Ù¥‘•È¥¹Ñ•É…Ñ¥½¸…¹ÁÉ½µÁĞµÑ¼µİ½É±İ½É­™±½İÌ€¡4ÄÀ¤¸(´5Õ±Ñ¥Á±…å•È°É•Á±¥…Ñ¥½¸…¹É½±±‰…¬¸(´•¹•É…°µÁÕÉÁ½Í”¹½‘”µÉ…Á ÁÉ½•‘ÕÉ…°•‘¥Ñ½È¸(´å¹…µ¥Œ½­¥¹•µ…Ñ¥ŒÑÉ¥…¹±”µµ•Í Á¡åÍ¥Ì½È¥µÁ±¥¥Ğµ•Í ½½­¥¹œ¸(´ATµ•Í¡¥¹œ°É••‘äµ•Í¡¥¹œ°…‘Ù…¹•1=°±¥¡Ñ¥¹œ‰…­”…¹…µ‰¥•¹Ğ½±ÕÍ¥½¸¥¸Ñ¡”¥¹¥Ñ¥…°¥µÁ±•µ•¹Ñ…Ñ¥½¸¸(´±…¥µÌ½˜¥¹™¥¹¥Ñ”µİ½É±Í…±”½È™¥á•Á•É™½Éµ…¹”½¸Õ¹ÍÁ•¥™¥•¡…É‘İ…É”¸((ŒŒY½á•°Á•ÉÍ¥ÍÑ•¹”¥µÁ±•µ•¹Ñ…Ñ¥½¸ÕÁ‘…Ñ”ƒŠP€ÈÀÈØ´ÄÄ´Ää((´•¹¥¹”½Ù½á•±€•áÁ½Í•Ì„ÍÑ…‰±”ØÄ±¥ÑÑ±”µ•¹‘¥…¸¡Õ¹¬Á…å±½…½‘•Œ€ àÄäÈ‰åÑ•ÌÁ•È€ÄÛ
-Ì¡Õ¹¬¤¸(´•¹¥¹”½ÁÉ½©•ĞµÍÑ½É…•€½İ¹Ì½´¹¡½É•½¸¹Ù½á•°µİ½É±‘€•áÑ•¹Í¥½¸Á•ÉÍ¥ÍÑ•¹”¸Q¡”•áÑ•¹Í¥½¸É•½É‘ÌÍ¡•µ„Ù•ÉÍ¥½¸°İ½É±Ù½á•°Í•ÑÑ¥¹Ì°Í¥¹•¡Õ¹¬½½É‘¥¹…Ñ•Ì°É•Ù¥Í¥½ºÚîÆ­y
+- [x] Extract the content-addressed project file and asset store into shared `@engine/project-storage`, retaining the Editor compatibility re-export.
+- [x] Define and validate the versioned voxel chunk extension and integrate it with shared binary asset persistence before Editor/Player wiring.
+
+## Phase 1 â€” world/chunk core
+
+- [x] Add `@engine/world` and register it in the root TypeScript project graph.
+- [x] Add immutable signed chunk coordinates, canonical coordinate keys and floor-based world-to-chunk mapping.
+- [x] Test positive/negative positions, exact boundaries, voxel-size scaling, key round-trip and stable validation errors.
+- [x] Add validated world settings and fixed 16Â³ chunk configuration.
+- [x] Add immutable dense Uint16 cell snapshots, palette references and payload validation.
+- [x] Add stable error codes, edit revisions and changed-region reporting.
+- [x] Local Node.js 22.23.5 / pnpm 12.18.0 `pnpm check` passed with 230/230 Vitest tests after the shared project-storage extraction; Chromium E2E passed 23/23. Exact-head CI for this M7 slice is required before merge.
+- [x] Original stacked M7 exact-head GitHub Actions run [#508](https://github.com/Startat6am/3d-engine/actions/runs/44465317676) passed the full CI workflow, including Chromium E2E. The clean main-based branch must run CI again.
+
+## Phase 2 â€” CPU meshing
+
+- [x] Implement deterministic exposed-face meshing against immutable chunk/neighbor snapshots.
+- [x] Emit `@engine/geometry` MeshData-compatible parts; no renderer/backend imports.
+- [x] Define provisional missing-neighbor faces and record neighbor revision/availability tokens.
+- [x] Reject stale mesh results when source or neighbor revisions/availability change.
+- [x] Add cooperative async meshing with `AbortSignal`; cancellation rejects without exposing partial geometry.
+- [x] Test empty/full, material boundaries, adjacent cells/chunks, normals, winding, indices and scale.
+
+## Phase 3 â€” streaming and procedural hooks
+
+- [x] Add a bounded request queue, concurrency/priority, cancellation propagation, deduplication, explicit eviction and disposal; require caller-supplied resident/payload limits.
+- [x] Add a deterministic seeded generator context/PRNG hook and deterministic test generator.
+- [ ] Keep main-thread execution as the correctness baseline; add workers only after contract parity tests.
+- [x] Add repeated load/evict/dispose lifecycle stress coverage and scheduler diagnostics.
+- [ ] Add end-to-end load/edit/mesh/evict/dispose coverage across the full voxel pipeline.
+
+## Phase 4 â€” serialization and runtime integration
+
+The v1 persistence contract, focused storage tests, Editor directory-project persistence wiring, and Player project loader are implemented. Player opens project folders through the browser File System Access API, verifies the directory project and voxel blobs, meshes chunks with loaded-neighbor culling, restores Box/Sphere/Plane/Cylinder entities, and imports saved GLB assets through `@engine/gltf-importer`. GLB node hierarchies and TRS transforms are composed with the Editor entity transform; mesh primitives, PBR base color/metallic/roughness/alpha/emissive factors, embedded image textures, samplers and texture transforms are passed to the renderer. Cross-app Playwright acceptance now saves a textured GLB project in Editor, opens the same folder in Player, and verifies an ImageBitmap texture upload. The Editor-to-Player folder workflow was also manually confirmed on Android, with the project root (not its nested `worlds` directory) selected. External GLB image URIs, custom components and non-GLB external texture references remain unsupported; broader browser and desktop acceptance remains.
+
+- [x] Persist chunk descriptors through the versioned world envelope extension.
+- [x] Store binary cell payloads as immutable content-addressed project blobs; avoid Base64 expansion in directory projects.
+- [x] Add schema and semantic validation, plus atomic-open failure coverage for malformed/missing/corrupt content.
+- [ ] Add explicit migration fixtures for future extension/schema revisions.
+- [ ] Integrate static collision through public physics APIs and explicit mesh budgets.
+- [x] Manually verify Editor save â†’ Player folder open on Android; the project root contains `worlds/main.world` and must be selected as the folder.
+- [x] Load Editor-saved GLB assets in Player through the shared importer; restore node transforms, mesh primitives, PBR factors and embedded texture channels.
+- [x] Add cross-app Playwright coverage for Editor save â†’ Player folder open with a textured GLB and verify a browser image upload.
+- [ ] Add a mixed voxel + conventional mesh acceptance world in Player and Editor, including visible chunk rendering and round-trip validation.
+
+## Phase 5 â€” verification and closeout
+
+- [ ] Run format, lint, typecheck, unit/contract tests, package/app builds, GLB benchmarks and Playwright Chromium E2E.
+- [ ] Add voxel correctness, streaming, lifecycle and performance benchmarks with raw output.
+- [ ] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
+- [ ] Obtain owner acceptance of M7 scope and measured exit gates before closing M7.
+
+## Explicit exclusions
+
+- AI/provider integration and prompt-to-world workflows (M10).
+- Multiplayer, replication and rollback.
+- General-purpose node-graph procedural editor.
+- Dynamic/kinematic triangle-mesh physics or implicit mesh cooking.
+- GPU meshing, greedy meshing, advanced LOD, lighting bake and ambient occlusion in the initial implementation.
+- Claims of infinite-world scale or fixed performance on unspecified hardware.
+
+## Voxel persistence implementation update â€” 2026-11-19
+
+- `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16Â³ chunk).
+- `@engine/project-storage` owns `com.choreon.voxel-world` extension persistence. The extension records schema version, world voxel settings, signed chunk coordinates, revisions, palettes, and payload references with codec version, exact byte length, and SHA-256.
+- Chunk blobs are immutable and content-addressed; duplicate byte-identical chunks share one blob. Save verifies every blob before writing the manifest last. Load rejects missing/corrupt blobs, unsupported versions, malformed metadata, and duplicate coordinates before returning decoded snapshots.
+- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and initial Player folder loading/rendering are wired; GLB asset resolution, voxel authoring, static collision, and end-to-end acceptance remain open.
+- Exact-head GitHub Actions run [#44556875444](https://github.com/Startat6am/3d-engine/actions/runs/44556875444) passed for code head `8da13169472965bfb613943a7e91d94084d3edc0`.
