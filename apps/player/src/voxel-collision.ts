@@ -12,12 +12,22 @@ function chunkKey(x: number, y: number, z: number): string {
 }
 
 /** Build physics-ready chunk colliders, including all six neighbor revision tokens. */
+export interface VoxelChunkDimensions {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
 export function createVoxelChunkColliderInputs(
   chunks: readonly VoxelChunkSnapshot[],
   voxelSize = 1,
+  chunkDimensions: VoxelChunkDimensions = { x: 16, y: 16, z: 16 },
 ) {
   if (!Number.isFinite(voxelSize) || voxelSize <= 0) {
     throw new RangeError('Voxel collision size must be a finite positive number');
+  }
+  if (Object.values(chunkDimensions).some((size) => !Number.isInteger(size) || size <= 0)) {
+    throw new RangeError('Voxel chunk dimensions must be positive integers');
   }
 
   const byCoordinate = new Map<string, VoxelChunkSnapshot>();
@@ -55,7 +65,11 @@ export function createVoxelChunkColliderInputs(
       key,
       entity: `voxel-chunk:${key}` as EntityId,
       revision: JSON.stringify([mesh.sourceRevision, mesh.neighborRevisions]),
-      position: [x * 16 * voxelSize, y * 16 * voxelSize, z * 16 * voxelSize] as const,
+      position: [
+        x * chunkDimensions.x * voxelSize,
+        y * chunkDimensions.y * voxelSize,
+        z * chunkDimensions.z * voxelSize,
+      ] as const,
       vertices: mesh.geometry.positions,
       indices: mesh.geometry.indices,
     });
@@ -68,8 +82,9 @@ export function syncVoxelChunkColliders(
   colliderSet: StaticMeshColliderSet,
   chunks: readonly VoxelChunkSnapshot[],
   voxelSize = 1,
+  chunkDimensions: VoxelChunkDimensions = { x: 16, y: 16, z: 16 },
 ): number {
-  const inputs = createVoxelChunkColliderInputs(chunks, voxelSize);
+  const inputs = createVoxelChunkColliderInputs(chunks, voxelSize, chunkDimensions);
   colliderSet.sync(inputs);
   return inputs.length;
 }
