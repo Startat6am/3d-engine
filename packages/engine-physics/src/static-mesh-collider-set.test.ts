@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import type { EntityId } from '@engine/core';
 import type { PhysicsBodyHandle, PhysicsColliderHandle, PhysicsWorld } from './types.js';
 import { StaticMeshColliderSet, type StaticMeshColliderInput } from './static-mesh-collider-set.js';
+import { EngineRuntime } from '@engine/core';
+import { RapierPhysicsWorld, setRapierModuleLoaderForTests } from './rapier-world.js';
 
 function createHarness() {
   let next = 0;
@@ -54,3 +56,40 @@ describe('StaticMeshColliderSet', () => {
   });
 
   it('creates a replacement before releasing the pre...[truncated]
+
+async function createRapierPhysics(): Promise<RapierPhysicsWorld> {
+  setRapierModuleLoaderForTests(async () => {
+    const rapier = await import('@dimforge/rapier3d-compat');
+    await rapier.init();
+    return rapier as unknown as typeof import('@dimforge/rapier3d');
+  });
+  try {
+    return await RapierPhysicsWorld.create({ gravity: [0, 0, 0] });
+  } finally {
+    setRapierModuleLoaderForTests(null);
+  }
+}
+
+describe('StaticMeshColliderSet with Rapier', () => {
+  it('registers a triangle mesh for raycasts and removes it when its chunk unloads', async () => {
+    const physics = await createRapierPhysics();
+    const set = new StaticMeshColliderSet(physics);
+    const entity = new EngineRuntime().world.createEntity();
+    set.sync([{
+      key: '0,0,0',
+      entity,
+      revision: 1,
+      position: [0, 0, 0],
+      vertices: new Float32Array([-2, 0, -2, 2, 0, -2, 0, 0, 2]),
+      indices: new Uint32Array([0, 2, 1]),
+    }]);
+    physics.step(1 / 60);
+    expect(physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })?.entity).toBe(entity);
+
+    set.sync([]);
+    physics.step(1 / 60);
+    expect(physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })).toBeNull();
+    set.dispose();
+    physics.dispose();
+  });
+});
