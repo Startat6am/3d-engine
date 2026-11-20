@@ -27,7 +27,7 @@ Updated: 2026-11-21
   restores primitive and GLB entities, and builds bounded static voxel colliders through PhysicsWorld.
   Editor supports chunk selection, local XYZ cell painting/erasing, built-in Grass/Dirt/Stone
   material selection and revisioned palette extension. Painted multi-material save/reopen E2E coverage
-  has been added; exact-head CI for this authoring slice is pending. Viewport brush interaction, palette
+  passed exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`. Viewport brush interaction, palette
   management, migration fixtures, lifecycle coverage and voxel benchmarks remain.
 - M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
   started. AI authoring remains M10; do not reorder the roadmap.
@@ -77,15 +77,14 @@ Explicitly deferred; do not describe as passed:
 - Player now exposes an `Open project folder` action backed by `BrowserProjectFileStore` and `loadVoxelWorldProject`. It verifies project assets/chunk blobs before replacing the sample scene, renders voxel chunks through `meshVoxelChunk` with loaded-neighbor face culling, maps built-in palette keys to preview colors, restores Box/Sphere/Plane/Cylinder `MeshRenderer` entities, and frames the loaded content.
 - Player restores Box/Sphere/Plane/Cylinder entities and imported GLB node hierarchies, mesh primitives, PBR factors and embedded texture channels. External GLB image URIs, custom components and non-GLB external texture references remain unsupported. Folder selection requires the browser File System Access API (Chromium-based browser, secure context).
 - Player builds bounded chunk-local static voxel colliders through the public PhysicsWorld API, tracks source and neighbor revisions, synchronizes replacements/unloads through `StaticMeshColliderSet`, and disposes handles on page teardown. The Editor→Player E2E creates a voxel chunk beside an imported GLB, verifies binary chunk persistence, reopens the project in Player, and asserts rendered mesh parts plus static voxel colliders; exact-head Chromium acceptance passed in CI #612.
-- Exact-head GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) passed on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, GLB geometry and embedded-image benchmarks, and Chromium E2E. After that head, coordinate-based voxel paint/erase and multi-material round-trip assertions were added. Local `pnpm check` passes with 257/257 tests and both app builds; local Playwright cannot launch Chromium because this sandbox lacks `libglib-2.0.so.0`. The new exact-head CI run is pending.
+- Exact-head GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) passed on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, GLB geometry and embedded-image benchmarks, and Chromium E2E. After that head, coordinate-based voxel paint/erase and multi-material round-trip assertions were added. Local `pnpm check` passes with 257/257 tests and both app builds; local Playwright cannot launch Chromium because this sandbox lacks `libglib-2.0.so.0`. Exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) passed on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`, including the painted multi-material save/reopen E2E.
 
 Next sequence:
 
-1. Pass exact-head Chromium E2E for painted multi-material chunk save/reopen and Player mesh reconstruction; coverage is added but pending CI.
-2. Add viewport ray-based painting plus palette removal/reordering and richer authoring controls.
-3. Add migration fixtures and full load/edit/mesh/evict/dispose pipeline coverage.
-4. Run voxel correctness/streaming/performance benchmarks and record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
-5. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
+1. Add viewport ray-based painting plus palette removal/reordering and richer authoring controls.
+2. Add migration fixtures and full load/edit/mesh/evict/dispose pipeline coverage.
+3. Run voxel correctness/streaming/performance benchmarks and record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
+4. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
 
 Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
 
