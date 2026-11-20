@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { createChunkCoordinate } from '@engine/world';
 import { createVoxelChunkSnapshot } from '@engine/voxel';
 import { createVoxelChunkColliderInputs } from './voxel-collision.js';
 
@@ -7,7 +6,7 @@ function chunk(x: number, revision = 1) {
   const cells = new Uint16Array(16 * 16 * 16);
   cells[x === 0 ? 15 : 0] = 1;
   return createVoxelChunkSnapshot({
-    coordinate: createChunkCoordinate({ x, y: 0, z: 0 }),
+    coordinate: { x, y: 0, z: 0 } as Parameters<typeof createVoxelChunkSnapshot>[0]['coordinate'],
     revision,
     palette: [{ material: { kind: 'builtin', key: 'stone' } }],
     cells,
