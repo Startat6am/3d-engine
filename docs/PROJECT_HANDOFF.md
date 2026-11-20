@@ -11,7 +11,7 @@ Updated: 2026-11-19
   #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
 - M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
   on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
-- Player project-folder loading and voxel rendering are committed in `a3131b6a1f4c066e6dced58249161d1f5144f28a`; exact-head GitHub Actions [run #557](https://github.com/Startat6am/3d-engine/actions/runs/44598618910) passed. Exact-head CI remains the merge gate.
+- Player project-folder loading, GLB restoration, and bounded static voxel collider integration are present on the current M7 head. Exact-head CI remains the merge gate.
 - Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
   automatically.
 
@@ -70,19 +70,19 @@ Explicitly deferred; do not describe as passed:
 - Repeated load/evict/dispose lifecycle coverage is present in `packages/engine-world/src/streaming.test.ts`; the test keeps resident bounds enforced across repeated cycles.
 - `@engine/project-storage` owns the versioned `com.choreon.voxel-world` extension and content-addressed binary chunk blobs. Save verifies payload read-back and writes the manifest last; load validates extension/codec versions, exact payload length, SHA-256, coordinates, palette and cell indexes before returning snapshots.
 - Focused persistence tests cover round-trip, invalid settings, duplicate coordinates, unsupported versions, missing/corrupted blobs, content deduplication and manifest-last ordering.
-- Editor directory-project persistence carries voxel settings/chunk snapshots through project open/save and refuses standalone `.world` export when external voxel blobs would be lost. The Editor still has no voxel authoring/rendering UI.
+- Editor directory-project persistence carries voxel settings/chunk snapshots through project open/save and refuses standalone `.world` export when external voxel blobs would be lost. The Editor now exposes a first voxel authoring action that adds and renders a 16×16 grass surface chunk beside conventional mesh entities; full cell painting and palette editing remain open.
 - Player now exposes an `Open project folder` action backed by `BrowserProjectFileStore` and `loadVoxelWorldProject`. It verifies project assets/chunk blobs before replacing the sample scene, renders voxel chunks through `meshVoxelChunk` with loaded-neighbor face culling, maps built-in palette keys to preview colors, restores Box/Sphere/Plane/Cylinder `MeshRenderer` entities, and frames the loaded content.
-- Player limitations are explicit: GLB/custom entities and external texture/material asset references are not decoded by this loader yet; unsupported entities are reported rather than replaced with fake geometry. Folder selection requires the browser File System Access API (Chromium-based browser, secure context). The folder-picker interaction has not yet had a manual browser acceptance test.
-- Static voxel collision, a mixed voxel/conventional-mesh acceptance fixture, and a complete Editor-to-Player round-trip acceptance test remain open.
+- Player restores Box/Sphere/Plane/Cylinder entities and imported GLB node hierarchies, mesh primitives, PBR factors and embedded texture channels. External GLB image URIs, custom components and non-GLB external texture references remain unsupported. Folder selection requires the browser File System Access API (Chromium-based browser, secure context).
+- Player builds bounded chunk-local static voxel colliders through the public PhysicsWorld API, tracks source and neighbor revisions, synchronizes replacements/unloads through `StaticMeshColliderSet`, and disposes handles on page teardown. A mixed voxel+GLB Editor→Player E2E path is now being added; exact-head Chromium acceptance remains pending.
 - Local verification for the Player integration slice: `pnpm --filter @engine/player typecheck`, Player production build, `pnpm check`, and `pnpm e2e` pass. Exact-head GitHub Actions remains the merge gate; do not treat this as full M7 verification.
 
 Next sequence:
 
 1. Add browser acceptance coverage for opening a saved Editor project folder in Player, including adjacent chunks and a conventional primitive entity.
 2. Add GLB/material/texture asset decoding in Player so unsupported conventional entities can be restored without loss.
-3. Integrate bounded static collision through the public physics API and add a mixed voxel/conventional-mesh acceptance scene.
-4. Add voxel authoring/rendering UI in Editor and complete the project round-trip workflow.
-5. Run `pnpm check`, `pnpm e2e`, GLB benchmarks and exact-head GitHub Actions; record measured results and limitations.
+3. Finish and pass the mixed voxel + conventional mesh Editor→Player round-trip E2E, including the new voxel authoring path and static collider cleanup.
+4. Expand Editor authoring beyond the initial generated surface: cell painting, palette/material selection and safe revisioned edits.
+5. Add migration fixtures, full load/edit/mesh/evict/dispose pipeline coverage, and run exact-head `pnpm check`, `pnpm e2e`, GLB/voxel benchmarks and GitHub Actions; record measured results and limitations.
 6. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
 
 Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
