@@ -79,12 +79,11 @@ Explicitly deferred; do not describe as passed:
 
 Next sequence:
 
-1. Add browser acceptance coverage for opening a saved Editor project folder in Player, including adjacent chunks and a conventional primitive entity.
-2. Add GLB/material/texture asset decoding in Player so unsupported conventional entities can be restored without loss.
-3. Finish and pass the mixed voxel + conventional mesh Editor→Player round-trip E2E, including the new voxel authoring path and static collider cleanup.
-4. Expand Editor authoring beyond the initial generated surface: cell painting, palette/material selection and safe revisioned edits.
-5. Add migration fixtures, full load/edit/mesh/evict/dispose pipeline coverage, and run exact-head `pnpm check`, `pnpm e2e`, GLB/voxel benchmarks and GitHub Actions; record measured results and limitations.
-6. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
+1. Pass exact-head Chromium E2E for the mixed voxel + GLB Editor→Player project-folder round-trip and static collider lifecycle.
+2. Expand Editor authoring beyond the initial generated surface: cell painting, palette/material selection and safe revisioned edits.
+3. Add migration fixtures and full load/edit/mesh/evict/dispose pipeline coverage.
+4. Run voxel correctness/streaming/performance benchmarks and record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
+5. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
 
 Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
 
