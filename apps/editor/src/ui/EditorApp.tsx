@@ -1628,7 +1628,8 @@ export function EditorApp() {
             </button>
           ))}
           <div className="panel-foot">
-            {entities.length} OBJECTS · {voxelChunks.length} VOXEL CHUNKS
+            <span>{entities.length} OBJECTS</span>
+            <span>{voxelChunks.length} VOXEL CHUNKS</span>
           </div>
         </aside>
         <section className="viewport">
