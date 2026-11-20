@@ -131,7 +131,11 @@ body {
 #character-state {
   display: block;
   color: #9fe3bd;
-  font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font:
+    11px ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    monospace;
   letter-spacing: 0.04em;
 }
 #character-state[data-state='airborne'] {
