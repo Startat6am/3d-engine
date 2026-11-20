@@ -208,7 +208,10 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
 
   await page.getByRole('button', { name: 'Move stone up' }).click();
   await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Move grass down' })).toBeEnabled();
+  await expect(page.locator('.voxel-palette-entry').nth(0)).toContainText('stone');
+  await expect(page.locator('.voxel-palette-entry').nth(1)).toContainText('grass');
+  await expect(page.getByRole('button', { name: 'Move grass up' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Move stone down' })).toBeEnabled();
 
   await page.getByRole('button', { name: 'Erase cell' }).click();
   await expect(page.getByText('Revision 3 · 2 materials')).toBeVisible();
