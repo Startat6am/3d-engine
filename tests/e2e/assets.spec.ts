@@ -464,6 +464,12 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     .getByRole('button', { name: /Voxel chunk/ })
     .click();
   await expect(page.getByText(/VOXEL CHUNKS/)).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('2');
+  await page.getByLabel('Voxel cell Y').fill('2');
+  await page.getByLabel('Voxel cell Z').fill('3');
+  await page.getByLabel('Voxel material').selectOption('builtin:stone');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 2 materials')).toBeVisible();
 
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
@@ -485,7 +491,10 @@ test('directory project saves content-addressed blobs and opens atomically', asy
       assetPayloads?: unknown[];
       extensions?: {
         'com.choreon.voxel-world'?: {
-          chunks: unknown[];
+          chunks: Array<{
+            revision: number;
+            palette: Array<{ material: { kind: string; key?: string } }>;
+          }>;
         };
       };
     };
@@ -505,7 +514,10 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   expect(saved.paths).toContain('worlds/main.world');
   expect(saved.paths.some((path) => path.startsWith('voxel/chunks/sha256/'))).toBe(true);
   expect(saved.paths).toHaveLength(4);
+  const savedVoxelChunk = saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks[0];
   expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
+  expect(savedVoxelChunk?.revision).toBe(1);
+  expect(savedVoxelChunk?.palette.map((entry) => entry.material.key)).toEqual(['grass', 'stone']);
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
 
   // Change the active scene, then reopen the folder. The directory loader should
@@ -617,6 +629,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   const playerStatus = page.locator('#project-status');
   await expect(playerStatus).toContainText('Loaded');
   await expect(playerStatus).toContainText('rendered mesh parts');
+  await expect(playerStatus).toContainText('2 voxel mesh parts');
   await expect(playerStatus).toContainText('static voxel colliders');
   await expect(playerStatus).not.toContainText('unsupported');
   await expect
