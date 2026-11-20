@@ -383,6 +383,14 @@ export function EditorApp() {
         chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z ===
         selectedVoxelChunkKey,
     ) ?? null;
+  const voxelPaletteUsage = useMemo(() => {
+    if (!selectedVoxelChunk) return [];
+    const counts = new Array<number>(selectedVoxelChunk.palette.length).fill(0);
+    for (const value of selectedVoxelChunk.copyCells()) {
+      if (value > 0) counts[value - 1] = (counts[value - 1] ?? 0) + 1;
+    }
+    return counts;
+  }, [selectedVoxelChunk]);
 
   const voxelRenderObjects = useMemo<RenderObject[]>(() => {
     const byCoordinate = new Map(
@@ -568,6 +576,83 @@ export function EditorApp() {
     setSelectedId('');
     setIsDirty(true);
     setIsAddMenuOpen(false);
+  };
+
+  const commitVoxelPalette = (
+    palette: VoxelChunkSnapshot['palette'],
+    remap: (value: number) => number,
+  ) => {
+    if (!selectedVoxelChunk || selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
+    const cells = selectedVoxelChunk.copyCells();
+    for (let index = 0; index < cells.length; index += 1) {
+      cells[index] = remap(cells[index]!);
+    }
+    const snapshot = createVoxelChunkSnapshot({
+      coordinate: selectedVoxelChunk.coordinate,
+      revision: selectedVoxelChunk.revision + 1,
+      palette,
+      cells,
+    });
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    setVoxelChunks((current) =>
+      current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
+          ? snapshot
+          : chunk,
+      ),
+    );
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel material palette updated',
+      details: 'Chunk ' + chunkKey + ', revision ' + snapshot.revision + '.',
+    });
+  };
+
+  const moveVoxelPaletteEntry = (from: number, to: number) => {
+    if (
+      !selectedVoxelChunk ||
+      from < 0 ||
+      to < 0 ||
+      from >= selectedVoxelChunk.palette.length ||
+      to >= selectedVoxelChunk.palette.length ||
+      from === to
+    )
+      return;
+    const palette = [...selectedVoxelChunk.palette];
+    const [entry] = palette.splice(from, 1);
+    if (!entry) return;
+    palette.splice(to, 0, entry);
+    commitVoxelPalette(palette, (value) => {
+      if (value === 0) return 0;
+      const oldIndex = value - 1;
+      const newIndex = palette.findIndex((item) => item === entry);
+      if (oldIndex === from) return newIndex + 1;
+      if (from < to && oldIndex > from && oldIndex <= to) return oldIndex;
+      if (from > to && oldIndex >= to && oldIndex < from) return oldIndex + 2;
+      return value;
+    });
+  };
+
+  const removeVoxelPaletteEntry = (paletteIndex: number) => {
+    if (
+      !selectedVoxelChunk ||
+      paletteIndex < 0 ||
+      paletteIndex >= selectedVoxelChunk.palette.length
+    ) {
+      return;
+    }
+    const cells = selectedVoxelChunk.copyCells();
+    const storedIndex = paletteIndex + 1;
+    if (cells.some((value) => value === storedIndex)) return;
+    const palette = selectedVoxelChunk.palette.filter((_, index) => index !== paletteIndex);
+    commitVoxelPalette(palette, (value) => (value > storedIndex ? value - 1 : value));
   };
 
   const updateVoxelCell = (value: number) => {
@@ -1960,22 +2045,42 @@ export function EditorApp() {
               </div>
               <label>PALETTE</label>
               <ul className="voxel-palette">
-                {selectedVoxelChunk.palette.map((entry, index) => (
-                  <li
-                    key={
-                      entry.material.kind +
-                      ':' +
-                      (entry.material.kind === 'asset'
-                        ? entry.material.assetId
-                        : entry.material.key)
-                    }
-                  >
-                    <span>{index + 1}</span>
-                    {entry.material.kind === 'builtin'
-                      ? entry.material.key
-                      : entry.material.assetId}
-                  </li>
-                ))}
+                {selectedVoxelChunk.palette.map((entry, index) => {
+                  const materialName =
+                    entry.material.kind === 'builtin' ? entry.material.key : entry.material.assetId;
+                  const usage = voxelPaletteUsage[index] ?? 0;
+                  return (
+                    <li
+                      key={entry.material.kind + ':' + materialName}
+                      className="voxel-palette-entry"
+                    >
+                      <span>{index + 1}</span>
+                      <strong>{materialName}</strong>
+                      <small>{usage} cells</small>
+                      <button
+                        aria-label={'Move ' + materialName + ' up'}
+                        disabled={index === 0}
+                        onClick={() => moveVoxelPaletteEntry(index, index - 1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        aria-label={'Move ' + materialName + ' down'}
+                        disabled={index === selectedVoxelChunk.palette.length - 1}
+                        onClick={() => moveVoxelPaletteEntry(index, index + 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        aria-label={'Remove ' + materialName}
+                        disabled={usage > 0}
+                        onClick={() => removeVoxelPaletteEntry(index)}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
               <button className="voxel-delete" onClick={removeSelectedVoxelChunk}>
                 Delete voxel chunk
