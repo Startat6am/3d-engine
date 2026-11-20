@@ -29,6 +29,12 @@
     },
     {
       "path": "../../packages/engine-project-storage"
+    },
+    {
+      "path": "../../packages/engine-voxel"
+    },
+    {
+      "path": "../../packages/engine-world"
     }
   ],
   "include": ["src"]
