@@ -21,7 +21,7 @@ function createHarness() {
     removeCollider: vi.fn((handle: PhysicsColliderHandle) =>
       calls.push(`remove-collider:${handle}`),
     ),
-    removeBody: vi.fn((handle: PhysicsBodyHandle) => calls.push(`remove-body:${handle})),
+    removeBody: vi.fn((handle: PhysicsBodyHandle) => calls.push(`remove-body:${handle}`)),
   } as unknown as PhysicsWorld;
   return { physics, calls };
 }
