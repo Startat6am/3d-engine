@@ -55,11 +55,7 @@ export function createVoxelChunkColliderInputs(
       key,
       entity: `voxel-chunk:${key}` as EntityId,
       revision: JSON.stringify([mesh.sourceRevision, mesh.neighborRevisions]),
-      position: [
-        x * 16 * voxelSize,
-        y * 16 * voxelSize,
-        z * 16 * voxelSize,
-      ] as const,
+      position: [x * 16 * voxelSize, y * 16 * voxelSize, z * 16 * voxelSize] as const,
       vertices: mesh.geometry.positions,
       indices: mesh.geometry.indices,
     });
