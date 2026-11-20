@@ -1,6 +1,5 @@
 import type { EntityId } from '@engine/core';
 import { StaticMeshColliderSet } from '@engine/physics';
-import { DEFAULT_CHUNK_DIMENSIONS } from '@engine/world';
 import {
   createVoxelChunkCollisionMesh,
   isVoxelChunkCollisionMeshCurrent,
@@ -57,9 +56,9 @@ export function createVoxelChunkColliderInputs(
       entity: `voxel-chunk:${key}` as EntityId,
       revision: JSON.stringify([mesh.sourceRevision, mesh.neighborRevisions]),
       position: [
-        x * DEFAULT_CHUNK_DIMENSIONS.x * voxelSize,
-        y * DEFAULT_CHUNK_DIMENSIONS.y * voxelSize,
-        z * DEFAULT_CHUNK_DIMENSIONS.z * voxelSize,
+        x * 16 * voxelSize,
+        y * 16 * voxelSize,
+        z * 16 * voxelSize,
       ] as const,
       vertices: mesh.geometry.positions,
       indices: mesh.geometry.indices,
