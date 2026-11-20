@@ -41,4 +41,11 @@ describe('createVoxelChunkColliderInputs', () => {
   });
 
   it('rejects duplicate coordinates and invalid voxel sizes', () => {
-    expect(() => createVoxelChunkColliderInputs([chunk(0), chu...[truncated]
+    expect(() => createVoxelChunkColliderInputs([chunk(0), chunk(0, 2)])).toThrow(
+      'Duplicate voxel chunk coordinate',
+    );
+    expect(() => createVoxelChunkColliderInputs([chunk(0)], 0)).toThrow(
+      'finite positive number',
+    );
+  });
+});
