@@ -269,3 +269,12 @@ export function decodeVoxelChunkPayload(
     cells,
   });
 }
+
+export {
+  createVoxelChunkCollisionMesh,
+  DEFAULT_VOXEL_COLLISION_MESH_LIMITS,
+  VoxelCollisionMeshError,
+  type VoxelChunkCollisionMesh,
+  type VoxelCollisionMeshLimits,
+  type VoxelCollisionGeometry,
+} from './collision.js';
