@@ -23,9 +23,10 @@ Updated: 2026-11-19
   deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and a
   bounded chunk scheduler, deterministic seeded generation, repeated load/eviction lifecycle stress
   coverage, content-addressed v1 `com.choreon.voxel-world` persistence, and Editor project persistence
-  wiring are implemented. Player can open project folders, verify voxel blobs, mesh/render voxel chunks
-  with neighbor culling, and restore supported primitive mesh entities. Voxel authoring, GLB/custom asset
-  rendering, static collision, end-to-end acceptance and broader M7 validation remain pending.
+  wiring are implemented. Player opens project folders, verifies voxel blobs, renders voxel chunks,
+  restores primitive and GLB entities, and builds bounded static voxel colliders through PhysicsWorld.
+  Editor has an initial voxel surface authoring/rendering action. Mixed voxel+GLB round-trip E2E is
+  implemented and awaiting exact-head Chromium CI; full cell/palette editing and broader M7 validation remain.
 - M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
   started. AI authoring remains M10; do not reorder the roadmap.
 
