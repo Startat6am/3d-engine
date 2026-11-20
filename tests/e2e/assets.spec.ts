@@ -603,6 +603,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   const playerStatus = page.locator('#project-status');
   await expect(playerStatus).toContainText('Loaded');
   await expect(playerStatus).toContainText('rendered mesh parts');
+  await expect(playerStatus).toContainText('static voxel colliders');
   await expect(playerStatus).not.toContainText('unsupported');
   await expect
     .poll(() =>
