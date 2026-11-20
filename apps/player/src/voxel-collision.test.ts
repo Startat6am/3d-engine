@@ -40,10 +40,18 @@ describe('createVoxelChunkColliderInputs', () => {
     expect(second.revision).not.toBe(first.revision);
   });
 
+  it('uses configured chunk dimensions when positioning colliders', () => {
+    const inputs = createVoxelChunkColliderInputs([chunk(2)], 0.25, { x: 8, y: 12, z: 20 });
+    expect(inputs[0]?.position).toEqual([4, 0, 0]);
+  });
+
   it('rejects duplicate coordinates and invalid voxel sizes', () => {
     expect(() => createVoxelChunkColliderInputs([chunk(0), chunk(0, 2)])).toThrow(
       'Duplicate voxel chunk coordinate',
     );
     expect(() => createVoxelChunkColliderInputs([chunk(0)], 0)).toThrow('finite positive number');
+    expect(() => createVoxelChunkColliderInputs([chunk(0)], 1, { x: 16, y: 0, z: 16 })).toThrow(
+      'positive integers',
+    );
   });
 });
