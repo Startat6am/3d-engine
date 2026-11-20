@@ -18,8 +18,10 @@ function createHarness() {
       calls.push(`create-collider:${handle}`);
       return handle;
     }),
-    removeCollider: vi.fn((handle: PhysicsColliderHandle) => calls.push(`remove-collider:${handle}`)),
-    removeBody: vi.fn((handle: PhysicsBodyHandle) => calls.push(`remove-body:${handle}`)),
+    removeCollider: vi.fn((handle: PhysicsColliderHandle) =>
+      calls.push(`remove-collider:${handle}`),
+    ),
+    removeBody: vi.fn((handle: PhysicsBodyHandle) => calls.push(`remove-body:${handle})),
   } as unknown as PhysicsWorld;
   return { physics, calls };
 }
@@ -105,19 +107,25 @@ describe('StaticMeshColliderSet with Rapier', () => {
     const physics = await createRapierPhysics();
     const set = new StaticMeshColliderSet(physics);
     const entity = new EngineRuntime().world.createEntity();
-    set.sync([{
-      key: '0,0,0',
-      entity,
-      revision: 1,
-      position: [0, 0, 0],
-      vertices: new Float32Array([-2, 0, -2, 2, 0, -2, 0, 0, 2]),
-      indices: new Uint32Array([0, 2, 1]),
-    }]);
+    set.sync([
+      {
+        key: '0,0,0',
+        entity,
+        revision: 1,
+        position: [0, 0, 0],
+        vertices: new Float32Array([-2, 0, -2, 2, 0, -2, 0, 0, 2]),
+        indices: new Uint32Array([0, 2, 1]),
+      },
+    ]);
     physics.step(1 / 60);
-    expect(physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })?.entity).toBe(entity);
+    expect(
+      physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })?.entity,
+    ).toBe(entity);
     set.sync([]);
     physics.step(1 / 60);
-    expect(physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })).toBeNull();
+    expect(
+      physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 }),
+    ).toBeNull();
     set.dispose();
     physics.dispose();
   });
