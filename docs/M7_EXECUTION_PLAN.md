@@ -48,13 +48,14 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 
 ## Phase 4 — serialization and runtime integration
 
-The v1 persistence contract, focused storage tests, Editor directory-project persistence wiring, and the first Player project loader are implemented. Player opens project folders through the browser File System Access API, verifies the directory project and voxel blobs, meshes chunks with loaded-neighbor culling, renders supported Box/Sphere/Plane/Cylinder entities, and frames the loaded content. The Player does not yet decode GLB/custom entities or resolve texture/material asset references; browser folder-picker interaction has not yet been manually acceptance-tested.
+The v1 persistence contract, focused storage tests, Editor directory-project persistence wiring, and the first Player project loader are implemented. Player opens project folders through the browser File System Access API, verifies the directory project and voxel blobs, meshes chunks with loaded-neighbor culling, renders supported Box/Sphere/Plane/Cylinder entities, and frames the loaded content. The Editor-to-Player project-folder workflow has now been manually confirmed by the project owner on Android, including selecting the project root folder (not its nested `worlds` directory). The Player does not yet decode GLB/custom entities or resolve texture/material asset references; broader browser and desktop acceptance remains.
 
 - [x] Persist chunk descriptors through the versioned world envelope extension.
 - [x] Store binary cell payloads as immutable content-addressed project blobs; avoid Base64 expansion in directory projects.
 - [x] Add schema and semantic validation, plus atomic-open failure coverage for malformed/missing/corrupt content.
 - [ ] Add explicit migration fixtures for future extension/schema revisions.
 - [ ] Integrate static collision through public physics APIs and explicit mesh budgets.
+- [x] Manually verify Editor save → Player folder open on Android; the project root contains `worlds/main.world` and must be selected as the folder.
 - [ ] Add a mixed voxel + conventional mesh acceptance world in Player and Editor, including visible chunk rendering and round-trip validation.
 
 ## Phase 5 — verification and closeout
