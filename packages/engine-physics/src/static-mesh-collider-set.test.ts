@@ -18,9 +18,7 @@ function createHarness() {
       calls.push(`create-collider:${handle}`);
       return handle;
     }),
-    removeCollider: vi.fn((handle: PhysicsColliderHandle) =>
-      calls.push(`remove-collider:${handle}`),
-    ),
+    removeCollider: vi.fn((handle: PhysicsColliderHandle) => calls.push(`remove-collider:${handle}`)),
     removeBody: vi.fn((handle: PhysicsBodyHandle) => calls.push(`remove-body:${handle}`)),
   } as unknown as PhysicsWorld;
   return { physics, calls };
@@ -46,8 +44,81 @@ describe('StaticMeshColliderSet', () => {
     expect(physics.createBody).toHaveBeenCalledTimes(2);
     set.sync([input('0,0,0', 1), input('1,0,0', 1)]);
     expect(physics.createBody).toHaveBeenCalledTimes(2);
-
     set.sync([input('0,0,0', 1)]);
     expect(set.size).toBe(1);
     expect(calls).toContain('remove-collider:collider-4');
-    expec...[truncated]
+    expect(calls).toContain('remove-body:body-3');
+  });
+
+  it('creates a replacement before releasing the previous chunk collider', () => {
+    const { physics, calls } = createHarness();
+    const set = new StaticMeshColliderSet(physics);
+    set.sync([input('0,0,0', 1)]);
+    set.sync([input('0,0,0', 2)]);
+    expect(calls.indexOf('create-collider:collider-4')).toBeLessThan(
+      calls.indexOf('remove-collider:collider-2'),
+    );
+    expect(set.size).toBe(1);
+  });
+
+  it('releases a newly-created body if collider creation fails and retains the old collider', () => {
+    const { physics, calls } = createHarness();
+    const set = new StaticMeshColliderSet(physics);
+    set.sync([input('0,0,0', 1)]);
+    vi.mocked(physics.createCollider).mockImplementationOnce(() => {
+      throw new Error('collider allocation failed');
+    });
+    expect(() => set.sync([input('0,0,0', 2)])).toThrow('collider allocation failed');
+    expect(set.size).toBe(1);
+    expect(calls).toContain('remove-body:body-3');
+    expect(calls).not.toContain('remove-collider:collider-2');
+  });
+
+  it('disposes all handles once and rejects later sync calls', () => {
+    const { physics } = createHarness();
+    const set = new StaticMeshColliderSet(physics);
+    set.sync([input('0,0,0', 1)]);
+    set.dispose();
+    set.dispose();
+    expect(set.size).toBe(0);
+    expect(physics.removeCollider).toHaveBeenCalledTimes(1);
+    expect(physics.removeBody).toHaveBeenCalledTimes(1);
+    expect(() => set.sync([])).toThrow('disposed');
+  });
+});
+
+async function createRapierPhysics(): Promise<RapierPhysicsWorld> {
+  setRapierModuleLoaderForTests(async () => {
+    const rapier = await import('@dimforge/rapier3d-compat');
+    await rapier.init();
+    return rapier as unknown as typeof import('@dimforge/rapier3d');
+  });
+  try {
+    return await RapierPhysicsWorld.create({ gravity: [0, 0, 0] });
+  } finally {
+    setRapierModuleLoaderForTests(null);
+  }
+}
+
+describe('StaticMeshColliderSet with Rapier', () => {
+  it('registers a triangle mesh for raycasts and removes it when its chunk unloads', async () => {
+    const physics = await createRapierPhysics();
+    const set = new StaticMeshColliderSet(physics);
+    const entity = new EngineRuntime().world.createEntity();
+    set.sync([{
+      key: '0,0,0',
+      entity,
+      revision: 1,
+      position: [0, 0, 0],
+      vertices: new Float32Array([-2, 0, -2, 2, 0, -2, 0, 0, 2]),
+      indices: new Uint32Array([0, 2, 1]),
+    }]);
+    physics.step(1 / 60);
+    expect(physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })?.entity).toBe(entity);
+    set.sync([]);
+    physics.step(1 / 60);
+    expect(physics.raycast({ origin: [0, 2, 0], direction: [0, -1, 0], maxDistance: 5 })).toBeNull();
+    set.dispose();
+    physics.dispose();
+  });
+});
