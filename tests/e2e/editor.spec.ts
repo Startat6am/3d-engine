@@ -177,7 +177,7 @@ test('empty scenes show an actionable state instead of an empty placeholder insp
   await page.getByRole('button', { name: 'Delete selected object' }).click();
   await expect(page.getByText('Empty scene')).toBeVisible();
   await expect(
-    page.getByText('Select an object in the Hierarchy or add a primitive to begin.'),
+    page.getByText('Select an object or voxel chunk in the Hierarchy, or add content to begin.'),
   ).toBeVisible();
   await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
 });
@@ -194,5 +194,19 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
   await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
+  await expect(page.getByLabel('Voxel chunk editor')).toBeVisible();
+  await expect(page.getByText('Revision 0 · 1 materials')).toBeVisible();
+
+  await page.getByLabel('Voxel cell X').fill('2');
+  await page.getByLabel('Voxel cell Y').fill('2');
+  await page.getByLabel('Voxel cell Z').fill('3');
+  await page.getByLabel('Voxel material').selectOption('builtin:stone');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 2 materials')).toBeVisible();
+  await expect(page.locator('.voxel-palette')).toContainText('grass');
+  await expect(page.locator('.voxel-palette')).toContainText('stone');
+
+  await page.getByRole('button', { name: 'Erase cell' }).click();
+  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
   await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
 });
