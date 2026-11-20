@@ -23,7 +23,12 @@ import {
 } from '@engine/renderer';
 import { meshVoxelChunk, type VoxelMaterialReference } from '@engine/voxel';
 import type { WorldDocument } from '@engine/serialization';
-import { GlbImporter, type GlbAsset, type GltfPbrMaterial } from '@engine/gltf-importer';
+import {
+  GlbImporter,
+  type GlbAsset,
+  type GltfPbrMaterial,
+  type GltfTextureTransform,
+} from '@engine/gltf-importer';
 import { attachFpsCounter } from './fps-counter.js';
 
 interface DirectoryPickerWindow extends Window {
@@ -197,11 +202,7 @@ function textureFromGlb(
   textureIndex: number | undefined,
   assetId: string,
   contentHash: string,
-  transform: GltfPbrMaterial['textureTransforms'] extends infer T
-    ? T extends Record<string, infer V>
-      ? V | undefined
-      : never
-    : never,
+  transform: GltfTextureTransform | undefined,
 ): TextureSource | undefined {
   if (textureIndex === undefined) return undefined;
   const texture = asset.textures[textureIndex];

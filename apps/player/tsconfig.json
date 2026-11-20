@@ -15,6 +15,12 @@
       "path": "../../packages/engine-geometry"
     },
     {
+      "path": "../../packages/engine-assets"
+    },
+    {
+      "path": "../../packages/engine-gltf-importer"
+    },
+    {
       "path": "../../packages/engine-renderer"
     },
     {
