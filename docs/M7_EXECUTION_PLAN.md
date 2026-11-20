@@ -1,9 +1,9 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player loads voxel project folders, restores primitive entities, and imports saved GLB assets through the shared importer, including node transforms, mesh primitives, PBR factors and embedded texture channels. Player integrates bounded voxel collision geometry with the public PhysicsWorld API through `createVoxelChunkColliderInputs` and `StaticMeshColliderSet`, including source/neighbor revision tokens, configured chunk origins, pre-allocation mesh budgets, replacement and page-disposal cleanup. Editor now has an initial voxel-authoring path that adds and renders a 16×16 grass surface chunk alongside conventional entities. The Editor→Player E2E authors a voxel chunk beside an imported GLB, saves the project folder, and reopens it in Player; exact-head Chromium acceptance passed in CI #612. Full voxel editing tools, broader mixed-scene coverage and remaining M7 validation remain.
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player loads voxel project folders, restores primitive entities, and imports saved GLB assets through the shared importer, including node transforms, mesh primitives, PBR factors and embedded texture channels. Player integrates bounded voxel collision geometry with the public PhysicsWorld API through `createVoxelChunkColliderInputs` and `StaticMeshColliderSet`, including source/neighbor revision tokens, configured chunk origins, pre-allocation mesh budgets, replacement and page-disposal cleanup. Editor now has an voxel editor supports selecting chunks, painting/erasing cells by local XYZ coordinates, selecting built-in Grass/Dirt/Stone materials, and revisioned palette updates alongside conventional entities. Cross-app E2E now verifies painted multi-material chunk persistence and Player mesh reconstruction; exact-head CI for this authoring slice is pending. Viewport ray-based brush painting, palette removal/reordering, migration fixtures, full streaming lifecycle acceptance and voxel benchmarks remain open.
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
-**Updated:** 2026-11-20
+**Updated:** 2026-11-21
 
 ## Goal
 
@@ -59,12 +59,17 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Load Editor-saved GLB assets in Player through the shared importer; restore node transforms, mesh primitives, PBR factors and embedded texture channels.
 - [x] Add cross-app Playwright coverage for Editor save → Player folder open with a textured GLB and verify a browser image upload.
 - [x] Complete the initial mixed voxel + conventional mesh acceptance: Editor authors/renders a voxel chunk beside a GLB entity, saves the directory project, and Player reopens it with rendered mesh parts and static voxel colliders; exact-head Chromium E2E passed in CI #612.
+- [x] Add coordinate-based Editor voxel cell paint/erase with built-in material selection, automatic palette extension, immutable revisioned edits and chunk removal.
+- [ ] Pass exact-head Chromium E2E for painted multi-material chunk save/reopen, verifying revision, palette and Player mesh parts (coverage added; CI pending).
 
 ## Phase 5 — verification and closeout
 
-- [x] Exact-head quality gates passed in GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, both GLB benchmarks and Playwright Chromium E2E. Voxel-specific benchmarks and measured resource report remain open.
+- [x] Baseline exact-head quality gates passed in GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, both GLB benchmarks and Playwright Chromium E2E.
+- [x] Local `pnpm check` passed after voxel cell editor changes: Prettier, ESLint, TypeScript, 257/257 Vitest tests and package/app builds. Local Playwright is blocked by the sandbox missing `libglib-2.0.so.0`; exact-head CI remains required for new E2E coverage.
+- [ ] Rerun exact-head quality gates and Chromium E2E for the painted multi-material round-trip.
 - [ ] Add voxel correctness, streaming, lifecycle and performance benchmarks with raw output.
 - [ ] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
+- [ ] Add viewport ray-based voxel brush interaction and palette removal/reordering after coordinate-based editing is validated.
 - [ ] Obtain owner acceptance of M7 scope and measured exit gates before closing M7.
 
 ## Explicit exclusions
@@ -81,5 +86,5 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16³ chunk).
 - `@engine/project-storage` owns `com.choreon.voxel-world` extension persistence. The extension records schema version, world voxel settings, signed chunk coordinates, revisions, palettes, and payload references with codec version, exact byte length, and SHA-256.
 - Chunk blobs are immutable and content-addressed; duplicate byte-identical chunks share one blob. Save verifies every blob before writing the manifest last. Load rejects missing/corrupt blobs, unsupported versions, malformed metadata, and duplicate coordinates before returning decoded snapshots.
-- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and initial Player folder loading/rendering are wired; GLB asset resolution and static collision are now wired in Player. Initial voxel authoring/rendering and a mixed voxel+GLB cross-app E2E path have been added; the expanded exact-head acceptance run remains pending.
+- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and Player folder loading/rendering are wired; GLB asset resolution and static collision are integrated in Player. Editor now supports coordinate-based cell paint/erase and built-in material palette extension. The cross-app E2E is extended to persist a painted multi-material chunk and verify two voxel mesh parts in Player; exact-head CI is pending.
 - Exact-head GitHub Actions run [#44556875444](https://github.com/Startat6am/3d-engine/actions/runs/44556875444) passed for code head `8da13169472965bfb613943a7e91d94084d3edc0`.
