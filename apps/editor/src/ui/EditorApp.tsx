@@ -38,6 +38,8 @@ import {
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
 import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
+import { createVoxelChunkSnapshot, meshVoxelChunk } from '@engine/voxel';
+import { createChunkCoordinate } from '@engine/world';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 import {
   BrowserProjectFileStore,
@@ -373,16 +375,59 @@ export function EditorApp() {
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
 
+  const voxelRenderObjects = useMemo<RenderObject[]>(() => {
+    const byCoordinate = new Map(
+      voxelChunks.map((chunk) => [
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
+        chunk,
+      ]),
+    );
+    return voxelChunks.flatMap((chunk) => {
+      const { x, y, z } = chunk.coordinate;
+      const neighbor = (dx: number, dy: number, dz: number) =>
+        byCoordinate.get(x + dx + ',' + (y + dy) + ',' + (z + dz));
+      const neighbors = {
+        ...(neighbor(1, 0, 0) ? { positiveX: neighbor(1, 0, 0)! } : {}),
+        ...(neighbor(-1, 0, 0) ? { negativeX: neighbor(-1, 0, 0)! } : {}),
+        ...(neighbor(0, 1, 0) ? { positiveY: neighbor(0, 1, 0)! } : {}),
+        ...(neighbor(0, -1, 0) ? { negativeY: neighbor(0, -1, 0)! } : {}),
+        ...(neighbor(0, 0, 1) ? { positiveZ: neighbor(0, 0, 1)! } : {}),
+        ...(neighbor(0, 0, -1) ? { negativeZ: neighbor(0, 0, -1)! } : {}),
+      };
+      const mesh = meshVoxelChunk(chunk, neighbors, voxelWorldSettings.voxelSize);
+      const position: Vec3 = [
+        x * voxelWorldSettings.chunkDimensions.x * voxelWorldSettings.voxelSize,
+        y * voxelWorldSettings.chunkDimensions.y * voxelWorldSettings.voxelSize,
+        z * voxelWorldSettings.chunkDimensions.z * voxelWorldSettings.voxelSize,
+      ];
+      return mesh.parts.map((part, index) => ({
+        id: 'voxel:' + x + ',' + y + ',' + z + ':' + index,
+        geometry: part.geometry,
+        material: createDefaultMaterial(
+          part.material.kind === 'builtin' && part.material.key === 'grass'
+            ? 0x70ad62
+            : part.material.kind === 'builtin' && part.material.key === 'dirt'
+              ? 0x9b7048
+              : 0x8995a5,
+        ),
+        position,
+        rotation: [0, 0, 0, 1] as const,
+        scale: [1, 1, 1] as const,
+      }));
+    });
+  }, [voxelChunks, voxelWorldSettings]);
   const renderObjects = useMemo(
-    () =>
-      entities.map((entity) => ({
+    () => [
+      ...entities.map((entity) => ({
         ...entity,
         material:
           entity.id === selectedId
             ? { ...entity.material, color: entity.material.color }
             : entity.material,
       })),
-    [entities, selectedId],
+      ...voxelRenderObjects,
+    ],
+    [entities, selectedId, voxelRenderObjects],
   );
   const renderScene = useMemo(
     () => ({ camera, background: 0x151a23, objects: renderObjects }),
@@ -489,6 +534,30 @@ export function EditorApp() {
     },
     [entities],
   );
+
+  const addVoxelChunk = () => {
+    const occupied = new Set(
+      voxelChunks.map(
+        (chunk) => chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
+      ),
+    );
+    let x = 0;
+    while (occupied.has(x + ',0,0')) x += 1;
+    const cells = new Uint16Array(16 * 16 * 16);
+    for (let z = 0; z < 16; z += 1) {
+      for (let cellX = 0; cellX < 16; cellX += 1) {
+        cells[cellX + 16 * (z * 16)] = 1;
+      }
+    }
+    const chunk = createVoxelChunkSnapshot({
+      coordinate: createChunkCoordinate({ x, y: 0, z: 0 }),
+      palette: [{ material: { kind: 'builtin', key: 'grass' } }],
+      cells,
+    });
+    setVoxelChunks([...voxelChunks, chunk]);
+    setIsDirty(true);
+    setIsAddMenuOpen(false);
+  };
 
   const updateVector = (key: 'position' | 'rotation' | 'scale', axis: number, value: string) => {
     const number = Number(value);
@@ -1540,6 +1609,10 @@ export function EditorApp() {
                   <small>3D primitive</small>
                 </button>
               ))}
+              <button onClick={addVoxelChunk}>
+                <span>Voxel chunk</span>
+                <small>16×16 grass surface</small>
+              </button>
             </div>
           ) : null}
           <div className="tree-row active">
@@ -1554,7 +1627,9 @@ export function EditorApp() {
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          <div className="panel-foot">{entities.length} OBJECTS</div>
+          <div className="panel-foot">
+            {entities.length} OBJECTS · {voxelChunks.length} VOXEL CHUNKS
+          </div>
         </aside>
         <section className="viewport">
           <div className="viewport-label">
