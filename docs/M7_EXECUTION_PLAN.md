@@ -1,6 +1,6 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player loads voxel project folders, restores primitive entities, and imports saved GLB assets through the shared importer, including node transforms, mesh primitives, PBR factors and embedded texture channels. Voxel authoring, PhysicsWorld collider lifecycle integration, mixed voxel/mesh acceptance and broader M7 validation remain. A bounded chunk-local static collision mesh builder is implemented and unit-tested; it emits geometry only and does not allocate physics resources.
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player loads voxel project folders, restores primitive entities, and imports saved GLB assets through the shared importer, including node transforms, mesh primitives, PBR factors and embedded texture channels. Player integrates bounded voxel collision geometry with the public PhysicsWorld API through `createVoxelChunkColliderInputs` and `StaticMeshColliderSet`, including source/neighbor revision tokens, configured chunk origins, pre-allocation mesh budgets, replacement and page-disposal cleanup. Editor now has an initial voxel-authoring path that adds and renders a 16×16 grass surface chunk alongside conventional entities. The Editor→Player acceptance test is being extended to round-trip that voxel chunk with an imported GLB; full voxel editing tools, broader mixed-scene coverage and remaining M7 validation remain.
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
 **Updated:** 2026-11-20
@@ -54,15 +54,15 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Store binary cell payloads as immutable content-addressed project blobs; avoid Base64 expansion in directory projects.
 - [x] Add schema and semantic validation, plus atomic-open failure coverage for malformed/missing/corrupt content.
 - [ ] Add explicit migration fixtures for future extension/schema revisions.
-- [ ] Integrate static collision through public physics APIs and explicit mesh budgets.
+- [x] Integrate static collision through public physics APIs and explicit mesh budgets; Player builds chunk-local meshes, validates source/neighbor revision tokens, synchronizes bounded static colliders, and disposes them with the page.
 - [x] Manually verify Editor save → Player folder open on Android; the project root contains `worlds/main.world` and must be selected as the folder.
 - [x] Load Editor-saved GLB assets in Player through the shared importer; restore node transforms, mesh primitives, PBR factors and embedded texture channels.
 - [x] Add cross-app Playwright coverage for Editor save → Player folder open with a textured GLB and verify a browser image upload.
-- [ ] Add a mixed voxel + conventional mesh acceptance world in Player and Editor, including visible chunk rendering and round-trip validation.
+- [ ] Complete mixed voxel + conventional mesh acceptance: the Editor can now author/render a voxel chunk and the cross-app E2E exercises voxel + GLB project persistence; exact-head Chromium acceptance must pass before this gate is closed.
 
 ## Phase 5 — verification and closeout
 
-- [ ] Run format, lint, typecheck, unit/contract tests, package/app builds, GLB benchmarks and Playwright Chromium E2E.
+- [ ] Run exact-head format, lint, typecheck, unit/contract tests, package/app builds, GLB benchmarks and Playwright Chromium E2E after the current Editor authoring slice.
 - [ ] Add voxel correctness, streaming, lifecycle and performance benchmarks with raw output.
 - [ ] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
 - [ ] Obtain owner acceptance of M7 scope and measured exit gates before closing M7.
@@ -81,5 +81,5 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16³ chunk).
 - `@engine/project-storage` owns `com.choreon.voxel-world` extension persistence. The extension records schema version, world voxel settings, signed chunk coordinates, revisions, palettes, and payload references with codec version, exact byte length, and SHA-256.
 - Chunk blobs are immutable and content-addressed; duplicate byte-identical chunks share one blob. Save verifies every blob before writing the manifest last. Load rejects missing/corrupt blobs, unsupported versions, malformed metadata, and duplicate coordinates before returning decoded snapshots.
-- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and initial Player folder loading/rendering are wired; GLB asset resolution, voxel authoring, static collision, and end-to-end acceptance remain open.
+- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and initial Player folder loading/rendering are wired; GLB asset resolution and static collision are now wired in Player. Initial voxel authoring/rendering and a mixed voxel+GLB cross-app E2E path have been added; the expanded exact-head acceptance run remains pending.
 - Exact-head GitHub Actions run [#44556875444](https://github.com/Startat6am/3d-engine/actions/runs/44556875444) passed for code head `8da13169472965bfb613943a7e91d94084d3edc0`.
