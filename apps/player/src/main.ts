@@ -507,11 +507,13 @@ async function openProjectFolder(): Promise<void> {
     return;
   }
   if (loadButton) loadButton.disabled = true;
-  setProjectProgress(2, 'Choose project folder');
-  setProjectStatus('Opening project… verifying manifest, assets and voxel chunk hashes.');
+  // Opening the native picker is not project loading: do not show a progress bar
+  // until the user has selected a directory and we can begin reading it.
+  setProjectProgress(0, '', false);
+  setProjectStatus('Choose a project folder…');
   try {
     const directory = await picker({ mode: 'read' });
-    setProjectProgress(12, 'Reading manifest, assets and voxel chunks');
+    setProjectProgress(8, 'Reading manifest, assets and voxel chunks');
     await yieldToBrowser();
     const project = await loadVoxelWorldProject(new BrowserProjectFileStore(directory));
     setProjectProgress(52, 'Preparing scene entities and GLB models');
@@ -629,7 +631,9 @@ async function openProjectFolder(): Promise<void> {
     setProjectProgress(88, 'Applying loaded scene');
     await yieldToBrowser();
     const chunkCount = project.chunks.length;
-    const meshCount = world.prepared.length;
+    // Voxel mesh parts are registered as Renderable entities alongside prepared
+    // document entities; include both so the status reflects what is on screen.
+    const meshCount = world.prepared.length + voxelObjects.length;
     setProjectProgress(100, 'Project loaded');
     setProjectStatus(
       `Loaded “${project.document.world.name}” · ${chunkCount} voxel chunks · ${voxelObjects.length} voxel mesh parts · ${meshCount} rendered mesh parts` +
