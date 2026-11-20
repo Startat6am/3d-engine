@@ -61,6 +61,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Complete the initial mixed voxel + conventional mesh acceptance: Editor authors/renders a voxel chunk beside a GLB entity, saves the directory project, and Player reopens it with rendered mesh parts and static voxel colliders; exact-head Chromium E2E passed in CI #612.
 - [x] Add coordinate-based Editor voxel cell paint/erase with built-in material selection, automatic palette extension, immutable revisioned edits and chunk removal.
 - [x] Add palette reordering with cell-index remapping and safe removal of unused palette entries.
+- [ ] Pass exact-head Chromium E2E for palette reorder/removal, usage protection and cell-index remapping; coverage added, CI #631 pending.
 - [x] Pass exact-head Chromium E2E for painted multi-material chunk save/reopen, verifying revision, palette and Player mesh parts; passed in [CI #615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`.
 
 ## Phase 5 — verification and closeout
