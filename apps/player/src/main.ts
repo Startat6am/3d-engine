@@ -22,6 +22,8 @@ import {
   type TextureSource,
 } from '@engine/renderer';
 import { meshVoxelChunk, type VoxelMaterialReference } from '@engine/voxel';
+import { createPhysicsWorld, StaticMeshColliderSet, type PhysicsWorld } from '@engine/physics';
+import { createVoxelChunkColliderInputs } from './voxel-collision.js';
 import type { WorldDocument } from '@engine/serialization';
 import {
   GlbImporter,
@@ -106,6 +108,31 @@ engine.register({ stop: () => renderer.dispose() });
 await engine.start();
 
 const runtime = new EngineRuntime();
+// Initialize Rapier without blocking Player startup or project-picker event wiring.
+// The world and chunk-collider owner live until the page is torn down.
+let physicsWorld: PhysicsWorld | null = null;
+let voxelColliderSet: StaticMeshColliderSet | null = null;
+let pageDisposed = false;
+const physicsReady = createPhysicsWorld({ gravity: [0, -9.81, 0] }).then(
+  (world) => {
+    const colliders = new StaticMeshColliderSet(world);
+    if (pageDisposed) {
+      colliders.dispose();
+      world.dispose();
+      return null;
+    }
+    physicsWorld = world;
+    voxelColliderSet = colliders;
+    return { world, colliders };
+  },
+  (error: unknown) => {
+    setProjectStatus(
+      `Physics initialization failed: ${error instanceof Error ? error.message : String(error)}`,
+      true,
+    );
+    return null;
+  },
+);
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
   'Renderable',
 );
@@ -529,7 +556,20 @@ async function openProjectFolder(): Promise<void> {
       }));
     });
 
-    // Commit the replacement only after every referenced blob and mesh has been prepared.
+    // Prepare and register static voxel collision before replacing the visible scene.
+    // The revision token includes the source chunk and all six neighbor revisions.
+    setProjectProgress(80, 'Building static voxel collision');
+    await yieldToBrowser();
+    const physics = await physicsReady;
+    if (!physics) throw new Error('Rapier physics world is unavailable');
+    const colliderInputs = createVoxelChunkColliderInputs(
+      project.chunks,
+      project.settings.voxelSize,
+      project.settings.chunkDimensions,
+    );
+    physics.colliders.sync(colliderInputs);
+
+    // Commit the replacement only after every referenced blob, render mesh and collider is ready.
     for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
     for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
     activeProjectEntities.length = 0;
@@ -593,6 +633,7 @@ async function openProjectFolder(): Promise<void> {
     setProjectProgress(100, 'Project loaded');
     setProjectStatus(
       `Loaded “${project.document.world.name}” · ${chunkCount} voxel chunks · ${voxelObjects.length} voxel mesh parts · ${meshCount} rendered mesh parts` +
+        ` · ${colliderInputs.length} static voxel colliders` +
         (world.unsupported
           ? ` · ${world.unsupported} unsupported entities or GLB parts skipped`
           : ''),
@@ -621,11 +662,21 @@ let camera = createDefaultCamera();
 const updateFps = attachFpsCounter(canvas);
 let previousFrame = 0;
 let animationFrame = 0;
+let physicsAccumulator = 0;
+const physicsFixedStep = 1 / 60;
+const maxPhysicsFrameDelta = 0.25;
 const renderFrame = (now: number) => {
   updateFps(now);
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
   runtime.advance(delta);
+
+  // Keep Rapier on a bounded fixed timestep; large tab-resume deltas are clamped.
+  physicsAccumulator += Math.min(delta, maxPhysicsFrameDelta);
+  while (physicsAccumulator >= physicsFixedStep) {
+    physicsWorld?.step(physicsFixedStep);
+    physicsAccumulator -= physicsFixedStep;
+  }
 
   const objects: RenderObject[] = [];
   runtime.world.query(Renderable).forEach((entity, renderableValue) => {
@@ -647,6 +698,9 @@ const renderFrame = (now: number) => {
 
 const onPageHide = () => {
   window.cancelAnimationFrame(animationFrame);
+  pageDisposed = true;
+  voxelColliderSet?.dispose();
+  physicsWorld?.dispose();
   void engine.dispose();
 };
 window.addEventListener('pagehide', onPageHide, { once: true });
