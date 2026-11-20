@@ -38,7 +38,7 @@ import {
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
 import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
-import { createVoxelChunkSnapshot, meshVoxelChunk } from '@engine/voxel';
+import { createVoxelChunkSnapshot, editVoxelChunk, meshVoxelChunk } from '@engine/voxel';
 import { createChunkCoordinate } from '@engine/world';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 import {
@@ -340,6 +340,9 @@ export function EditorApp() {
     chunkDimensions: { x: 16, y: 16, z: 16 },
   });
   const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
+  const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<string | null>(null);
+  const [voxelCell, setVoxelCell] = useState({ x: 0, y: 1, z: 0 });
+  const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -374,6 +377,12 @@ export function EditorApp() {
   const pinchDistanceRef = useRef<number | null>(null);
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
+  const selectedVoxelChunk =
+    voxelChunks.find(
+      (chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z ===
+        selectedVoxelChunkKey,
+    ) ?? null;
 
   const voxelRenderObjects = useMemo<RenderObject[]>(() => {
     const byCoordinate = new Map(
@@ -555,8 +564,89 @@ export function EditorApp() {
       cells,
     });
     setVoxelChunks([...voxelChunks, chunk]);
+    setSelectedVoxelChunkKey(x + ',0,0');
+    setSelectedId('');
     setIsDirty(true);
     setIsAddMenuOpen(false);
+  };
+
+  const updateVoxelCell = (value: number) => {
+    if (!selectedVoxelChunk) return;
+    const [kind, key] = voxelMaterial.split(':');
+    const material =
+      kind === 'asset'
+        ? { kind: 'asset' as const, assetId: key ?? '' }
+        : { kind: 'builtin' as const, key: key ?? 'grass' };
+    const existingIndex = selectedVoxelChunk.palette.findIndex(
+      (entry) =>
+        entry.material.kind === material.kind &&
+        (entry.material.kind === 'asset'
+          ? entry.material.assetId === (material.kind === 'asset' ? material.assetId : '')
+          : entry.material.key === (material.kind === 'builtin' ? material.key : '')),
+    );
+    let base = selectedVoxelChunk;
+    let paletteIndex = existingIndex + 1;
+    if (value > 0 && existingIndex < 0) {
+      const palette = [...selectedVoxelChunk.palette, { material }];
+      base = createVoxelChunkSnapshot({
+        coordinate: selectedVoxelChunk.coordinate,
+        revision: selectedVoxelChunk.revision,
+        palette,
+        cells: selectedVoxelChunk.copyCells(),
+      });
+      paletteIndex = palette.length;
+    }
+    const result = editVoxelChunk(base, [{ ...voxelCell, value: value === 0 ? 0 : paletteIndex }]);
+    if (result.snapshot === selectedVoxelChunk) return;
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    setVoxelChunks((current) =>
+      current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
+          ? result.snapshot
+          : chunk,
+      ),
+    );
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: value === 0 ? 'Voxel cell cleared' : 'Voxel cell painted',
+      details:
+        'Chunk ' +
+        chunkKey +
+        ', cell (' +
+        voxelCell.x +
+        ', ' +
+        voxelCell.y +
+        ', ' +
+        voxelCell.z +
+        '), revision ' +
+        result.snapshot.revision +
+        '.',
+    });
+  };
+
+  const removeSelectedVoxelChunk = () => {
+    if (!selectedVoxelChunk) return;
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    setVoxelChunks((current) =>
+      current.filter(
+        (chunk) =>
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z !== chunkKey,
+      ),
+    );
+    setSelectedVoxelChunkKey(null);
+    setIsDirty(true);
   };
 
   const updateVector = (key: 'position' | 'rotation' | 'scale', axis: number, value: string) => {
@@ -1622,11 +1712,31 @@ export function EditorApp() {
             <button
               key={entity.id}
               className={`tree-row entity-row ${entity.id === selectedId ? 'selected' : ''}`}
-              onClick={() => setSelectedId(entity.id)}
+              onClick={() => {
+                setSelectedVoxelChunkKey(null);
+                setSelectedId(entity.id);
+              }}
             >
               ◈ <span>{entity.name}</span>
             </button>
           ))}
+          {voxelChunks.map((chunk) => {
+            const key = chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z;
+            return (
+              <button
+                key={key}
+                className={
+                  'tree-row entity-row ' + (key === selectedVoxelChunkKey ? 'selected' : '')
+                }
+                onClick={() => {
+                  setSelectedVoxelChunkKey(key);
+                  setSelectedId('');
+                }}
+              >
+                ▦ <span>Voxel chunk ({key})</span>
+              </button>
+            );
+          })}
           <div className="panel-foot">
             <span>{entities.length} OBJECTS</span>
             <span>{voxelChunks.length} VOXEL CHUNKS</span>
@@ -1737,7 +1847,10 @@ export function EditorApp() {
                 bounds.width,
                 bounds.height,
               );
-              if (hit) setSelectedId(hit);
+              if (hit) {
+                setSelectedVoxelChunkKey(null);
+                setSelectedId(hit);
+              }
             }}
             onPointerCancel={(event) => {
               activePointersRef.current.delete(event.pointerId);
@@ -1750,7 +1863,7 @@ export function EditorApp() {
           <output ref={fpsRef} className="viewport-fps" aria-label="Frames per second">
             FPS --
           </output>
-          {entities.length === 0 ? (
+          {entities.length === 0 && voxelChunks.length === 0 ? (
             <div className="viewport-empty-state">
               <strong>Empty scene</strong>
               <span>Use + in Hierarchy to add a primitive, or File → Import GLB.</span>
@@ -1775,7 +1888,100 @@ export function EditorApp() {
               ⌫
             </button>
           </div>
-          {selected ? (
+          {selectedVoxelChunk ? (
+            <section className="voxel-inspector" aria-label="Voxel chunk editor">
+              <div className="inspector-title">
+                ▦ <strong>Voxel chunk</strong>
+              </div>
+              <div className="object-source">
+                <span>
+                  Chunk ({selectedVoxelChunk.coordinate.x}, {selectedVoxelChunk.coordinate.y},{' '}
+                  {selectedVoxelChunk.coordinate.z})
+                </span>
+                <small>
+                  Revision {selectedVoxelChunk.revision} · {selectedVoxelChunk.palette.length}{' '}
+                  materials
+                </small>
+              </div>
+              <label>CELL COORDINATES</label>
+              <div className="vector-field">
+                <span>XYZ</span>
+                <div>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <input
+                      key={axis}
+                      aria-label={'Voxel cell ' + axis.toUpperCase()}
+                      type="number"
+                      min="0"
+                      max="15"
+                      step="1"
+                      value={voxelCell[axis]}
+                      onChange={(event) =>
+                        setVoxelCell((current) => ({
+                          ...current,
+                          [axis]: Number(event.target.value),
+                        }))
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+              <label>PAINT MATERIAL</label>
+              <select
+                aria-label="Voxel material"
+                value={voxelMaterial}
+                onChange={(event) => setVoxelMaterial(event.target.value)}
+              >
+                <option value="builtin:grass">Grass</option>
+                <option value="builtin:dirt">Dirt</option>
+                <option value="builtin:stone">Stone</option>
+              </select>
+              <div className="voxel-edit-actions">
+                <button
+                  onClick={() => updateVoxelCell(1)}
+                  disabled={
+                    ![voxelCell.x, voxelCell.y, voxelCell.z].every(
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
+                    )
+                  }
+                >
+                  Paint cell
+                </button>
+                <button
+                  onClick={() => updateVoxelCell(0)}
+                  disabled={
+                    ![voxelCell.x, voxelCell.y, voxelCell.z].every(
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
+                    )
+                  }
+                >
+                  Erase cell
+                </button>
+              </div>
+              <label>PALETTE</label>
+              <ul className="voxel-palette">
+                {selectedVoxelChunk.palette.map((entry, index) => (
+                  <li
+                    key={
+                      entry.material.kind +
+                      ':' +
+                      (entry.material.kind === 'asset'
+                        ? entry.material.assetId
+                        : entry.material.key)
+                    }
+                  >
+                    <span>{index + 1}</span>
+                    {entry.material.kind === 'builtin'
+                      ? entry.material.key
+                      : entry.material.assetId}
+                  </li>
+                ))}
+              </ul>
+              <button className="voxel-delete" onClick={removeSelectedVoxelChunk}>
+                Delete voxel chunk
+              </button>
+            </section>
+          ) : selected ? (
             <>
               <div className="inspector-title">
                 ◈{' '}
@@ -1820,7 +2026,7 @@ export function EditorApp() {
             </>
           ) : (
             <div className="empty-inspector">
-              Select an object in the Hierarchy or add a primitive to begin.
+              Select an object or voxel chunk in the Hierarchy, or add content to begin.
             </div>
           )}
         </aside>
