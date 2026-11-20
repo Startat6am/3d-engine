@@ -30,34 +30,537 @@ function makeTriangleGlb(nodeNames = ['TriangleNode']): Buffer {
       { bufferView: 1, componentType: 5126, count: 3, type: 'VEC3' },
       { bufferView: 2, componentType: 5126, count: 3, type: 'VEC2' },
     ],
-    images: [{ name: 'One pixe∂ªßq´^uHú∞Å°ïÖëï»§∞(ÄÄÄÅ¡πù°’π¨†ù%Pú∞Å¡•·ï±Ã§∞(ÄÄÄÅ¡πù°’π¨†ù%9ú∞Å	’ôôï»πÖ±±Ωå†¿§§∞(ÄÅt§Ï)Ù()—ïÕ–†ù1Å•µ¡Ω…—ÃÅ…ïù•Õ—ï»ÅÕ—Öâ±îÅ¡…Ω©ïç–ÅÖÕÕï—ÃÅÖπêÅÕ’…Ÿ•ŸîÅ›Ω…±êÅÕÖŸîΩ…ïΩ¡ï∏ú∞ÅÖÕÂπåÄ°Ï(ÄÅ¡Öùî∞)Ù§ÄÙ¯ÅÏ(ÄÅçΩπÕ–Å¡Öùï……Ω…ÃËÅÕ—…•πùmtÄÙÅmtÏ(ÄÅçΩπÕ–ÅçΩπÕΩ±ï……Ω…ÃËÅÕ—…•πùmtÄÙÅmtÏ(ÄÅ¡ÖùîπΩ∏†ù¡Öùïï……Ω»ú∞Ä°ï……Ω»§ÄÙ¯Å¡Öùï……Ω…Ãπ¡’Õ†°ï……Ω»πµïÕÕÖùî§§Ï(ÄÅ¡ÖùîπΩ∏†ùçΩπÕΩ±îú∞Ä°µïÕÕÖùî§ÄÙ¯ÅÏ(ÄÄÄÅ•òÄ°µïÕÕÖùîπ—Â¡î†§ÄÙÙÙÄùï……Ω»ú§ÅçΩπÕΩ±ï……Ω…Ãπ¡’Õ†°µïÕÕÖùîπ—ï·–†§§Ï(ÄÅÙ§Ï(ÄÅÖ›Ö•–Å¡ÖùîπÖëë%π•—Mç…•¡–††§ÄÙ¯ÅÏ(ÄÄÄÅçΩπÕ–Å9Ö—•Ÿï]Ω…≠ï»ÄÙÅ›•πëΩ‹π]Ω…≠ï»Ï(ÄÄÄÅçΩπÕ–ÅÕ—Ö—ÃÄÙÅÏÅç…ïÖ—ïêËÄ¿∞Å—ï…µ•πÖ—ïêËÄ¿ÅÙÏ(ÄÄÄÅ›•πëΩ‹π]Ω…≠ï»ÄÙÅç±ÖÕÃÅï·—ïπëÃÅ9Ö—•Ÿï]Ω…≠ï»ÅÏ(ÄÄÄÄÄÅçΩπÕ—…’ç—Ω»°Õç…•¡—UI0ËÅÕ—…•πúÅÅUI0∞ÅΩ¡—•ΩπÃ¸ËÅ]Ω…≠ï…=¡—•ΩπÃ§ÅÏ(ÄÄÄÄÄÄÄÅÕ’¡ï»°Õç…•¡—UI0∞ÅΩ¡—•ΩπÃ§Ï(ÄÄÄÄÄÄÄÅÕ—Ö—Ãπç…ïÖ—ïêÄ¨ÙÄƒÏ(ÄÄÄÄÄÅÙ((ÄÄÄÄÄÅΩŸï……•ëîÅ—ï…µ•πÖ—î†§ËÅŸΩ•êÅÏ(ÄÄÄÄÄÄÄÅÕ—Ö—Ãπ—ï…µ•πÖ—ïêÄ¨ÙÄƒÏ(ÄÄÄÄÄÄÄÅÕ’¡ï»π—ï…µ•πÖ—î†§Ï(ÄÄÄÄÄÅÙ(ÄÄÄÅÙÏ(ÄÄÄÅ=â©ïç–πëïô•πïA…Ω¡ï…—‰°›•πëΩ‹∞Äù}}›Ω…≠ï…M—Ö—Ãú∞ÅÏÅŸÖ±’îËÅÕ—Ö—Ã∞ÅçΩπô•ù’…Öâ±îËÅ—…’îÅÙ§Ï(ÄÅÙ§Ï(ÄÅÖ›Ö•–Å¡ÖùîπùΩ—º†úºú§Ï(ÄÅÖ›Ö•–Å¡Öùîπ±ΩçÖ—Ω»†ù•π¡’—mÖççï¡–Ùàπù±à±µΩëï∞Ωù±—òµâ•πÖ…‰âtú§πÕï—%π¡’—•±ïÃ°Ï(ÄÄÄÅπÖµîËÄù—…•Öπù±îπù±àú∞(ÄÄÄÅµ•µïQÂ¡îËÄùµΩëï∞Ωù±—òµâ•πÖ…‰ú∞(ÄÄÄÅâ’ôôï»ËÅµÖ≠ïQ…•Öπù±ï±à†§∞(ÄÅÙ§Ï(ÄÅÖ›Ö•–Åï·¡ïç–°¡Öùîπùï—	ÂQï·–†ùQ…•Öπù±ï9Ωëîú§§π—Ω	ïY•Õ•â±î†§Ï(ÄÅçΩπÕ–Å›Ω…≠ï…M—Ö—ÃÄÙÅÖ›Ö•–Å¡ÖùîπïŸÖ±’Ö—î††§ÄÙ¯ÅÏ(ÄÄÄÅçΩπÕ–ÅÕ—Ö—ÃÄÙÄ°›•πëΩ‹ÅÖÃÅ]•πëΩ‹ÄòÅÏÅ}}›Ω…≠ï…M—Ö—Ã¸ËÅÏÅç…ïÖ—ïêËÅπ’µâï»ÏÅ—ï…µ•πÖ—ïêËÅπ’µâï»ÅÙÅÙ§(ÄÄÄÄÄÄπ}}›Ω…≠ï…M—Ö—ÃÏ(ÄÄÄÅ…ï—’…∏ÅÕ—Ö—ÃÄ¸ÅÏÄ∏∏πÕ—Ö—ÃÅÙÄËÅπ’±∞Ï(ÄÅÙ§Ï(ÄÅï·¡ïç–°›Ω…≠ï…M—Ö—Ã§π—Ω≈’Ö∞°ÏÅç…ïÖ—ïêËÄƒ∞Å—ï…µ¶⁄Óù∆≠y“'VffW#¢'VffW"Êg&ˆ“Üfó'7E6fRí¿¢“ì∞¢vóBWáV7BávRÊvWD'ïFWáBÇuG&ñÊv∆TÊˆFRrííÁFÙ&Ufó6ñ&∆RÇì∞¢6ˆÁ7B6V6ˆÊDFˆ7V÷VÁB“•4Ù‚Á'6RÜvóB6fUv˜&∆BÇíí2GóVˆbfó'7DFˆ7V÷VÁC∞¢WáV7Bá6V6ˆÊDFˆ7V÷VÁBÊ76WG2íÁFÙÜfT∆VÊwFÇÉ"ì∞¢WáV7Bá6V6ˆÊDFˆ7V÷VÁBÊ76WG2ÊfñÊBÇÜóFV“í”‚óFV“Ê∂ñÊB””“v÷ˆFV¬rìÚÊñBíÁFÙ&RÜ76WBÊñBì∞¢WáV7Bá6V6ˆÊDFˆ7V÷VÁBÊ76WG2ÊfñÊBÇÜóFV“í”‚óFV“Ê∂ñÊB””“wFWáGW&RrìÚÊñBíÁFÙ&RáFWáGW&RÊñBì∞¢WáV7Bá6V6ˆÊDFˆ7V÷VÁBÊ76WEñ∆ˆG2íÁFÙWV¬Üfó'7DFˆ7V÷VÁBÊ76WEñ∆ˆG2ì∞¢6ˆÁ7B&V˜VÊVDVÁFóGí“6V6ˆÊDFˆ7V÷VÁBÁv˜&∆BÊVÁFóFñW2ÊfñÊBÄ¢ÜVÁFóGíí”‚VÁFóGíÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊ76WDñB¿¢ì∞¢WáV7Bá&V˜VÊVDVÁFóGìÚÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊ76WDñBíÁFÙ&RÜ76WBÊñBì∞¢WáV7Bá&V˜VÊVDVÁFóGìÚÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊ÷FW&ñ√ÚÊ&6T6ˆ∆˜%FWáGW&T76WDñBíÁFÙ&RÄ¢FWáGW&RÊñB¿¢ì∞¢WáV7Bá&V˜VÊVDVÁFóGìÚÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊ÷FW&ñ√ÚÊ&6T6ˆ∆˜%FWáGW&U6WGFñÊw2íÁFÙWV¬Ä¢ñ◊˜'FVDVÁFóGìÚÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊ÷FW&ñ√ÚÊ&6T6ˆ∆˜%FWáGW&U6WGFñÊw2¿¢ì∞¢WáV7Bá&V˜VÊVDVÁFóGìÚÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊ÷FW&ñ¬íÁFÙ÷F6Ñˆ&¶V7Bá∞¢÷WF∆∆ñ5&˜VvÜÊW75FWáGW&T76WDñC¢FWáGW&RÊñB¿¢Ê˜&÷≈FWáGW&T76WDñC¢FWáGW&RÊñB¿¢ˆ66«W6ñˆÂFWáGW&T76WDñC¢FWáGW&RÊñB¿¢V÷ó76ófUFWáGW&T76WDñC¢FWáGW&RÊñB¿¢«Ü÷ˆFS¢t‘4≤r¿¢«Ü7WFˆfc¢„3r¿¢F˜V&∆U6ñFVC¢G'VR¿¢Ê˜&÷≈66∆S¢≥„CR¬„CU“¿¢ˆ66«W6ñˆÂ7G&VÊwFÉ¢„c"¿¢“ì∞¢WáV7Bá&V˜VÊVDVÁFóGìÚÊ6ˆ◊ˆÊVÁG3Ú‰÷W6Ö&VÊFW&W#ÚÊvVˆ÷WG'ìÚÁWg2íÁFÙWV¬Ö≥¬¬¬¬¬“ì∞¢ÚÚF◊W&VBV÷&VFFVBFWáGW&Rñ∆˚k∫wµÁHò[YNà\ﬁ[ò»
+    images: [{ name: 'One pixel', mimeType: 'image/png', bufferView: 3 }],
+    extensionsUsed: ['KHR_texture_transform'],
+    extensionsRequired: ['KHR_texture_transform'],
+    samplers: [{ magFilter: 9728, minFilter: 9985, wrapS: 33648, wrapT: 33071 }],
+    textures: [{ source: 0, sampler: 0 }],
+    materials: [
+      {
+        pbrMetallicRoughness: {
+          baseColorTexture: {
+            index: 0,
+            extensions: {
+              KHR_texture_transform: {
+                offset: [0.25, 0.5],
+                rotation: Math.PI / 2,
+                scale: [2, 3],
+              },
+            },
+          },
+          metallicRoughnessTexture: { index: 0 },
+        },
+        normalTexture: { index: 0, scale: 0.45 },
+        occlusionTexture: { index: 0, strength: 0.62 },
+        emissiveTexture: { index: 0 },
+        emissiveFactor: [0.1, 0.2, 0.3],
+        alphaMode: 'MASK',
+        alphaCutoff: 0.37,
+        doubleSided: true,
+      },
+    ],
+    meshes: [
+      {
+        name: 'Triangle',
+        primitives: [{ attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 }, material: 0 }],
+      },
+    ],
+    nodes: nodeNames.map((name, index) => ({
+      name,
+      mesh: 0,
+      translation: [index * 2 - 1, 0, 0],
+    })),
+  };
+  const json = Buffer.from(JSON.stringify(document));
+  const jsonPadding = (4 - (json.length % 4)) % 4;
+  const jsonChunk = Buffer.concat([json, Buffer.alloc(jsonPadding, 0x20)]);
+  const binaryPadding = (4 - (binary.length % 4)) % 4;
+  const binaryChunk = Buffer.concat([binary, Buffer.alloc(binaryPadding)]);
+  const totalLength = 12 + 8 + jsonChunk.length + 8 + binaryChunk.length;
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67, 0);
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(totalLength, 8);
+  const jsonHeader = Buffer.alloc(8);
+  jsonHeader.writeUInt32LE(jsonChunk.length, 0);
+  jsonHeader.writeUInt32LE(0x4e4f534a, 4);
+  const binaryHeader = Buffer.alloc(8);
+  binaryHeader.writeUInt32LE(binaryChunk.length, 0);
+  binaryHeader.writeUInt32LE(0x004e4942, 4);
+  return Buffer.concat([header, jsonHeader, jsonChunk, binaryHeader, binaryChunk]);
+}
 
-HOàXZŸQ\ôX›‹ûJ	… KàJN¬àÿöôX›ôYö[ôTõ‹\ùJ⁄[ô›À	◊◊‹õ⁄ôX›ö[\…À»ò[YNàö[\À€€ôöY›\òXõNàùYHJN¬àÿöôX›ôYö[ôTõ‹\ùJ⁄[ô›À	◊◊‹õ⁄ôX›‹ö]\…À»ò[YNà‹ö]\À€€ôöY›\òXõNàùYHJN¬àJN¬à]ÿZ]YŸKòY[ö]ÿ‹ö\
+function makeGlbWithUnresolvedTextureSource(): Buffer {
+  const source = makeTriangleGlb();
+  const jsonLength = source.readUInt32LE(12);
+  const document = JSON.parse(source.toString('utf8', 20, 20 + jsonLength)) as {
+    textures: Array<{ source?: number; sampler?: number }>;
+  };
+  delete document.textures[0]!.source;
+  const jsonBytes = Buffer.from(JSON.stringify(document));
+  const jsonPadding = (4 - (jsonBytes.length % 4)) % 4;
+  const jsonChunk = Buffer.concat([jsonBytes, Buffer.alloc(jsonPadding, 0x20)]);
+  const binaryHeaderOffset = 20 + jsonLength;
+  const binaryLength = source.readUInt32LE(binaryHeaderOffset);
+  const binary = source.subarray(binaryHeaderOffset + 8, binaryHeaderOffset + 8 + binaryLength);
+  const binaryPadding = (4 - (binary.length % 4)) % 4;
+  const binaryChunk = Buffer.concat([binary, Buffer.alloc(binaryPadding)]);
+  const totalLength = 12 + 8 + jsonChunk.length + 8 + binaryChunk.length;
+  const header = Buffer.alloc(12);
+  header.writeUInt32LE(0x46546c67, 0);
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(totalLength, 8);
+  const jsonHeader = Buffer.alloc(8);
+  jsonHeader.writeUInt32LE(jsonChunk.length, 0);
+  jsonHeader.writeUInt32LE(0x4e4f534a, 4);
+  const nextBinaryHeader = Buffer.alloc(8);
+  nextBinaryHeader.writeUInt32LE(binaryChunk.length, 0);
+  nextBinaryHeader.writeUInt32LE(0x004e4942, 4);
+  return Buffer.concat([header, jsonHeader, jsonChunk, nextBinaryHeader, binaryChunk]);
+}
 
+function pngChunk(type: string, data: Buffer): Buffer {
+  const name = Buffer.from(type, 'ascii');
+  const payload = Buffer.concat([name, data]);
+  let crc = 0xffffffff;
+  for (const byte of payload) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+  }
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(data.length, 0);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE((crc ^ 0xffffffff) >>> 0, 0);
+  return Buffer.concat([header, payload, checksum]);
+}
 
-HOà¬àÿöôX›ôYö[ôTõ‹\ùJ⁄[ô›À	◊◊Ÿ€í[XYŸPö]X\\ÿY…À¬à€€ôöY›\òXõNàùYKà‹ö]XõNàùYKàò[YNààJN¬à€€ú›‹öY⁄[ò[HŸXë”îô[ô\ö[ô–€€ù^úõ››\Kù^›Xí[XYŸLë¬àŸXë”îô[ô\ö[ô–€€ù^úõ››\Kù^›Xí[XYŸLëHù[ò›[€à
-ããò\ô‹ H¬àYà
-\ô‹Àò]
-LJH[ú›[òŸ[Ÿà[XYŸPö]X\
-H¬à€€ú›ÿ€‹HH⁄[ô›»\»⁄[ô›»	à»◊Ÿ€í[XYŸPö]X\\ÿYŒàù[Xô\àN¬àÿ€‹Kó◊Ÿ€í[XYŸPö]X\\ÿY»
-œHN¬àBàô]\õà‹öY⁄[ò[ò\J\À\ô‹ N¬àN¬àJN¬à]ÿZ]YŸKô€› 	À… N¬à]ÿZ]YŸKõÿÿ]‹ä	⁄[ú]ÿXÿŸ\Hãô€ã[Ÿ[Ÿ€ãXö[ò\ûHóI KúŸ][ú]ö[\ ¬àò[YNà	‹õ⁄ôX›ô€âÀàZ[YU\Nà	€[Ÿ[Ÿ€ãXö[ò\ûIÀàùYôô\éàXZŸUöX[ô€Q€ä
-KàJN¬à]ÿZ]^X›
-YŸKôŸ]ûU^
-	’öX[ô€SõŸI JKù–ôUö\⁄XõJ
-N¬Çà€€ú›Y[ùHHYŸKõÿÿ]‹ä	Àôö[K[Y[ùI N¬àYà
-J]ÿZ]Y[ùKô]ò[X]J
-[[Y[ù
-HOà
-[[Y[ù\»S]Z[—[[Y[ù
-Kõ‹[äJJH¬à]ÿZ]YŸKõÿÿ]‹ä	Àôö[K[Y[ùH›[[X\ûI Kò€X⁄ 
-N¬àBà]ÿZ]Y[ùKôŸ]ûTõ€J	ÿù]€âÀ»ò[YNà	‘ÿ]ôHõ⁄ôX›õ€\∏†)â»JKò€X⁄ 
-N¬à]ÿZ]YŸKôŸ]ûTõ€J	ÿù]€âÀ»ò[YNà–€€ú€€K»JKò€X⁄ 
-N¬à]ÿZ]^X›
-YŸKôŸ]ûU^
-	‘õ⁄ôX›õ€\àÿ]ôY	À»^X›àùYHJJKù–ôUö\⁄XõJ
-N¬Çà€€ú›ÿ]ôYH]ÿZ]YŸKô]ò[X]J
+function makeSolidPng(red: number, green: number, blue: number): Buffer {
+  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(1, 0);
+  header.writeUInt32BE(1, 4);
+  header[8] = 8;
+  header[9] = 6;
+  const pixels = deflateSync(Buffer.from([0, red, green, blue, 255]));
+  return Buffer.concat([
+    signature,
+    pngChunk('IHDR', header),
+    pngChunk('IDAT', pixels),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
 
-HOà-ÆÈ‹j◊ù    async getDirectoryHandle(name: string, options?: { create?: boolean }) {
+test('GLB imports register stable project assets and survive world save/reopen', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const NativeWorker = window.Worker;
+    const stats = { created: 0, terminated: 0 };
+    window.Worker = class extends NativeWorker {
+      constructor(scriptURL: string | URL, options?: WorkerOptions) {
+        super(scriptURL, options);
+        stats.created += 1;
+      }
+
+      override terminate(): void {
+        stats.terminated += 1;
+        super.terminate();
+      }
+    };
+    Object.defineProperty(window, '__workerStats', { value: stats, configurable: true });
+  });
+  await page.goto('/');
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'triangle.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const workerStats = await page.evaluate(() => {
+    const stats = (window as Window & { __workerStats?: { created: number; terminated: number } })
+      .__workerStats;
+    return stats ? { ...stats } : null;
+  });
+  expect(workerStats).toEqual({ created: 1, terminated: 1 });
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await page.waitForTimeout(250);
+  expect(consoleErrors).toEqual([]);
+
+  const saveWorld = async () => {
+    const menu = page.locator('.file-menu');
+    if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await page.locator('.file-menu summary').click();
+    }
+    const downloadPromise = page.waitForEvent('download');
+    const saveButton = menu.locator('.file-menu-content button').nth(2);
+    await expect(saveButton).toBeVisible();
+    await saveButton.click();
+    const download = await downloadPromise;
+    const path = await download.path();
+    if (!path) throw new Error('World export did not produce a file');
+    return readFile(path, 'utf8');
+  };
+
+  const firstSave = await saveWorld();
+  const firstDocument = JSON.parse(firstSave) as {
+    assets: Array<{
+      id: string;
+      kind: string;
+      uri: string;
+      contentHash: string;
+      importer: { id: string };
+      dependencies: string[];
+    }>;
+    assetPayloads: Array<{ assetId: string; mimeType: string; encoding: string; data: string }>;
+    world: {
+      entities: Array<{
+        components?: {
+          MeshRenderer?: {
+            assetId?: string;
+            geometry?: { uvs?: number[] };
+            material?: {
+              baseColorTextureAssetId?: string;
+              metallicRoughnessTextureAssetId?: string;
+              normalTextureAssetId?: string;
+              occlusionTextureAssetId?: string;
+              emissiveTextureAssetId?: string;
+              alphaMode?: string;
+              alphaCutoff?: number;
+              doubleSided?: boolean;
+              normalScale?: number[];
+              occlusionStrength?: number;
+              baseColorTextureSettings?: {
+                sampler?: {
+                  magFilter: number | null;
+                  minFilter: number | null;
+                  wrapS: number;
+                  wrapT: number;
+                };
+                transform?: { offset: number[]; rotation: number; scale: number[] };
+              };
+            };
+          };
+        };
+      }>;
+    };
+  };
+  expect(firstDocument.assets).toHaveLength(2);
+  const asset = firstDocument.assets.find((item) => item.kind === 'model')!;
+  const texture = firstDocument.assets.find((item) => item.kind === 'texture')!;
+  expect(asset.uri).toBe('imports/triangle.glb');
+  expect(asset.contentHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+  expect(asset.importer.id).toBe('engine.gltf.glb');
+  expect(asset.dependencies).toContain(texture.id);
+  expect(texture.uri).toBe('imports/triangle.glb.image-0.png');
+  expect(texture.importer.id).toBe('engine.gltf.embedded-image');
+  const importedEntity = firstDocument.world.entities.find(
+    (entity) => entity.components?.MeshRenderer?.assetId,
+  );
+  expect(importedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
+  expect(importedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
+    texture.id,
+  );
+  expect(importedEntity?.components?.MeshRenderer?.material?.baseColorTextureSettings).toEqual({
+    sampler: { magFilter: 9728, minFilter: 9985, wrapS: 33648, wrapT: 33071 },
+    transform: { offset: [0.25, 0.5], rotation: Math.PI / 2, scale: [2, 3] },
+  });
+  expect(importedEntity?.components?.MeshRenderer?.material).toMatchObject({
+    metallicRoughnessTextureAssetId: texture.id,
+    normalTextureAssetId: texture.id,
+    occlusionTextureAssetId: texture.id,
+    emissiveTextureAssetId: texture.id,
+    alphaMode: 'MASK',
+    alphaCutoff: 0.37,
+    doubleSided: true,
+    normalScale: [0.45, 0.45],
+    occlusionStrength: 0.62,
+  });
+  expect(importedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
+  expect(firstDocument.assetPayloads).toHaveLength(2);
+  const modelPayload = firstDocument.assetPayloads.find((payload) => payload.assetId === asset.id)!;
+  const texturePayload = firstDocument.assetPayloads.find(
+    (payload) => payload.assetId === texture.id,
+  )!;
+  expect(modelPayload).toMatchObject({
+    assetId: asset.id,
+    mimeType: 'model/gltf-binary',
+    encoding: 'base64',
+  });
+  expect(Buffer.from(modelPayload.data, 'base64')).toEqual(makeTriangleGlb());
+  expect(texturePayload).toMatchObject({
+    assetId: texture.id,
+    mimeType: 'image/png',
+    encoding: 'base64',
+  });
+
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'round-trip.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(firstSave),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const secondDocument = JSON.parse(await saveWorld()) as typeof firstDocument;
+  expect(secondDocument.assets).toHaveLength(2);
+  expect(secondDocument.assets.find((item) => item.kind === 'model')?.id).toBe(asset.id);
+  expect(secondDocument.assets.find((item) => item.kind === 'texture')?.id).toBe(texture.id);
+  expect(secondDocument.assetPayloads).toEqual(firstDocument.assetPayloads);
+  const reopenedEntity = secondDocument.world.entities.find(
+    (entity) => entity.components?.MeshRenderer?.assetId,
+  );
+  expect(reopenedEntity?.components?.MeshRenderer?.assetId).toBe(asset.id);
+  expect(reopenedEntity?.components?.MeshRenderer?.material?.baseColorTextureAssetId).toBe(
+    texture.id,
+  );
+  expect(reopenedEntity?.components?.MeshRenderer?.material?.baseColorTextureSettings).toEqual(
+    importedEntity?.components?.MeshRenderer?.material?.baseColorTextureSettings,
+  );
+  expect(reopenedEntity?.components?.MeshRenderer?.material).toMatchObject({
+    metallicRoughnessTextureAssetId: texture.id,
+    normalTextureAssetId: texture.id,
+    occlusionTextureAssetId: texture.id,
+    emissiveTextureAssetId: texture.id,
+    alphaMode: 'MASK',
+    alphaCutoff: 0.37,
+    doubleSided: true,
+    normalScale: [0.45, 0.45],
+    occlusionStrength: 0.62,
+  });
+  expect(reopenedEntity?.components?.MeshRenderer?.geometry?.uvs).toEqual([0, 0, 1, 0, 0, 1]);
+  // A tampered embedded texture payload must fail hash verification before
+  // committing any of the staged world state.
+  const tamperedDocument = JSON.parse(firstSave) as typeof firstDocument;
+  const tamperedTexturePayload = tamperedDocument.assetPayloads.find(
+    (payload) => payload.assetId === texture.id,
+  )!;
+  tamperedTexturePayload.data = Buffer.from('tampered image bytes').toString('base64');
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'tampered.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(tamperedDocument)),
+  });
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Could not open tampered.world', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Embedded asset payload hash mismatch/)).toBeVisible();
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  // The rejected load must leave the previous scene and its valid asset payloads intact.
+  const afterRejectedLoad = JSON.parse(await saveWorld()) as typeof firstDocument;
+  expect(afterRejectedLoad.assets.map((item) => item.id)).toContain(asset.id);
+  expect(afterRejectedLoad.assets.map((item) => item.id)).toContain(texture.id);
+  expect(afterRejectedLoad.assetPayloads).toEqual(firstDocument.assetPayloads);
+
+  // Component payloads are extensible at the envelope level, but known PBR
+  // material fields must pass semantic validation before a world is committed.
+  const invalidMaterialDocument = JSON.parse(firstSave) as typeof firstDocument;
+  const invalidMaterialEntity = invalidMaterialDocument.world.entities.find(
+    (entity) => entity.components?.MeshRenderer?.assetId,
+  )!;
+  invalidMaterialEntity.components!.MeshRenderer!.material!.alphaMode = 'INVALID';
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'invalid-material.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(invalidMaterialDocument)),
+  });
+  await expect(
+    page.getByText('Could not open invalid-material.world', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/Material alphaMode is invalid/)).toBeVisible();
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const afterRejectedMaterialLoad = JSON.parse(await saveWorld()) as typeof firstDocument;
+  const preservedMaterial = afterRejectedMaterialLoad.world.entities.find(
+    (entity) => entity.components?.MeshRenderer?.assetId,
+  )?.components?.MeshRenderer?.material;
+  expect(preservedMaterial?.alphaMode).toBe('MASK');
+  expect(afterRejectedMaterialLoad.assetPayloads).toEqual(firstDocument.assetPayloads);
+
+  await page.waitForTimeout(250);
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test('directory project saves content-addressed blobs and opens atomically', async ({ page }) => {
+  await page.addInitScript(() => {
+    type FakeFileNode = { bytes: Uint8Array };
+    const files = new Map<string, FakeFileNode>();
+    const directories = new Set<string>(['']);
+    const writes: string[] = [];
+    const makeDirectory = (prefix: string) => ({
+      async getDirectoryHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!directories.has(path)) {
+          if (!options?.create) throw new DOMException('Directory not found', 'NotFoundError');
+          directories.add(path);
+        }
+        return makeDirectory(path);
+      },
+      async getFileHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!files.has(path)) {
+          if (!options?.create) throw new DOMException('File not found', 'NotFoundError');
+          files.set(path, { bytes: new Uint8Array() });
+        }
+        return {
+          async getFile() {
+            const node = files.get(path)!;
+            return new File([node.bytes.slice().buffer as ArrayBuffer], name);
+          },
+          async createWritable() {
+            let pending = new Uint8Array();
+            return {
+              async write(data: Uint8Array) {
+                pending = new Uint8Array(data);
+              },
+              async close() {
+                files.set(path, { bytes: pending });
+                writes.push(path);
+              },
+              async abort() {},
+            };
+          },
+        };
+      },
+    });
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => makeDirectory(''),
+    });
+    Object.defineProperty(window, '__projectFiles', { value: files, configurable: true });
+    Object.defineProperty(window, '__projectWrites', { value: writes, configurable: true });
+  });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__glbImageBitmapUploads', {
+      configurable: true,
+      writable: true,
+      value: 0,
+    });
+    const original = WebGL2RenderingContext.prototype.texSubImage2D;
+    WebGL2RenderingContext.prototype.texSubImage2D = function (...args) {
+      if (args.at(-1) instanceof ImageBitmap) {
+        const scope = window as Window & { __glbImageBitmapUploads: number };
+        scope.__glbImageBitmapUploads += 1;
+      }
+      return original.apply(this, args);
+    };
+  });
+  await page.goto('/');
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'project.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  const menu = page.locator('.file-menu');
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.locator('.file-menu summary').click();
+  }
+  await menu.getByRole('button', { name: 'Save Project Folder‚Ä¶' }).click();
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Project folder saved', { exact: true })).toBeVisible();
+
+  const saved = await page.evaluate(() => {
+    const scope = window as Window & {
+      __projectFiles?: Map<string, { bytes: Uint8Array }>;
+      __projectWrites?: string[];
+    };
+    const files = scope.__projectFiles!;
+    const manifestBytes = files.get('worlds/main.world')!.bytes;
+    const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
+      assets: Array<{ id: string; kind: string; uri: string }>;
+      assetPayloads?: unknown[];
+    };
+    return {
+      paths: [...files.keys()].sort(),
+      writes: [...scope.__projectWrites!],
+      fileData: [...files.entries()].map(([path, node]) => ({
+        path,
+        bytes: Array.from(node.bytes),
+      })),
+      manifest,
+    };
+  });
+  expect(saved.manifest.assetPayloads).toBeUndefined();
+  expect(saved.manifest.assets).toHaveLength(2);
+  expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
+  expect(saved.paths).toContain('worlds/main.world');
+  expect(saved.paths).toHaveLength(3);
+  expect(saved.writes.at(-1)).toBe('worlds/main.world');
+
+  // Change the active scene, then reopen the folder. The directory loader should
+  // resolve the external blobs and restore the previously saved world.
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'second.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['SecondTriangle']),
+  });
+  await expect(page.getByText('SecondTriangle')).toBeVisible();
+  await menu.getByRole('button', { name: 'Open Project Folder‚Ä¶' }).click();
+  await expect(page.getByText('Project folder opened', { exact: true })).toBeVisible();
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await expect(page.getByText('SecondTriangle')).toHaveCount(0);
+
+  // A tampered external image must fail before replacing the active scene.
+  const texturePath = saved.manifest.assets.find((asset) => asset.kind === 'texture')!.uri;
+  await page.evaluate((path) => {
+    const files = (window as Window & { __projectFiles: Map<string, { bytes: Uint8Array }> })
+      .__projectFiles;
+    files.set(path, { bytes: new Uint8Array([9, 9, 9]) });
+  }, texturePath);
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'after-failed-open.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['AfterFailedOpen']),
+  });
+  await expect(page.getByText('AfterFailedOpen')).toBeVisible();
+  await menu.getByRole('button', { name: 'Open Project Folder‚Ä¶' }).click();
+  await expect(page.getByText('Could not open project folder', { exact: true })).toBeVisible();
+  await expect(page.getByText(/External asset hash mismatch/)).toBeVisible();
+  await expect(page.getByText('AfterFailedOpen')).toBeVisible();
+
+  // A missing external image must also fail before replacing the active scene.
+  await page.evaluate((path) => {
+    const files = (window as Window & { __projectFiles: Map<string, { bytes: Uint8Array }> })
+      .__projectFiles;
+    files.delete(path);
+  }, texturePath);
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'after-missing-blob.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['AfterMissingBlob']),
+  });
+  await expect(page.getByText('AfterMissingBlob')).toBeVisible();
+  const openProjectError = page.getByText('Could not open project folder', { exact: true });
+  const previousOpenErrorCount = await openProjectError.count();
+  await menu.getByRole('button', { name: 'Open Project Folder‚Ä¶' }).click();
+  await expect.poll(() => openProjectError.count()).toBeGreaterThan(previousOpenErrorCount);
+  await expect(page.getByText(/Project file not found:/)).toBeVisible();
+  await expect(page.getByText('AfterMissingBlob')).toBeVisible();
+
+  // The exact saved Editor folder must also load in Player, including its GLB
+  // geometry, PBR material, embedded image, sampler and texture transform.
+  await page.goto('http://127.0.0.1:5174');
+  await page.evaluate((entries) => {
+    (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads = 0;
+    const files = new Map(
+      entries.map(({ path, bytes }) => [path, { bytes: new Uint8Array(bytes) }]),
+    );
+    const directories = new Set<string>(['']);
+    for (const { path } of entries) {
+      const segments = path.split('/');
+      for (let index = 1; index < segments.length; index += 1) {
+        directories.add(segments.slice(0, index).join('/'));
+      }
+    }
+    const makeDirectory = (prefix: string) => ({
+      async getDirectoryHandle(name: string, options?: { create?: boolean }) {
         const path = prefix ? `${prefix}/${name}` : name;
         if (!directories.has(path)) {
           if (!options?.create) throw new DOMException('Directory not found', 'NotFoundError');
@@ -97,43 +600,469 @@ HOà-ÆÈ‹j◊ù    async getDirectoryHandle(name: string, options?: { create?: boole
     });
   }, saved.fileData);
   await page.getByRole('button', { name: 'Open project folder' }).click();
-  const p∂ªßq´^u—ï»Åô•πÖ∞µ±ïÖÕîÅë•Õ¡ΩÕÖ∞Åµ’Õ–ÅëïçΩëîΩ’¡±ΩÖêÅç±ïÖπ±‰ÅÖùÖ•∏∏(ÄÅÖ›Ö•–Åù±â%π¡’–πÕï—%π¡’—•±ïÃ°Ï(ÄÄÄÅπÖµîËÄù±•ôïçÂç±îµÖùÖ•∏πù±àú∞(ÄÄÄÅµ•µïQÂ¡îËÄùµΩëï∞Ωù±—òµâ•πÖ…‰ú∞(ÄÄÄÅâ’ôôï»ËÅµÖ≠ïQ…•Öπù±ï±à†§∞(ÄÅÙ§Ï(ÄÅÖ›Ö•–Åï·¡ïç–°¡Öùîπùï—	ÂQï·–†ùQ…•Öπù±ï9Ωëîú§§π—Ω	ïY•Õ•â±î†§Ï(ÄÅÖ›Ö•–Å¡Öùîπ›Ö•—Ω…Q•µïΩ’–†Ã¿¿§Ï(ÄÅï·¡ïç–°¡Öùï……Ω…Ã§π—Ω≈’Ö∞°mt§Ï)Ù§Ï()—ïÕ–†ù…ïπëï…ï»Å≠ïï¡ÃÅÑÅÕ°Ö…ïêÅ—ï·—’…îÅÖ±•ŸîÅ’π—•∞Å—°îÅô•πÖ∞ÅΩâ©ïç–Å±ïÖÕîÅ•ÃÅ…ï±ïÖÕïêú∞ÅÖÕÂπåÄ°Ï(ÄÅ¡Öùî∞)Ù§ÄÙ¯ÅÏ(ÄÅÖ›Ö•–Å¡ÖùîπÖëë%π•—Mç…•¡–††§ÄÙ¯ÅÏ(ÄÄÄÅçΩπÕ–ÅçΩπ—ï·–ÄÙÅ]ïâ0…Iïπëï…•πùΩπ—ï·–π¡…Ω—Ω—Â¡îÏ(ÄÄÄÅçΩπÕ–Åëï±ï—ïQï·—’…îÄÙÅçΩπ—ï·–πëï±ï—ïQï·—’…îÏ(ÄÄÄÅ=â©ïç–πëïô•πïA…Ω¡ï…—‰°›•πëΩ‹∞Äù}}ëï±ï—ïëQï·—’…ïΩ’π–ú∞ÅÏÅŸÖ±’îËÄ¿∞Å›…•—Öâ±îËÅ—…’îÅÙ§Ï(ÄÄÄÅçΩπ—ï·–πëï±ï—ïQï·—’…îÄÙÅô’πç—•Ω∏Ä°—ï·—’…îËÅ]ïâ1Qï·—’…îÅÅπ’±∞§ÅÏ(ÄÄÄÄÄÄ°›•πëΩ‹ÅÖÃÅ]•πëΩ‹ÄòÅÏÅ}}ëï±ï—ïëQï·—’…ïΩ’π–ËÅπ’µâï»ÅÙ§π}}ëï±ï—ïëQï·—’…ïΩ’π–Ä¨ÙÄƒÏ(ÄÄÄÄÄÅ…ï—’…∏Åëï±ï—ïQï·—’…îπçÖ±∞°—°•Ã∞Å—ï·—’…î§Ï(ÄÄÄÅÙÏ(ÄÅÙ§Ï((ÄÅÖ›Ö•–Å¡ÖùîπùΩ—º†úºú§Ï(ÄÅçΩπÕ–Åù±â%π¡’–ÄÙÅ¡Öùîπ±ΩçÖ—Ω»†ù•π¡’—mÖççï¡–Ùàπù±à±µΩëï∞Ωù±—òµâ•πÖ…‰âtú§Ï(ÄÅÖ›Ö•–Åù±â%π¡’–πÕï—%π¡’—•±ïÃ°Ï(ÄÄÄÅπÖµîËÄùÕ°Ö…ïêµ—ï·—’…îπù±àú∞(ÄÄÄÅµ•µïQÂ¡îËÄùµΩëï∞Ωù±—òµâ•πÖ…‰ú∞(ÄÄÄÅâ’ôôï»ËÅµÖ≠ïQ…•Öπù±ï±à°lùM°Ö…ïëQï·—’…ïú∞ÄùM°Ö…ïëQï·—’…ïùt§∞(ÄÅÙ§Ï(ÄÅÖ›Ö•–Åï·¡ïç–°¡Öùîπùï—	ÂQï·–†ùM°Ö…ïëQï·—’…ïú§§π—Ω	ïY•Õ•â±î†§Ï(ÄÅÖ›Ö•–Åï·¡ïç–°¡Öùîπùï—	ÂQï·–†ùM°Ö…ïëQï·—’…ïú§§π—Ω	ïY•Õ•â±î†§Ï(ÄÅÖ›Ö•–Åï·¡ïç–(ÄÄÄÄπ¡Ω±∞††§ÄÙ¯Å¡ÖùîπïŸÖ±’Ö—î††§ÄÙ¯ÅëΩç’µïπ–π≈’ï…ÂMï±ïç—Ω»†ùçÖπŸÖÃú§¸πëÖ—ÖÕï–π…ïπëï…ï»§§(ÄÄÄÄπ—Ω	î†ù›ïâù∞»ú§Ï(ÄÄººÅ±±Ω‹ÅÖ±∞Åô•ŸîÅµÖ—ï…•Ö∞Å—ï·—’…îÅç°Öππï±ÃÅ—ºÅô•π•Õ†ÅëïçΩë•πúÅÖπêÅ’¡±ΩÖë•πú∏(ÄÇ⁄Óù∆≠y÷≈FWáGW&TñB“FWáGW&RÊñC∞¢6ˆÁ7B&W∆6V÷VÁEFWáGW&TñB“&W∆6V÷VÁB“G∂˜&ñvñÊ≈FWáGW&TñG÷∞¢6ˆÁ7B&W∆6V÷VÁEÊr“÷∂U6ˆ∆ñEÊrÉ##¬3¬ìì∞¢6ˆÁ7Bñ∆ˆB“Fˆ7V÷VÁBÊ76WEñ∆ˆG2ÊfñÊBÇÜóFV“í”‚óFV“Ê76WDñB””“˜&ñvñÊ≈FWáGW&TñBì∞¢ñbÇñ∆ˆBíFá&˜rÊWrW'&˜"Çu6fVBv˜&∆BFˆW2Ê˜B6ˆÁFñ‚FÜRV÷&VFFVBFWáGW&Rñ∆ˆBrì∞¢ñ∆ˆBÊ76WDñB“&W∆6V÷VÁEFWáGW&TñC∞¢ñ∆ˆBÊFF“&W∆6V÷VÁEÊrÁFı7G&ñÊrÇv&6ScBrì∞¢FWáGW&RÊñB“&W∆6V÷VÁEFWáGW&TñC∞¢FWáGW&RÁW&í“vñ◊˜'G2˜&W∆6V÷VÁB◊FWáGW&RÁÊrs∞¢FWáGW&RÊ6ˆÁFVÁDÜ6Ç“6Ü#Sc¢G∂7&VFTÜ6ÇÇw6Ü#SbríÁWFFRá&W∆6V÷VÁEÊríÊFñvW7BÇvÜWÇró÷∞¢f˜"Ü6ˆÁ7B76WBˆbFˆ7V÷VÁBÊ76WG2í∞¢ñbÜ76WBÊFWVÊFVÊ6ñW2í∞¢76WBÊFWVÊFVÊ6ñW2“76WBÊFWVÊFVÊ6ñW2Ê÷ÇÜñBí”‡¢ñB””“˜&ñvñÊ≈FWáGW&TñBÚ&W∆6V÷VÁEFWáGW&TñB¢ñB¿¢ì∞¢–¢–¢6ˆÁ7B&W∆6UFWáGW&U&VfW&VÊ6W2“áf«VS¢VÊ∂Ê˜v‚ì¢fˆñB”‚∞¢ñbÑ'&íÊó4'&íáf«VRíí∞¢f«VRÊf˜$V6Çá&W∆6UFWáGW&U&VfW&VÊ6W2ì∞¢&WGW&„∞¢–¢ñbÇf«VR«¬GóVˆbf«VR”“vˆ&¶V7Brí&WGW&„∞¢f˜"Ü6ˆÁ7B∂∂Wí¬6Üñ∆E“ˆbˆ&¶V7BÊVÁG&ñW2áf«VRíí∞¢ñbÜ∂WíÊVÊG5vóFÇÇuFWáGW&T76WDñBríbb6Üñ∆B””“˜&ñvñÊ≈FWáGW&TñBí∞¢áf«VR2&V6˜&C«7G&ñÊr¬VÊ∂Ê˜v„‚ï∂∂Wï““&W∆6V÷VÁEFWáGW&TñC∞¢“V«6R∞¢&W∆6UFWáGW&U&VfW&VÊ6W2Ü6Üñ∆Bì∞¢–¢–¢”∞¢&W∆6UFWáGW&U&VfW&VÊ6W2ÜFˆ7V÷VÁBÁv˜&∆Bì∞¢Fˆ7V÷VÁBÁv˜&∆BÊÊ÷R“u&W∆6V÷VÁBv˜&∆Bs∞¢vóBvRÊWf«VFRÇÇí”‚∞¢ávñÊF˜r2vñÊF˜rb≤ı˜&W∆6V÷VÁE7F'FVC¢&ˆˆ∆V‚“íÂı˜&W∆6V÷[k∫wµÁ[Z\ŸJ
-ô\€€ôJHOà⁄[ô›ÀúŸ][Y[›]
-ô\€€ôKL
-JN¬à›]Kó◊›ŸXô€‹ŸP€€ù^^[ú⁄[€ãúô\›‹ôP€€ù^
+  const playerStatus = page.locator('#project-status');
+  await expect(playerStatus).toContainText('Loaded');
+  await expect(playerStatus).toContainText('rendered mesh parts');
+  await expect(playerStatus).not.toContainText('unsupported');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads,
+      ),
+    )
+    .toBeGreaterThan(0);
+});
 
-N¬àJN¬Çà]ÿZ]^X›àú€
-à
+test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
+  page,
+}) => {
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  const source = makeTriangleGlb();
 
-HOÇàYŸKô]ò[X]J
+  // The importer accepts an existing texture record without an embedded image
+  // source. Editor resolution then fails after it has staged image/model records
+  // and payloads, but before committing the staged project copies.
+  await glbInput.setInputFiles({
+    name: 'unresolved-texture.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeGlbWithUnresolvedTextureSource(),
+  });
+  await page.getByRole('button', { name: /Console/ }).click();
+  await expect(page.getByText('Importer engine.gltf.glb failed', { exact: true })).toBeVisible();
+  await expect(page.getByText(/GLB material references an unavailable texture: 0/)).toBeVisible();
 
-HOÇà
-⁄[ô›»\»⁄[ô›»	à»◊›ŸXô€€€ù^]ô[ùŒà›ö[ô÷◊HJKó◊›ŸXô€€€ù^]ô[ùÀö[ò€Y\ à	‹ô\›‹ôY	Àà
-Kà
-Kà»[Y[›]àLÃKà
-Bàù–ôJùYJN¬à]ÿZ]^X›àú€
+  const saveWorld = async () => {
+    const menu = page.locator('.file-menu');
+    if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+      await page.locator('.file-menu summary').click();
+    }
+    const downloadPromise = page.waitForEvent('download');
+    const saveButton = menu.locator('.file-menu-content button').nth(2);
+    await expect(saveButton).toBeVisible();
+    await saveButton.click();
+    const download = await downloadPromise;
+    const path = await download.path();
+    if (!path) throw new Error('World export did not produce a file');
+    return JSON.parse(await readFile(path, 'utf8')) as {
+      assets: Array<{ kind: string }>;
+      assetPayloads: Array<{ assetId: string }>;
+      world: { entities: Array<{ components?: { MeshRenderer?: { primitive?: string } } }> };
+    };
+  };
 
+  const afterFailure = await saveWorld();
+  expect(afterFailure.assets).toEqual([]);
+  expect(afterFailure.assetPayloads).toEqual([]);
+  expect(
+    afterFailure.world.entities.some(
+      (entity) => entity.components?.MeshRenderer?.primitive === 'GLB',
+    ),
+  ).toBe(false);
 
-HOÇàYŸKô]ò[X]J
+  // A valid import after the failed staging path must still commit normally.
+  await glbInput.setInputFiles({
+    name: 'recovered.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: source,
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  const afterRecovery = await saveWorld();
+  expect(afterRecovery.assets).toHaveLength(2);
+  expect(afterRecovery.assetPayloads).toHaveLength(2);
+  expect(afterRecovery.assets.map((asset) => asset.kind).sort()).toEqual(['model', 'texture']);
+});
 
-HOà¬à€€ú›€€ù^Hÿ›[Y[ùú]Y\ûTŸ[X›‹ä	ÿÿ[ùò\… OÀôŸ]€€ù^
-	›ŸXô€â N¬àô]\õà€€ù^»€€ù^ö\–€€ù^‹›
+test('renderer releases uploaded texture resources when an imported object is removed', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const context = WebGL2RenderingContext.prototype;
+    const deleteTexture = context.deleteTexture;
+    Object.defineProperty(window, '__deletedTextureCount', { value: 0, writable: true });
+    context.deleteTexture = function (texture: WebGLTexture | null) {
+      (window as Window & { __deletedTextureCount: number }).__deletedTextureCount += 1;
+      return deleteTexture.call(this, texture);
+    };
+  });
 
-HàùYN¬àJKà
-Bàù–ôJò[ŸJN¬à]ÿZ]^X›
-ÿ[ùò\ Kù“]ôP]öXù]J	Ÿ]K\ô[ô\ô\âÀ	›ŸXô€â N¬à]ÿZ]^X›àú€
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  await glbInput.setInputFiles({
+    name: 'lifecycle.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
 
+  // Wait until the renderer has decoded and uploaded the embedded texture maps.
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('canvas')?.dataset.renderer))
+    .toBe('webgl2');
+  await page.waitForTimeout(300);
 
-HOÇàYŸKô]ò[X]Jà
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('TriangleNode')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __deletedTextureCount: number }).__deletedTextureCount,
+      ),
+    )
+    .toBeGreaterThan(0);
 
-HOà
-⁄[ô›»\»⁄[ô›»	à»◊›^\ôU\ÿY€›[ùàù[Xô\àJKó◊›^\ôU\ÿY€›[ùà
-Kà
-Bàù–ôQ‹ôX]\ï[ä\ÿY–ôYõ‹ôS‹‹ N¬à]ÿZ]^X›
-YŸKôŸ]ûU^
-	’öX[ô€SõŸI JKù–ôUö\⁄XõJ
-N¬à^X›
-YŸQ\úõ‹ú Kù—\]X[
-◊JN¬à^X›
-€€ú€€Q\úõ‹ú Kù—\]X[
-◊JN¬üJN¬
+  // A fresh import after final-lease disposal must decode/upload cleanly again.
+  await glbInput.setInputFiles({
+    name: 'lifecycle-again.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await page.waitForTimeout(300);
+  expect(pageErrors).toEqual([]);
+});
+
+test('renderer keeps a shared texture alive until the final object lease is released', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const context = WebGL2RenderingContext.prototype;
+    const deleteTexture = context.deleteTexture;
+    Object.defineProperty(window, '__deletedTextureCount', { value: 0, writable: true });
+    context.deleteTexture = function (texture: WebGLTexture | null) {
+      (window as Window & { __deletedTextureCount: number }).__deletedTextureCount += 1;
+      return deleteTexture.call(this, texture);
+    };
+  });
+
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  await glbInput.setInputFiles({
+    name: 'shared-texture.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(['SharedTextureA', 'SharedTextureB']),
+  });
+  await expect(page.getByText('SharedTextureA')).toBeVisible();
+  await expect(page.getByText('SharedTextureB')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => document.querySelector('canvas')?.dataset.renderer))
+    .toBe('webgl2');
+  // Allow all five material texture channels to finish decoding and uploading.
+  await page.waitForTimeout(350);
+
+  await page.getByRole('button', { name: 'SharedTextureB' }).click();
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('SharedTextureB')).toHaveCount(0);
+  await expect(page.getByText('SharedTextureA')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __deletedTextureCount: number }).__deletedTextureCount,
+      ),
+    )
+    .toBe(0);
+
+  // Explicitly select the remaining object before the second removal.
+  await page.getByRole('button', { name: 'SharedTextureA' }).click();
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('SharedTextureA')).toHaveCount(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __deletedTextureCount: number }).__deletedTextureCount,
+      ),
+    )
+    .toBeGreaterThan(0);
+});
+
+test('renderer ignores a stale texture decode failure after the scene replaces its source', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const original = window.createImageBitmap.bind(window);
+    const state = window as Window & {
+      __imageBitmapCalls: number;
+      __imageBitmapSuccesses: number;
+      __replacementStarted: boolean;
+      __replacementSuccesses: number;
+      __firstImageBitmapStarted: Promise<void>;
+      __resolveFirstImageBitmapStarted: () => void;
+      __rejectFirstImageBitmap: () => void;
+    };
+    state.__imageBitmapCalls = 0;
+    state.__imageBitmapSuccesses = 0;
+    state.__replacementStarted = false;
+    state.__replacementSuccesses = 0;
+    state.__firstImageBitmapStarted = new Promise((resolve) => {
+      state.__resolveFirstImageBitmapStarted = resolve;
+    });
+    window.createImageBitmap = ((...args: Parameters<typeof createImageBitmap>) => {
+      state.__imageBitmapCalls += 1;
+      if (state.__imageBitmapCalls === 1) {
+        state.__resolveFirstImageBitmapStarted();
+        return new Promise<ImageBitmap>((_resolve, reject) => {
+          state.__rejectFirstImageBitmap = () =>
+            reject(new Error('intentionally delayed stale texture decode failure'));
+        });
+      }
+      return original(...args).then((bitmap) => {
+        state.__imageBitmapSuccesses += 1;
+        if (state.__replacementStarted) state.__replacementSuccesses += 1;
+        return bitmap;
+      });
+    }) as typeof createImageBitmap;
+  });
+
+  await page.goto('/');
+  await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
+    name: 'texture-race.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await page.evaluate(async () => {
+    const state = window as Window & { __firstImageBitmapStarted: Promise<void> };
+    await state.__firstImageBitmapStarted;
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __imageBitmapSuccesses: number }).__imageBitmapSuccesses,
+      ),
+    )
+    .toBeGreaterThanOrEqual(2);
+
+  const menu = page.locator('.file-menu');
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await page.locator('.file-menu summary').click();
+  }
+  const downloadPromise = page.waitForEvent('download');
+  const saveButton = menu.locator('.file-menu-content button').nth(2);
+  await expect(saveButton).toBeVisible();
+  await saveButton.click();
+  const download = await downloadPromise;
+  const path = await download.path();
+  if (!path) throw new Error('World export did not produce a file');
+  const document = JSON.parse(await readFile(path, 'utf8')) as {
+    assets: Array<{
+      id: string;
+      contentHash: string;
+      kind: string;
+      uri?: string;
+      dependencies?: string[];
+    }>;
+    assetPayloads: Array<{ assetId: string; mimeType: string; encoding: string; data: string }>;
+    world: {
+      name: string;
+      entities: Array<{ components?: { MeshRenderer?: { material?: Record<string, unknown> } } }>;
+    };
+  };
+  const texture = document.assets.find((asset) => asset.kind === 'texture');
+  if (!texture) throw new Error('Saved world does not contain a texture asset');
+  const originalTextureId = texture.id;
+  const replacementTextureId = `replacement-${originalTextureId}`;
+  const replacementPng = makeSolidPng(220, 30, 90);
+  const payload = document.assetPayloads.find((item) => item.assetId === originalTextureId);
+  if (!payload) throw new Error('Saved world does not contain the embedded texture payload');
+  payload.assetId = replacementTextureId;
+  payload.data = replacementPng.toString('base64');
+  texture.id = replacementTextureId;
+  texture.uri = 'imports/replacement-texture.png';
+  texture.contentHash = `sha256:${createHash('sha256').update(replacementPng).digest('hex')}`;
+  for (const asset of document.assets) {
+    if (asset.dependencies) {
+      asset.dependencies = asset.dependencies.map((id) =>
+        id === originalTextureId ? replacementTextureId : id,
+      );
+    }
+  }
+  const replaceTextureReferences = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      value.forEach(replaceTextureReferences);
+      return;
+    }
+    if (!value || typeof value !== 'object') return;
+    for (const [key, child] of Object.entries(value)) {
+      if (key.endsWith('TextureAssetId') && child === originalTextureId) {
+        (value as Record<string, unknown>)[key] = replacementTextureId;
+      } else {
+        replaceTextureReferences(child);
+      }
+    }
+  };
+  replaceTextureReferences(document.world);
+  document.world.name = 'Replacement World';
+  await page.evaluate(() => {
+    (window as Window & { __replacementStarted: boolean }).__replacementStarted = true;
+  });
+  const callsBeforeReplacement = await page.evaluate(
+    () => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls,
+  );
+
+  await page.locator('input[accept=".world,application/json"]').setInputFiles({
+    name: 'replacement.world',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(document)),
+  });
+  await expect(page.getByLabel('World name')).toHaveValue('Replacement World');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __imageBitmapCalls: number }).__imageBitmapCalls),
+    )
+    .toBeGreaterThan(callsBeforeReplacement);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __replacementSuccesses: number }).__replacementSuccesses,
+      ),
+    )
+    .toBeGreaterThan(0);
+
+  // Complete the original decode only after the replacement has decoded successfully.
+  await page.evaluate(() => {
+    const state = window as Window & { __rejectFirstImageBitmap: () => void };
+    state.__rejectFirstImageBitmap();
+  });
+  await page.waitForTimeout(150);
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+});
+
+test('renderer restores its WebGL context and reuploads scene textures after context loss', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    const prototype = WebGL2RenderingContext.prototype;
+    const texImage2D = prototype.texImage2D;
+    const state = window as Window & { __textureUploadCount: number };
+    state.__textureUploadCount = 0;
+    prototype.texImage2D = function (...args: Parameters<typeof texImage2D>) {
+      state.__textureUploadCount += 1;
+      return texImage2D.apply(this, args);
+    };
+  });
+  await page.goto('/');
+  const glbInput = page.locator('input[accept=".glb,model/gltf-binary"]');
+  await glbInput.setInputFiles({
+    name: 'context-restore.glb',
+    mimeType: 'model/gltf-binary',
+    buffer: makeTriangleGlb(),
+  });
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __textureUploadCount: number }).__textureUploadCount,
+      ),
+    )
+    .toBeGreaterThan(0);
+  await page.waitForTimeout(350);
+  const uploadsBeforeLoss = await page.evaluate(
+    () => (window as Window & { __textureUploadCount: number }).__textureUploadCount,
+  );
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+
+  const supported = await page.evaluate(() => {
+    const element = document.querySelector('canvas');
+    const context = element?.getContext('webgl2');
+    return Boolean(context?.getExtension('WEBGL_lose_context'));
+  });
+  test.skip(!supported, 'WEBGL_lose_context is unavailable in this browser');
+
+  await page.evaluate(() => {
+    const element = document.querySelector('canvas');
+    const context = element?.getContext('webgl2');
+    const extension = context?.getExtension('WEBGL_lose_context');
+    if (!element || !context || !extension)
+      throw new Error('WebGL context-loss extension disappeared');
+
+    const state = window as Window & {
+      __webglContextEvents: string[];
+      __webglLoseContextExtension: WEBGL_lose_context;
+    };
+    state.__webglContextEvents = [];
+    state.__webglLoseContextExtension = extension;
+    element.addEventListener(
+      'webglcontextlost',
+      (event) => {
+        event.preventDefault();
+        state.__webglContextEvents.push('lost');
+      },
+      { once: true },
+    );
+    element.addEventListener(
+      'webglcontextrestored',
+      () => state.__webglContextEvents.push('restored'),
+      { once: true },
+    );
+    extension.loseContext();
+  });
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as Window & { __webglContextEvents: string[] }).__webglContextEvents.includes(
+            'lost',
+          ),
+        ),
+      { timeout: 5_000 },
+    )
+    .toBe(true);
+
+  await page.evaluate(async () => {
+    const state = window as Window & {
+      __webglLoseContextExtension: WEBGL_lose_context;
+    };
+    // Let the browser finish dispatching the loss event before requesting restoration.
+    await new Promise((resolve) => window.setTimeout(resolve, 100));
+    state.__webglLoseContextExtension.restoreContext();
+  });
+
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() =>
+          (window as Window & { __webglContextEvents: string[] }).__webglContextEvents.includes(
+            'restored',
+          ),
+        ),
+      { timeout: 10_000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const context = document.querySelector('canvas')?.getContext('webgl2');
+        return context ? context.isContextLost() : true;
+      }),
+    )
+    .toBe(false);
+  await expect(canvas).toHaveAttribute('data-renderer', 'webgl2');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __textureUploadCount: number }).__textureUploadCount,
+      ),
+    )
+    .toBeGreaterThan(uploadsBeforeLoss);
+  await expect(page.getByText('TriangleNode')).toBeVisible();
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
