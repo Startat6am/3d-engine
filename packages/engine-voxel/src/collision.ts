@@ -1,5 +1,5 @@
 import type { VoxelChunkNeighbors, VoxelNeighborRevision } from './meshing.js';
-import { meshVoxelChunk } from './meshing.js';
+import { isVoxelMeshResultCurrent, meshVoxelChunk } from './meshing.js';
 import type { VoxelChunkSnapshot } from './index.js';
 
 /** Defaults mirror @engine/physics DEFAULT_PHYSICS_RESOURCE_LIMITS. */
@@ -25,6 +25,25 @@ export interface VoxelChunkCollisionMesh {
   readonly provisional: boolean;
   /** Null when the chunk has no occupied cells. Positions are chunk-local. */
   readonly geometry: VoxelCollisionGeometry | null;
+}
+
+/** Returns false when the source chunk or any neighbor token has changed. */
+export function isVoxelChunkCollisionMeshCurrent(
+  result: VoxelChunkCollisionMesh,
+  source: VoxelChunkSnapshot,
+  neighbors: VoxelChunkNeighbors = {},
+): boolean {
+  return isVoxelMeshResultCurrent(
+    {
+      sourceCoordinate: result.sourceCoordinate,
+      sourceRevision: result.sourceRevision,
+      parts: [],
+      neighborRevisions: result.neighborRevisions,
+      provisional: result.provisional,
+    },
+    source,
+    neighbors,
+  );
 }
 
 export class VoxelCollisionMeshError extends Error {

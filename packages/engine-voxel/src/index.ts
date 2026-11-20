@@ -272,6 +272,7 @@ export function decodeVoxelChunkPayload(
 
 export {
   createVoxelChunkCollisionMesh,
+  isVoxelChunkCollisionMeshCurrent,
   DEFAULT_VOXEL_COLLISION_MESH_LIMITS,
   VoxelCollisionMeshError,
   type VoxelChunkCollisionMesh,

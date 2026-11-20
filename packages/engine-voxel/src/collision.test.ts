@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createChunkCoordinate } from '@engine/world';
 import { createVoxelChunkSnapshot } from './index.js';
-import { createVoxelChunkCollisionMesh, VoxelCollisionMeshError } from './collision.js';
+import {
+  createVoxelChunkCollisionMesh,
+  isVoxelChunkCollisionMeshCurrent,
+  VoxelCollisionMeshError,
+} from './collision.js';
 
 function chunk(x: number, cells: readonly [number, number, number, number][]) {
   const buffer = new Uint16Array(16 * 16 * 16);
@@ -53,6 +57,24 @@ describe('voxel static collision mesh', () => {
     expect(result.neighborRevisions.find((item) => item.direction === 'positiveX')?.revision).toBe(
       0,
     );
+  });
+
+  it('invalidates collision data when the source or neighbor revision changes', () => {
+    const source = chunk(0, [[15, 0, 0, 1]]);
+    const neighbor = chunk(1, [[0, 0, 0, 1]]);
+    const result = createVoxelChunkCollisionMesh(source, { positiveX: neighbor });
+    expect(isVoxelChunkCollisionMeshCurrent(result, source, { positiveX: neighbor })).toBe(true);
+
+    const editedSource = source.withEdits([{ x: 15, y: 0, z: 0, value: 0 }]).snapshot;
+    expect(isVoxelChunkCollisionMeshCurrent(result, editedSource, { positiveX: neighbor })).toBe(
+      false,
+    );
+
+    const editedNeighbor = neighbor.withEdits([{ x: 0, y: 0, z: 0, value: 0 }]).snapshot;
+    expect(isVoxelChunkCollisionMeshCurrent(result, source, { positiveX: editedNeighbor })).toBe(
+      false,
+    );
+    expect(isVoxelChunkCollisionMeshCurrent(result, source, {})).toBe(false);
   });
 
   it('returns no geometry for an empty chunk', () => {
