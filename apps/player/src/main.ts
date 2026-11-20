@@ -70,6 +70,25 @@ const canvas = document.querySelector<HTMLCanvasElement>('#player');
 if (!canvas) throw new Error('Player canvas was not found');
 const loadButton = document.querySelector<HTMLButtonElement>('#load-project');
 const projectStatus = document.querySelector<HTMLOutputElement>('#project-status');
+const projectProgress = document.createElement('section');
+projectProgress.setAttribute('role', 'status');
+projectProgress.setAttribute('aria-live', 'polite');
+projectProgress.style.cssText =
+  'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:10;width:min(420px,calc(100vw - 40px));padding:20px 22px;border:1px solid #40516a;border-radius:12px;background:#111722f2;color:#e8f1ff;box-shadow:0 18px 60px #0008;font:12px ui-monospace,monospace;display:none;';
+projectProgress.innerHTML =
+  '<div id="project-progress-title" style="font-size:13px;font-weight:700;margin-bottom:12px">Loading project</div><div style="height:8px;border-radius:99px;background:#29384b;overflow:hidden"><div id="project-progress-fill" style="height:100%;width:0%;border-radius:99px;background:#60a5fa;transition:width 180ms ease"></div></div><div style="display:flex;justify-content:space-between;gap:12px;margin-top:10px;color:#b9c9de"><span id="project-progress-stage">Preparing…</span><span id="project-progress-value">0%</span></div>';
+document.body.append(projectProgress);
+const progressStage = projectProgress.querySelector<HTMLElement>('#project-progress-stage');
+const progressFill = projectProgress.querySelector<HTMLElement>('#project-progress-fill');
+const progressValue = projectProgress.querySelector<HTMLElement>('#project-progress-value');
+const setProjectProgress = (value: number, stage: string, visible = true) => {
+  const percent = Math.max(0, Math.min(100, Math.round(value)));
+  projectProgress.style.display = visible ? 'block' : 'none';
+  if (progressStage) progressStage.textContent = stage;
+  if (progressFill) progressFill.style.width = `${percent}%`;
+  if (progressValue) progressValue.textContent = `${percent}%`;
+};
+const yieldToBrowser = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
 const setProjectStatus = (message: string, isError = false) => {
   if (!projectStatus) return;
@@ -461,11 +480,18 @@ async function openProjectFolder(): Promise<void> {
     return;
   }
   if (loadButton) loadButton.disabled = true;
+  setProjectProgress(2, 'Choose project folder');
   setProjectStatus('Opening project… verifying manifest, assets and voxel chunk hashes.');
   try {
     const directory = await picker({ mode: 'read' });
+    setProjectProgress(12, 'Reading manifest, assets and voxel chunks');
+    await yieldToBrowser();
     const project = await loadVoxelWorldProject(new BrowserProjectFileStore(directory));
+    setProjectProgress(52, 'Preparing scene entities and GLB models');
+    await yieldToBrowser();
     const world = await prepareWorldEntities(project.document);
+    setProjectProgress(68, 'Building voxel meshes');
+    await yieldToBrowser();
     const chunksByCoordinate = new Map(
       project.chunks.map((chunk) => [
         chunkKey(chunk.coordinate.x, chunk.coordinate.y, chunk.coordinate.z),
@@ -560,8 +586,11 @@ async function openProjectFolder(): Promise<void> {
         rotation: lookAtQuaternion(cameraPosition, target),
       };
     }
+    setProjectProgress(88, 'Applying loaded scene');
+    await yieldToBrowser();
     const chunkCount = project.chunks.length;
     const meshCount = world.prepared.length;
+    setProjectProgress(100, 'Project loaded');
     setProjectStatus(
       `Loaded “${project.document.world.name}” · ${chunkCount} voxel chunks · ${voxelObjects.length} voxel mesh parts · ${meshCount} rendered mesh parts` +
         (world.unsupported
@@ -570,8 +599,10 @@ async function openProjectFolder(): Promise<void> {
     );
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
+      setProjectProgress(0, '', false);
       setProjectStatus('Project selection cancelled.');
     } else {
+      setProjectProgress(0, '', false);
       setProjectStatus(
         `Could not open project: ${error instanceof Error ? error.message : String(error)}`,
         true,
@@ -579,6 +610,9 @@ async function openProjectFolder(): Promise<void> {
     }
   } finally {
     if (loadButton) loadButton.disabled = false;
+    if (progressValue?.textContent === '100%') {
+      window.setTimeout(() => setProjectProgress(100, 'Project loaded', false), 650);
+    }
   }
 }
 loadButton?.addEventListener('click', () => void openProjectFolder());
