@@ -61,10 +61,23 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const joystick = page.getByRole('group', { name: 'Movement joystick' });
   await expect(joystick).toBeVisible();
   await expect(page.getByRole('button', { name: 'Jump' })).toBeVisible();
-  const cameraButton = page.getByRole('button', { name: 'Toggle camera orbit mode' });
+  const cameraButton = page.getByRole('button', { name: 'Hold to rotate camera' });
   await expect(cameraButton).toBeVisible();
   await expect(cameraButton).toHaveAttribute('aria-pressed', 'false');
-  await cameraButton.click();
+  const cameraButtonBounds = await cameraButton.boundingBox();
+  if (!cameraButtonBounds) throw new Error('Camera button has no layout box');
+  const cameraHoldPoint = {
+    x: cameraButtonBounds.x + cameraButtonBounds.width / 2,
+    y: cameraButtonBounds.y + cameraButtonBounds.height / 2,
+  };
+  await cameraButton.dispatchEvent('pointerdown', {
+    pointerId: 91,
+    pointerType: 'touch',
+    isPrimary: true,
+    button: 0,
+    clientX: cameraHoldPoint.x,
+    clientY: cameraHoldPoint.y,
+  });
   await expect(cameraButton).toHaveAttribute('aria-pressed', 'true');
   await expect(cameraButton).toHaveAttribute('data-active', 'true');
   const beforeCameraDrag = await page.locator('#player-position').textContent();
@@ -74,15 +87,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const canvasBounds = await canvas.boundingBox();
   if (!canvasBounds) throw new Error('Playground canvas has no layout box');
   const dragStart = { x: canvasBounds.x + canvasBounds.width / 2, y: canvasBounds.y + 100 };
-  await canvas.dispatchEvent('pointerdown', {
-    pointerId: 91,
-    pointerType: 'touch',
-    isPrimary: true,
-    button: 0,
-    clientX: dragStart.x,
-    clientY: dragStart.y,
-  });
-  await canvas.dispatchEvent('pointermove', {
+  await page.locator('body').dispatchEvent('pointermove', {
     pointerId: 91,
     pointerType: 'touch',
     isPrimary: true,
@@ -90,7 +95,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
     clientX: dragStart.x + 120,
     clientY: dragStart.y - 35,
   });
-  await canvas.dispatchEvent('pointerup', {
+  await cameraButton.dispatchEvent('pointerup', {
     pointerId: 91,
     pointerType: 'touch',
     isPrimary: true,
@@ -102,8 +107,7 @@ test('Physics Playground loads Rapier WASM and exposes real simulation controls'
   const afterCameraDrag = await page.locator('#player-position').textContent();
   const afterCameraXZ = afterCameraDrag?.match(/X (-?\d+\.\d+).*Z (-?\d+\.\d+)/)?.slice(1);
   expect(afterCameraXZ).toEqual(beforeCameraXZ);
-  await cameraButton.click();
-  await expect(cameraButton).toHaveAttribute('aria-pressed', 'false');
+
   await expect(cameraButton).toHaveAttribute('data-active', 'false');
 
   const beforeTouchMove = await page.locator('#player-position').textContent();

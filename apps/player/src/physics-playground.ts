@@ -219,7 +219,6 @@ const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
 const updateFps = attachFpsCounter(canvas);
 const camera = createDefaultCamera();
 let cameraOrbitEnabled = false;
-let cameraOrbitPointerId: number | null = null;
 let cameraOrbitPointerX = 0;
 let cameraOrbitPointerY = 0;
 let cameraAzimuth = Math.atan2(camera.position[0], camera.position[2]);
@@ -252,54 +251,66 @@ function updateOrbitCamera() {
 
 function setCameraOrbitEnabled(enabled: boolean) {
   cameraOrbitEnabled = enabled;
-  cameraOrbitPointerId = null;
   cameraModeButton!.dataset.active = String(enabled);
   cameraModeButton!.setAttribute('aria-pressed', String(enabled));
   cameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
   canvas!.dataset.cameraMode = String(enabled);
   if (enabled) updateOrbitCamera();
 }
-cameraModeButton.addEventListener('click', () => {
-  setCameraOrbitEnabled(!cameraOrbitEnabled);
-});
-
-canvas.addEventListener('pointerdown', (event) => {
-  if (!cameraOrbitEnabled || cameraOrbitPointerId !== null || event.button !== 0) return;
-  cameraOrbitPointerId = event.pointerId;
+let cameraHoldPointerId: number | null = null;
+cameraModeButton.addEventListener('pointerdown', (event) => {
+  if (cameraHoldPointerId !== null || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  event.preventDefault();
+  cameraHoldPointerId = event.pointerId;
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
+  setCameraOrbitEnabled(true);
   try {
-    canvas.setPointerCapture(event.pointerId);
+    cameraModeButton!.setPointerCapture(event.pointerId);
   } catch {
     // Pointer capture may be unavailable for synthetic test events.
   }
 });
+const releaseCameraHold = (event: PointerEvent) => {
+  if (cameraHoldPointerId !== event.pointerId) return;
+  cameraHoldPointerId = null;
+  setCameraOrbitEnabled(false);
+};
+cameraModeButton.addEventListener('pointerup', releaseCameraHold);
+cameraModeButton.addEventListener('pointercancel', releaseCameraHold);
+cameraModeButton.addEventListener('lostpointercapture', releaseCameraHold);
+cameraModeButton.addEventListener('keydown', (event) => {
+  if ((event.code === 'Space' || event.code === 'Enter') && !event.repeat) {
+    event.preventDefault();
+    setCameraOrbitEnabled(true);
+  }
+});
+cameraModeButton.addEventListener('keyup', (event) => {
+  if (event.code === 'Space' || event.code === 'Enter') setCameraOrbitEnabled(false);
+});
 window.addEventListener('pointermove', (event) => {
-  if (!cameraOrbitEnabled || cameraOrbitPointerId !== event.pointerId) return;
-  event.preventDefault();
+  if (!cameraOrbitEnabled) return;
+  // While the camera button is held, pointer movement anywhere rotates the view.
   const deltaX = event.clientX - cameraOrbitPointerX;
   const deltaY = event.clientY - cameraOrbitPointerY;
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
   cameraAzimuth -= deltaX * cameraOrbitSensitivity;
-  canvas.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
+  canvas!.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
   cameraElevation = Math.max(
     cameraOrbitMinElevation,
     Math.min(cameraOrbitMaxElevation, cameraElevation + deltaY * cameraOrbitSensitivity),
   );
 });
-const releaseCameraOrbitPointer = (event: PointerEvent) => {
-  if (cameraOrbitPointerId === event.pointerId) cameraOrbitPointerId = null;
-};
-window.addEventListener('pointerup', releaseCameraOrbitPointer);
-window.addEventListener('pointercancel', releaseCameraOrbitPointer);
-canvas.addEventListener('lostpointercapture', releaseCameraOrbitPointer);
 window.addEventListener('blur', () => {
-  cameraOrbitPointerId = null;
+  cameraHoldPointerId = null;
+  setCameraOrbitEnabled(false);
 });
-
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') cameraOrbitPointerId = null;
+  if (document.visibilityState !== 'visible') {
+    cameraHoldPointerId = null;
+    setCameraOrbitEnabled(false);
+  }
 });
 
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
