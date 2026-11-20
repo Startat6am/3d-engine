@@ -1,6 +1,6 @@
 # World and Voxel Subsystem Specification
 
-**Status:** M7 implementation in progress; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, deterministic seeded generation, content-addressed persistence, Player static collision integration and initial Editor voxel authoring/rendering are implemented. Full editing workflows, mixed-scene acceptance, migration fixtures and broader validation remain open.
+**Status:** M7 implementation in progress; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, deterministic seeded generation, content-addressed persistence, Player static collision integration and initial Editor voxel authoring/rendering are implemented. The initial mixed voxel+GLB Editor→Player round-trip passed exact-head Chromium CI #612. Full editing workflows, migration fixtures, end-to-end streaming lifecycle acceptance and broader validation remain open.
 **Milestone:** 7 — World & Voxels.
 
 ## Purpose and boundaries
