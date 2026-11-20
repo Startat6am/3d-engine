@@ -19,12 +19,7 @@ interface StaticMeshColliderRecord {
   readonly collider: PhysicsColliderHandle;
 }
 
-/**
- * Owns static triangle-mesh bodies for streamed world chunks.
- * Sync replaces changed chunks only after their new collider was created,
- * removes chunks no longer present, and dispose releases every owned handle.
- * The caller must provide a revision token that includes source and neighbor revisions.
- */
+/** Owns static triangle-mesh bodies for streamed world chunks. */
 export class StaticMeshColliderSet {
   readonly #physics: PhysicsWorld;
   readonly #records = new Map<string, StaticMeshColliderRecord>();
@@ -53,4 +48,10 @@ export class StaticMeshColliderSet {
       }
       desired.set(input.key, input);
     }
-...[truncated]
+
+    for (const [key, input] of desired) {
+      const previous = this.#records.get(key);
+      if (previous?.revision === input.revision) continue;
+      const body = this.#physics.createBody(input.entity, {
+        type: 'static',
+        position: input.pos...[truncated]
