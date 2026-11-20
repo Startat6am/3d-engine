@@ -1,6 +1,6 @@
 # World and Voxel Subsystem Specification
 
-**Status:** M7 implementation in progress; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, deterministic seeded generation, content-addressed persistence, Player static collision integration and initial Editor voxel authoring/rendering are implemented. The initial mixed voxel+GLB Editor→Player round-trip passed exact-head Chromium CI #612. Full editing workflows, migration fixtures, end-to-end streaming lifecycle acceptance and broader validation remain open.
+**Status:** M7 implementation in progress; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, deterministic seeded generation, content-addressed persistence, Player static collision integration and Editor coordinate-based voxel cell editing are implemented. The initial mixed voxel+GLB Editor→Player round-trip passed exact-head Chromium CI #612. Painted multi-material round-trip CI, viewport brush interaction, palette management, migration fixtures, end-to-end streaming lifecycle acceptance and broader validation remain open.
 **Milestone:** 7 — World & Voxels.
 
 ## Purpose and boundaries
@@ -27,7 +27,7 @@ The voxel subsystem is a geometry provider. It must not introduce voxel-specific
 - Meshing cancellation: `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal`, and rejects with `MESHING_ABORTED` before returning any result; partial geometry remains private.
 - World streaming: `WorldChunkScheduler<T>` bounds concurrency, queue depth, resident count and per-chunk payload bytes; it deduplicates coordinate/revision requests, orders by priority, propagates cancellation, rejects stale completions, and exposes explicit eviction/disposal.
 - Procedural hook: `createChunkGenerationContext` combines a validated seed, signed chunk coordinate, AbortSignal and deterministic coordinate-scoped PRNG.
-- Implemented: repeated scheduler load/evict/dispose stress coverage, versioned content-addressed chunk blobs, Player static collider lifecycle integration, and initial Editor voxel chunk authoring/rendering. Remaining: full cross-app mixed-scene acceptance, full Editor cell/palette editing, end-to-end streaming lifecycle coverage and migration fixtures.
+- Implemented: repeated scheduler load/evict/dispose stress coverage, versioned content-addressed chunk blobs, Player static collider lifecycle integration, and Editor coordinate-based voxel cell painting/erasing with built-in material palette extension. Remaining: painted multi-material cross-app E2E CI, viewport ray-based brush interaction, palette removal/reordering, end-to-end streaming lifecycle coverage and migration fixtures.
 
 ## Coordinate and identity model
 
