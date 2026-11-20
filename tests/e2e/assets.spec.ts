@@ -458,6 +458,13 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   });
   await expect(page.getByText('TriangleNode')).toBeVisible();
 
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
+  await expect(page.getByText(/VOXEL CHUNKS/)).toBeVisible();
+
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
     await page.locator('.file-menu summary').click();
@@ -476,6 +483,11 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
       assets: Array<{ id: string; kind: string; uri: string }>;
       assetPayloads?: unknown[];
+      extensions?: {
+        'com.choreon.voxel-world'?: {
+          chunks: unknown[];
+        };
+      };
     };
     return {
       paths: [...files.keys()].sort(),
@@ -491,7 +503,9 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   expect(saved.manifest.assets).toHaveLength(2);
   expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
   expect(saved.paths).toContain('worlds/main.world');
-  expect(saved.paths).toHaveLength(3);
+  expect(saved.paths.some((path) => path.startsWith('voxel/chunks/sha256/'))).toBe(true);
+  expect(saved.paths).toHaveLength(4);
+  expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
 
   // Change the active scene, then reopen the folder. The directory loader should
@@ -544,8 +558,8 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect(page.getByText(/Project file not found:/)).toBeVisible();
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
 
-  // The exact saved Editor folder must also load in Player, including its GLB
-  // geometry, PBR material, embedded image, sampler and texture transform.
+  // The exact saved Editor folder must also load in Player as a mixed voxel/mesh
+  // scene, including the GLB geometry, PBR material, embedded image and static voxel collider.
   await page.goto('http://127.0.0.1:5174');
   await page.evaluate((entries) => {
     (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads = 0;
