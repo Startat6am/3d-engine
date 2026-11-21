@@ -2352,18 +2352,42 @@ export function EditorApp() {
               <small>
                 Choose Paint or Erase in the Scene Tools panel, then click a visible voxel face
               </small>
-              <label>PAINT MATERIAL</label>
-              <select
-                aria-label="Voxel material"
-                value={voxelMaterial}
-                onChange={(event) => setVoxelMaterial(event.target.value)}
+              <label>WORLD MATERIAL LIBRARY</label>
+              <div
+                className="voxel-material-library"
+                role="group"
+                aria-label="World voxel materials"
               >
-                {BUILTIN_VOXEL_MATERIALS.map((material) => (
-                  <option key={material.key} value={'builtin:' + material.key}>
-                    {material.label}
-                  </option>
-                ))}
-              </select>
+                {BUILTIN_VOXEL_MATERIALS.map((material) => {
+                  const materialRef = 'builtin:' + material.key;
+                  const selected = voxelMaterial === materialRef;
+                  return (
+                    <button
+                      key={material.key}
+                      type="button"
+                      className={
+                        selected ? 'voxel-material-swatch selected' : 'voxel-material-swatch'
+                      }
+                      aria-pressed={selected}
+                      aria-label={'Select ' + material.label + ' voxel material'}
+                      title={material.label}
+                      onClick={() => setVoxelMaterial(materialRef)}
+                    >
+                      <span
+                        className="voxel-material-color"
+                        style={{
+                          backgroundColor: '#' + material.color.toString(16).padStart(6, '0'),
+                        }}
+                      />
+                      <span>{material.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <small>
+                Choose a shared world material. A chunk adds its reference only after you paint with
+                it.
+              </small>
               <div className="voxel-edit-actions">
                 <button
                   onClick={() => updateVoxelCell(1)}
