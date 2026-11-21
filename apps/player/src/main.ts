@@ -545,8 +545,13 @@ async function openProjectFolder(): Promise<void> {
           const style = resolveVoxelMaterialStyle(
             part.material,
             project.document.assets as readonly AssetRecord[],
+            project.document.assetPayloads ?? [],
           );
-          return { ...createDefaultMaterial(style.color), roughness: style.roughness };
+          return {
+            ...createDefaultMaterial(style.color),
+            roughness: style.roughness,
+            ...(style.baseColorTexture ? { baseColorTexture: style.baseColorTexture } : {}),
+          };
         })(),
       }));
     });

@@ -136,6 +136,8 @@ const initialEntity = (): SceneEntity => ({
   scale: [1, 1, 1],
 });
 
+const MAX_VOXEL_TEXTURE_BYTES = 16 * 1024 * 1024;
+
 const ASSET_KINDS: readonly AssetKind[] = [
   'model',
   'mesh',
@@ -360,10 +362,18 @@ export function EditorApp() {
   });
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [voxelAssetMaterials, setVoxelAssetMaterials] = useState<
-    readonly { assetId: string; name: string; color: number; roughness: number }[]
+    readonly {
+      assetId: string;
+      name: string;
+      color: number;
+      roughness: number;
+      textureAssetId?: string;
+    }[]
   >([]);
   const [newVoxelMaterialName, setNewVoxelMaterialName] = useState('Custom Material');
   const [newVoxelMaterialColor, setNewVoxelMaterialColor] = useState('#a87952');
+  const [newVoxelMaterialRoughness, setNewVoxelMaterialRoughness] = useState('0.9');
+  const [newVoxelMaterialTexture, setNewVoxelMaterialTexture] = useState<File | null>(null);
   const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
   const [cameraTool, setCameraTool] = useState<'select' | 'pan' | 'rotate'>('select');
   const [brushPreview, setBrushPreview] = useState<{
@@ -463,12 +473,35 @@ export function EditorApp() {
               : undefined;
           const assetColor = assetMaterial?.metadata.color;
           const assetRoughness = assetMaterial?.metadata.roughness;
+          const textureAssetId = assetMaterial?.metadata.baseColorTextureAssetId;
+          const textureRecord =
+            typeof textureAssetId === 'string'
+              ? assetRegistryRef.current.get(textureAssetId as AssetId)
+              : undefined;
+          const texturePayload =
+            typeof textureAssetId === 'string'
+              ? assetPayloadsRef.current.get(textureAssetId as AssetId)
+              : undefined;
+          const baseColorTexture =
+            textureRecord?.kind === 'texture' &&
+            texturePayload &&
+            (texturePayload.mimeType === 'image/png' ||
+              texturePayload.mimeType === 'image/jpeg' ||
+              texturePayload.mimeType === 'image/webp')
+              ? {
+                  assetId: textureRecord.id,
+                  cacheKey: textureRecord.contentHash,
+                  mimeType: texturePayload.mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
+                  data: new Uint8Array(decodeBase64(texturePayload.data)),
+                }
+              : undefined;
           return {
             ...createDefaultMaterial(
               builtin?.color ?? (typeof assetColor === 'number' ? assetColor : 0x8995a5),
             ),
             ...(builtin ? { roughness: builtin.roughness } : {}),
             ...(typeof assetRoughness === 'number' ? { roughness: assetRoughness } : {}),
+            ...(baseColorTexture ? { baseColorTexture } : {}),
           };
         })(),
         position,
@@ -731,12 +764,70 @@ export function EditorApp() {
 
   const createVoxelMaterialAsset = async () => {
     const name = newVoxelMaterialName.trim();
-    if (!name || !/^#[0-9a-fA-F]{6}$/.test(newVoxelMaterialColor)) return;
+    const roughness = Number(newVoxelMaterialRoughness);
+    if (
+      !name ||
+      !/^#[0-9a-fA-F]{6}$/.test(newVoxelMaterialColor) ||
+      !Number.isFinite(roughness) ||
+      roughness < 0 ||
+      roughness > 1
+    ) {
+      return;
+    }
     const color = Number.parseInt(newVoxelMaterialColor.slice(1), 16);
-    const roughness = 0.9;
+    let textureAssetId: AssetId | undefined;
+    if (newVoxelMaterialTexture) {
+      const mimeType = newVoxelMaterialTexture.type;
+      if (
+        newVoxelMaterialTexture.size === 0 ||
+        newVoxelMaterialTexture.size > MAX_VOXEL_TEXTURE_BYTES
+      ) {
+        pushDiagnostic({
+          level: 'error',
+          source: 'Voxel materials',
+          message: 'Voxel texture size is outside the supported range',
+          details: 'Choose a non-empty image no larger than 16 MiB.',
+        });
+        return;
+      }
+      if (mimeType !== 'image/png' && mimeType !== 'image/jpeg' && mimeType !== 'image/webp') {
+        pushDiagnostic({
+          level: 'error',
+          source: 'Voxel materials',
+          message: 'Unsupported voxel texture format',
+          details: 'Choose a PNG, JPEG or WebP image.',
+        });
+        return;
+      }
+      const textureBuffer = await newVoxelMaterialTexture.arrayBuffer();
+      const textureId = ('asset:voxel-texture-' + crypto.randomUUID()) as AssetId;
+      const textureRecord = assetRegistryRef.current.register({
+        id: textureId,
+        name: name + ' Texture',
+        kind: 'texture',
+        uri: 'textures/voxel/' + textureId.slice('asset:'.length),
+        contentHash: await sha256(textureBuffer),
+        importer: { id: 'choreon.voxel-texture', version: '1', settings: {} },
+        metadata: { role: 'voxel-texture', mimeType },
+      });
+      assetPayloadsRef.current.set(textureRecord.id, {
+        assetId: textureRecord.id,
+        mimeType,
+        encoding: 'base64',
+        data: encodeBase64(textureBuffer),
+      });
+      textureAssetId = textureRecord.id;
+    }
+
     const assetId = ('asset:voxel-material-' + crypto.randomUUID()) as AssetId;
     const source = new TextEncoder().encode(
-      JSON.stringify({ schemaVersion: 1, name, color, roughness }),
+      JSON.stringify({
+        schemaVersion: 1,
+        name,
+        color,
+        roughness,
+        ...(textureAssetId ? { baseColorTextureAssetId: textureAssetId } : {}),
+      }),
     );
     const sourceBuffer = source.buffer.slice(
       source.byteOffset,
@@ -750,11 +841,13 @@ export function EditorApp() {
       uri: 'materials/voxel/' + assetId.slice('asset:'.length) + '.json',
       contentHash,
       importer: { id: 'choreon.voxel-material', version: '1', settings: {} },
+      dependencies: textureAssetId ? [textureAssetId] : [],
       metadata: {
         role: 'voxel-material',
         color,
         roughness,
         mimeType: 'application/vnd.choreon.voxel-material+json',
+        ...(textureAssetId ? { baseColorTextureAssetId: textureAssetId } : {}),
       },
     });
     assetPayloadsRef.current.set(assetId, {
@@ -765,15 +858,26 @@ export function EditorApp() {
     });
     setVoxelAssetMaterials((current) => [
       ...current,
-      { assetId: record.id, name: record.name, color, roughness },
+      {
+        assetId: record.id,
+        name: record.name,
+        color,
+        roughness,
+        ...(textureAssetId ? { textureAssetId } : {}),
+      },
     ]);
     setVoxelMaterial('asset:' + assetId);
+    setNewVoxelMaterialTexture(null);
     setIsDirty(true);
     pushDiagnostic({
       level: 'info',
       source: 'Voxel materials',
       message: 'Custom voxel material created',
-      details: name + ' is stored as a project asset and can be shared by chunks.',
+      details:
+        name +
+        (textureAssetId
+          ? ' is stored with a project texture asset and can be shared by chunks.'
+          : ' is stored as a project asset and can be shared by chunks.'),
     });
   };
 
@@ -1331,6 +1435,9 @@ export function EditorApp() {
             color: typeof record.metadata.color === 'number' ? record.metadata.color : 0x8995a5,
             roughness:
               typeof record.metadata.roughness === 'number' ? record.metadata.roughness : 0.9,
+            ...(typeof record.metadata.baseColorTextureAssetId === 'string'
+              ? { textureAssetId: record.metadata.baseColorTextureAssetId }
+              : {}),
           })),
       );
       commitEntities(parsed);
@@ -2499,6 +2606,21 @@ export function EditorApp() {
                   value={newVoxelMaterialColor}
                   onChange={(event) => setNewVoxelMaterialColor(event.target.value)}
                 />
+                <input
+                  aria-label="New voxel material roughness"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={newVoxelMaterialRoughness}
+                  onChange={(event) => setNewVoxelMaterialRoughness(event.target.value)}
+                />
+                <input
+                  aria-label="New voxel material texture"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => setNewVoxelMaterialTexture(event.target.files?.[0] ?? null)}
+                />
                 <button
                   type="button"
                   onClick={() => void createVoxelMaterialAsset()}
@@ -2508,8 +2630,8 @@ export function EditorApp() {
                 </button>
               </div>
               <small>
-                Built-ins and custom project materials share the world library. Custom materials are
-                embedded in the project and referenced by stable asset ID.
+                Built-ins and custom project materials share the world library. Optional PNG, JPEG
+                or WebP textures are stored as dependent project assets and sampled on voxel faces.
               </small>
               <small>
                 Choose a shared world material. A chunk adds its reference only after you paint with

@@ -67,6 +67,23 @@ describe('voxel world project persistence', () => {
     const digest = await crypto.subtle.digest('SHA-256', source.slice().buffer as ArrayBuffer);
     const contentHash = `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
     const assetId = 'asset:voxel-material-copper';
+    const textureAssetId = 'asset:voxel-texture-copper';
+    const textureBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    const textureDigest = await crypto.subtle.digest(
+      'SHA-256',
+      textureBytes.slice().buffer as ArrayBuffer,
+    );
+    const textureContentHash = `sha256:${Array.from(new Uint8Array(textureDigest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+    const textureAsset: AssetRecord = {
+      id: textureAssetId as AssetRecord['id'],
+      name: 'Copper Alloy Texture',
+      kind: 'texture',
+      uri: 'textures/voxel/copper.png',
+      contentHash: textureContentHash,
+      importer: { id: 'choreon.voxel-texture', version: '1', settings: {} },
+      dependencies: [],
+      metadata: { role: 'voxel-texture', mimeType: 'image/png' },
+    };
     const asset: AssetRecord = {
       id: assetId as AssetRecord['id'],
       name: 'Copper Alloy',
@@ -74,18 +91,25 @@ describe('voxel world project persistence', () => {
       uri: 'materials/voxel/copper.json',
       contentHash,
       importer: { id: 'choreon.voxel-material', version: '1', settings: {} },
-      dependencies: [],
+      dependencies: [textureAssetId as AssetRecord['id']],
       metadata: {
         role: 'voxel-material',
         color: 0xb87333,
         roughness: 0.9,
         mimeType: 'application/vnd.choreon.voxel-material+json',
+        baseColorTextureAssetId: textureAssetId,
       },
     };
     const materialDocument: WorldDocument = {
       ...document,
-      assets: [asset],
+      assets: [textureAsset, asset],
       assetPayloads: [
+        {
+          assetId: textureAssetId,
+          mimeType: 'image/png',
+          encoding: 'base64',
+          data: btoa(String.fromCharCode(...textureBytes)),
+        },
         {
           assetId,
           mimeType: 'application/vnd.choreon.voxel-material+json',
@@ -102,15 +126,33 @@ describe('voxel world project persistence', () => {
     const store = new MemoryProjectFileStore();
     await saveVoxelWorldProject(store, materialDocument, settings, [customMaterialChunk]);
     const loaded = await loadVoxelWorldProject(store);
-    expect(loaded.document.assets).toHaveLength(1);
-    expect(loaded.document.assets[0]).toMatchObject({
+    expect(loaded.document.assets).toHaveLength(2);
+    expect(
+      loaded.document.assets.find((entry) => (entry as AssetRecord).id === assetId),
+    ).toMatchObject({
       id: assetId,
       kind: 'material',
       contentHash,
-      metadata: { role: 'voxel-material', color: 0xb87333, roughness: 0.9 },
+      metadata: {
+        role: 'voxel-material',
+        color: 0xb87333,
+        roughness: 0.9,
+        baseColorTextureAssetId: textureAssetId,
+      },
     });
     expect(loaded.chunks[0]?.palette).toEqual([{ material: { kind: 'asset', assetId } }]);
-    expect(loaded.document.assetPayloads?.[0]).toMatchObject({
+    expect(loaded.document.assetPayloads).toHaveLength(2);
+    expect(
+      loaded.document.assetPayloads?.find((payload) => payload.assetId === textureAssetId),
+    ).toMatchObject({
+      assetId: textureAssetId,
+      mimeType: 'image/png',
+      encoding: 'base64',
+      data: btoa(String.fromCharCode(...textureBytes)),
+    });
+    expect(
+      loaded.document.assetPayloads?.find((payload) => payload.assetId === assetId),
+    ).toMatchObject({
       assetId,
       mimeType: 'application/vnd.choreon.voxel-material+json',
       encoding: 'base64',

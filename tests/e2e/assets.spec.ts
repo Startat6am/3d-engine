@@ -476,6 +476,12 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await page.getByLabel('Voxel cell X').fill('4');
   await page.getByLabel('New voxel material name').fill('Copper Alloy');
   await page.getByLabel('New voxel material color').fill('#b87333');
+  await page.getByLabel('New voxel material roughness').fill('0.35');
+  await page.getByLabel('New voxel material texture').setInputFiles({
+    name: 'copper.png',
+    mimeType: 'image/png',
+    buffer: makeSolidPng(184, 115, 51),
+  });
   await page.getByRole('button', { name: 'Create material' }).click();
   await page.getByRole('button', { name: 'Paint cell' }).click();
   await expect(page.getByText('Revision 3 · 3 materials')).toBeVisible();
@@ -518,12 +524,16 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     };
   });
   expect(saved.manifest.assetPayloads).toBeUndefined();
-  expect(saved.manifest.assets).toHaveLength(3);
-  expect(saved.manifest.assets.some((asset) => asset.kind === 'material')).toBe(true);
+  expect(saved.manifest.assets).toHaveLength(4);
+  const savedVoxelMaterial = saved.manifest.assets.find((asset) => asset.kind === 'material');
+  expect(savedVoxelMaterial).toMatchObject({
+    metadata: { color: 0xb87333, roughness: 0.35 },
+  });
+  expect(saved.manifest.assets.some((asset) => asset.kind === 'texture')).toBe(true);
   expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
   expect(saved.paths).toContain('worlds/main.world');
   expect(saved.paths.some((path) => path.startsWith('voxel/chunks/sha256/'))).toBe(true);
-  expect(saved.paths).toHaveLength(5);
+  expect(saved.paths).toHaveLength(6);
   const savedVoxelChunk = saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks[0];
   expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
   expect(savedVoxelChunk?.revision).toBe(3);
