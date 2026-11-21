@@ -355,6 +355,11 @@ export function EditorApp() {
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
   const [cameraTool, setCameraTool] = useState<'select' | 'pan' | 'rotate'>('select');
+  const [brushPreview, setBrushPreview] = useState<{
+    chunkKey: string;
+    cell: { x: number; y: number; z: number };
+    mode: 'paint' | 'erase';
+  } | null>(null);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -449,6 +454,38 @@ export function EditorApp() {
       }));
     });
   }, [voxelChunks, voxelWorldSettings]);
+  const brushPreviewObject = useMemo<RenderObject | null>(() => {
+    if (!brushPreview || cameraTool !== 'select') return null;
+    const chunk = voxelChunks.find(
+      (candidate) =>
+        [candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z].join(',') ===
+        brushPreview.chunkKey,
+    );
+    if (!chunk) return null;
+    const size = voxelWorldSettings.voxelSize;
+    const color = brushPreview.mode === 'paint' ? 0x66d9a8 : 0xff766f;
+    return {
+      id: '__voxel-brush-preview__',
+      geometry: createBoxGeometry(size * 0.94, size * 0.94, size * 0.94),
+      material: {
+        ...createDefaultMaterial(color),
+        opacity: 0.38,
+        transparent: true,
+        emissiveColor: color,
+      },
+      position: [
+        (chunk.coordinate.x * voxelWorldSettings.chunkDimensions.x + brushPreview.cell.x + 0.5) *
+          size,
+        (chunk.coordinate.y * voxelWorldSettings.chunkDimensions.y + brushPreview.cell.y + 0.5) *
+          size,
+        (chunk.coordinate.z * voxelWorldSettings.chunkDimensions.z + brushPreview.cell.z + 0.5) *
+          size,
+      ],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+    };
+  }, [brushPreview, cameraTool, voxelChunks, voxelWorldSettings]);
+
   const renderObjects = useMemo(
     () => [
       ...entities.map((entity) => ({
@@ -459,8 +496,9 @@ export function EditorApp() {
             : entity.material,
       })),
       ...voxelRenderObjects,
+      ...(brushPreviewObject ? [brushPreviewObject] : []),
     ],
-    [entities, selectedId, voxelRenderObjects],
+    [entities, selectedId, voxelRenderObjects, brushPreviewObject],
   );
   const renderScene = useMemo(
     () => ({ camera, background: 0x151a23, objects: renderObjects }),
@@ -1671,6 +1709,33 @@ export function EditorApp() {
     };
   };
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (cameraTool === 'select' && !event.buttons) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const surface = rendererRef.current?.pickSurface(
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+        bounds.width,
+        bounds.height,
+      );
+      const match = surface?.entityId.startsWith('voxel:')
+        ? /^voxel:(-?\d+),(-?\d+),(-?\d+):/.exec(surface.entityId)
+        : null;
+      const chunkKey = match ? [match[1], match[2], match[3]].join(',') : null;
+      const chunk = chunkKey
+        ? voxelChunks.find(
+            (candidate) =>
+              [candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z].join(',') ===
+              chunkKey,
+          )
+        : null;
+      const cell =
+        surface && chunk
+          ? resolveVoxelBrushCell(surface, chunk, voxelWorldSettings, voxelBrushMode)
+          : null;
+      setBrushPreview(cell && chunkKey ? { chunkKey, cell, mode: voxelBrushMode } : null);
+    } else if (cameraTool !== 'select') {
+      setBrushPreview(null);
+    }
     const pointers = activePointersRef.current;
     if (!pointers.has(event.pointerId)) return;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1712,9 +1777,9 @@ export function EditorApp() {
         const right: Vec3 = [forward[2], 0, -forward[0]];
         const speed = Math.max(0.004, Math.hypot(x, y, z) * 0.0018);
         const position: Vec3 = [
-          x - right[0] * dx * speed + forward[0] * dy * speed,
+          x + right[0] * dx * speed + forward[0] * dy * speed,
           y,
-          z - right[2] * dx * speed + forward[2] * dy * speed,
+          z + right[2] * dx * speed + forward[2] * dy * speed,
         ];
         return { ...current, position };
       });
@@ -1963,7 +2028,10 @@ export function EditorApp() {
               aria-label="Move camera"
               aria-pressed={cameraTool === 'pan'}
               title="Move camera: drag left/right to strafe, up/down to move forward/back"
-              onClick={() => setCameraTool((current) => (current === 'pan' ? 'select' : 'pan'))}
+              onClick={() => {
+                setCameraTool((current) => (current === 'pan' ? 'select' : 'pan'));
+                setBrushPreview(null);
+              }}
             >
               <span aria-hidden="true">✥</span>
               <small>Move</small>
@@ -2104,6 +2172,7 @@ export function EditorApp() {
             }
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
+            onPointerLeave={() => setBrushPreview(null)}
             onPointerUp={(event) => {
               const wasMultiTouch = multiTouchRef.current;
               activePointersRef.current.delete(event.pointerId);

@@ -132,7 +132,9 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     this.#scene.updateMatrixWorld(true);
     this.#raycaster.setFromCamera(pointer, camera);
     const intersections = this.#raycaster.intersectObjects(
-      [...this.#objects.values()].map((entry) => entry.mesh),
+      [...this.#objects.values()]
+        .filter((entry) => entry.mesh.userData['engineEntityId'] !== '__voxel-brush-preview__')
+        .map((entry) => entry.mesh),
       false,
     );
     const entityId = intersections[0]?.object.userData['engineEntityId'];
@@ -148,7 +150,9 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     this.#scene.updateMatrixWorld(true);
     this.#raycaster.setFromCamera(pointer, camera);
     const hit = this.#raycaster.intersectObjects(
-      [...this.#objects.values()].map((entry) => entry.mesh),
+      [...this.#objects.values()]
+        .filter((entry) => entry.mesh.userData['engineEntityId'] !== '__voxel-brush-preview__')
+        .map((entry) => entry.mesh),
       false,
     )[0];
     if (!hit) return null;
