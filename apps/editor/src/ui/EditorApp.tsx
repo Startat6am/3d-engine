@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AssetImportService,
   AssetImportScope,
@@ -9,25 +9,21 @@ import {
   type AssetId,
   type AssetKind,
   type RegisterAssetInput,
-} from "@engine/assets";
-import type { Matrix4 as Matrix4Type } from "three";
-import type { GlbAsset } from "@engine/gltf-importer";
-import type { WorldAssetPayload } from "@engine/serialization";
+} from '@engine/assets';
+import type { Matrix4 as Matrix4Type } from 'three';
+import type { GlbAsset } from '@engine/gltf-importer';
+import type { WorldAssetPayload } from '@engine/serialization';
 import {
   loadVoxelWorldProject,
   saveVoxelWorldProject,
   VOXEL_WORLD_EXTENSION_KEY,
   type VoxelWorldSettings,
   type VoxelChunkSnapshot,
-} from "@engine/project-storage";
-import { EditorHistory } from "./EditorHistory.js";
-import { readPbrMaterialState } from "./materialValidation.js";
-import { WorkerGlbImporter } from "../workers/WorkerGlbImporter.js";
-import {
-  parseWorld,
-  serializeWorld,
-  type WorldDocument,
-} from "@engine/serialization";
+} from '@engine/project-storage';
+import { EditorHistory } from './EditorHistory.js';
+import { readPbrMaterialState } from './materialValidation.js';
+import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
+import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
 import {
   createBoxGeometry,
   createCylinderGeometry,
@@ -35,29 +31,21 @@ import {
   createUvSphereGeometry,
   validateMeshData,
   type MeshData,
-} from "@engine/geometry";
+} from '@engine/geometry';
 import {
   createDefaultCamera,
   createDefaultMaterial,
   lookAtQuaternion,
-} from "@engine/renderer/contracts";
-import type {
-  RenderObject,
-  TextureSource,
-  Vec3,
-} from "@engine/renderer/contracts";
-import {
-  createVoxelChunkSnapshot,
-  editVoxelChunk,
-  meshVoxelChunk,
-} from "@engine/voxel";
-import { createChunkCoordinate } from "@engine/world";
-import type { ThreeWebGLRendererAdapter } from "@engine/renderer";
+} from '@engine/renderer/contracts';
+import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
+import { createVoxelChunkSnapshot, editVoxelChunk, meshVoxelChunk } from '@engine/voxel';
+import { createChunkCoordinate } from '@engine/world';
+import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 import {
   BrowserProjectFileStore,
   loadDirectoryProject,
   type DirectoryHandleLike,
-} from "../project/ProjectAssetStore.js";
+} from '../project/ProjectAssetStore.js';
 
 type TransformNumberInputProps = {
   readonly value: number;
@@ -66,11 +54,7 @@ type TransformNumberInputProps = {
 };
 
 /** Keeps an editable text draft so clearing a numeric field does not become zero. */
-function TransformNumberInput({
-  value,
-  label,
-  onCommit,
-}: TransformNumberInputProps) {
+function TransformNumberInput({ value, label, onCommit }: TransformNumberInputProps) {
   const [draft, setDraft] = useState(String(Number(value.toFixed(2))));
 
   useEffect(() => {
@@ -78,7 +62,7 @@ function TransformNumberInput({
   }, [value]);
 
   const commit = () => {
-    if (draft.trim() === "") {
+    if (draft.trim() === '') {
       setDraft(String(Number(value.toFixed(2))));
       return;
     }
@@ -98,7 +82,7 @@ function TransformNumberInput({
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
-        if (event.key === "Enter") {
+        if (event.key === 'Enter') {
           event.currentTarget.blur();
         }
       }}
@@ -106,25 +90,25 @@ function TransformNumberInput({
   );
 }
 
-type Primitive = "Box" | "Sphere" | "Plane" | "Cylinder";
+type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
 
 interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: (options?: {
-    readonly mode?: "read" | "readwrite";
+    readonly mode?: 'read' | 'readwrite';
   }) => Promise<DirectoryHandleLike>;
 }
-type TransformMode = "position" | "rotation" | "scale";
+type TransformMode = 'position' | 'rotation' | 'scale';
 type DiagnosticEntry = {
   id: number;
   time: string;
-  level: "info" | "warning" | "error";
+  level: 'info' | 'warning' | 'error';
   source: string;
   message: string;
   details?: string;
 };
 type SceneEntity = Extract<RenderObject, { readonly position: Vec3 }> & {
   readonly name: string;
-  readonly primitive: Primitive | "GLB";
+  readonly primitive: Primitive | 'GLB';
   readonly assetId?: AssetId;
   readonly rotationEuler?: readonly [number, number, number];
 };
@@ -135,9 +119,9 @@ const geometryFor: Record<Primitive, () => MeshData> = {
   Cylinder: () => createCylinderGeometry(),
 };
 const initialEntity = (): SceneEntity => ({
-  id: "entity-1",
-  name: "Box",
-  primitive: "Box",
+  id: 'entity-1',
+  name: 'Box',
+  primitive: 'Box',
   geometry: createBoxGeometry(),
   material: createDefaultMaterial(),
   position: [0, 0, 0],
@@ -146,18 +130,18 @@ const initialEntity = (): SceneEntity => ({
 });
 
 const ASSET_KINDS: readonly AssetKind[] = [
-  "model",
-  "mesh",
-  "material",
-  "texture",
-  "audio",
-  "animation",
-  "environment",
-  "other",
+  'model',
+  'mesh',
+  'material',
+  'texture',
+  'audio',
+  'animation',
+  'environment',
+  'other',
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readAssetMetadata(
@@ -167,9 +151,9 @@ function readAssetMetadata(
   if (!isRecord(value)) throw new Error(`Invalid asset metadata at ${path}`);
   for (const [key, item] of Object.entries(value)) {
     if (
-      typeof item !== "string" &&
-      typeof item !== "boolean" &&
-      !(typeof item === "number" && Number.isFinite(item))
+      typeof item !== 'string' &&
+      typeof item !== 'boolean' &&
+      !(typeof item === 'number' && Number.isFinite(item))
     ) {
       throw new Error(`Invalid asset metadata value at ${path}.${key}`);
     }
@@ -179,32 +163,25 @@ function readAssetMetadata(
 
 function parseAssetRecord(value: unknown, index: number): RegisterAssetInput {
   const path = `$.assets[${index}]`;
-  if (
-    !isRecord(value) ||
-    typeof value.id !== "string" ||
-    typeof value.name !== "string"
-  ) {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.name !== 'string') {
     throw new Error(`Invalid asset identity at ${path}`);
   }
-  if (
-    typeof value.kind !== "string" ||
-    !ASSET_KINDS.includes(value.kind as AssetKind)
-  ) {
+  if (typeof value.kind !== 'string' || !ASSET_KINDS.includes(value.kind as AssetKind)) {
     throw new Error(`Invalid asset kind at ${path}.kind`);
   }
-  if (typeof value.uri !== "string" || typeof value.contentHash !== "string") {
+  if (typeof value.uri !== 'string' || typeof value.contentHash !== 'string') {
     throw new Error(`Invalid asset URI or content hash at ${path}`);
   }
   if (
     !isRecord(value.importer) ||
-    typeof value.importer.id !== "string" ||
-    typeof value.importer.version !== "string"
+    typeof value.importer.id !== 'string' ||
+    typeof value.importer.version !== 'string'
   ) {
     throw new Error(`Invalid asset importer at ${path}.importer`);
   }
   if (
     !Array.isArray(value.dependencies) ||
-    !value.dependencies.every((item) => typeof item === "string")
+    !value.dependencies.every((item) => typeof item === 'string')
   ) {
     throw new Error(`Invalid asset dependencies at ${path}.dependencies`);
   }
@@ -217,20 +194,14 @@ function parseAssetRecord(value: unknown, index: number): RegisterAssetInput {
     importer: {
       id: value.importer.id,
       version: value.importer.version,
-      settings: readAssetMetadata(
-        value.importer.settings,
-        `${path}.importer.settings`,
-      ),
+      settings: readAssetMetadata(value.importer.settings, `${path}.importer.settings`),
     },
     dependencies: value.dependencies as AssetId[],
     metadata: readAssetMetadata(value.metadata, `${path}.metadata`),
   };
 }
 
-function mergeAssetRegistry(
-  current: AssetRegistry,
-  serialized: readonly unknown[],
-): AssetRegistry {
+function mergeAssetRegistry(current: AssetRegistry, serialized: readonly unknown[]): AssetRegistry {
   const merged = new AssetRegistry();
   for (const asset of current.list()) merged.register(asset);
   const pending = serialized.map(parseAssetRecord);
@@ -240,37 +211,28 @@ function mergeAssetRegistry(
       const asset = pending[index]!;
       const existing = merged.get(asset.id!);
       if (existing) {
-        if (
-          existing.contentHash !== asset.contentHash ||
-          existing.kind !== asset.kind
-        ) {
-          throw new Error(
-            `World asset identity conflicts with the current project: ${asset.id}`,
-          );
+        if (existing.contentHash !== asset.contentHash || existing.kind !== asset.kind) {
+          throw new Error(`World asset identity conflicts with the current project: ${asset.id}`);
         }
         pending.splice(index, 1);
         progressed = true;
-      } else if (
-        (asset.dependencies ?? []).every((dependency) => merged.has(dependency))
-      ) {
+      } else if ((asset.dependencies ?? []).every((dependency) => merged.has(dependency))) {
         merged.register(asset);
         pending.splice(index, 1);
         progressed = true;
       }
     }
     if (!progressed)
-      throw new Error(
-        "World assets contain missing dependencies or a dependency cycle",
-      );
+      throw new Error('World assets contain missing dependencies or a dependency cycle');
   }
   return merged;
 }
 
 async function sha256(source: ArrayBuffer): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", source);
-  const hex = Array.from(new Uint8Array(digest), (byte) =>
-    byte.toString(16).padStart(2, "0"),
-  ).join("");
+  const digest = await crypto.subtle.digest('SHA-256', source);
+  const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join(
+    '',
+  );
   return `sha256:${hex}`;
 }
 
@@ -280,18 +242,15 @@ function encodeBase64(source: ArrayBuffer): string {
   // Encode bounded, 3-byte-aligned slices to avoid a model-sized binary string.
   const chunkSize = 0x6000;
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-    chunks.push(
-      btoa(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))),
-    );
+    chunks.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))));
   }
-  return chunks.join("");
+  return chunks.join('');
 }
 
 function decodeBase64(source: string): ArrayBuffer {
   const binary = atob(source);
   const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index++)
-    bytes[index] = binary.charCodeAt(index);
+  for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
   return bytes.buffer;
 }
 
@@ -324,9 +283,7 @@ export function EditorApp() {
     setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
-      previous.some((entity) => entity.id === current)
-        ? current
-        : (previous[0]?.id ?? ""),
+      previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''),
     );
   }, []);
 
@@ -338,9 +295,7 @@ export function EditorApp() {
     setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
-      next.some((entity) => entity.id === current)
-        ? current
-        : (next[0]?.id ?? ""),
+      next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''),
     );
   }, []);
 
@@ -349,65 +304,54 @@ export function EditorApp() {
       const target = event.target;
       const editingText =
         target instanceof HTMLElement &&
-        (target.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
       if (editingText || !(event.ctrlKey || event.metaKey)) return;
       const key = event.key.toLowerCase();
-      if (key === "z" && event.shiftKey) {
+      if (key === 'z' && event.shiftKey) {
         event.preventDefault();
         redo();
-      } else if (key === "z") {
+      } else if (key === 'z') {
         event.preventDefault();
         undo();
-      } else if (key === "y") {
+      } else if (key === 'y') {
         event.preventDefault();
         redo();
       }
     };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [redo, undo]);
-  const [selectedId, setSelectedId] = useState("entity-1");
-  const [rendererError, setRendererError] = useState("");
-  const [rendererStatus, setRendererStatus] = useState<
-    "loading" | "ready" | "error"
-  >("loading");
+  const [selectedId, setSelectedId] = useState('entity-1');
+  const [rendererError, setRendererError] = useState('');
+  const [rendererStatus, setRendererStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
   const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
-  const pushDiagnostic = useCallback(
-    (entry: Omit<DiagnosticEntry, "id" | "time">) => {
-      setDiagnostics((current) =>
-        [
-          {
-            ...entry,
-            id: Date.now() + Math.random(),
-            time: new Date().toLocaleTimeString(),
-          },
-          ...current,
-        ].slice(0, 200),
-      );
-    },
-    [],
-  );
-  const [worldName, setWorldName] = useState("Untitled World");
-  const [voxelWorldSettings, setVoxelWorldSettings] =
-    useState<VoxelWorldSettings>({
-      voxelSize: 1,
-      chunkDimensions: { x: 16, y: 16, z: 16 },
-    });
-  const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>(
-    [],
-  );
-  const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<
-    string | null
-  >(null);
+  const pushDiagnostic = useCallback((entry: Omit<DiagnosticEntry, 'id' | 'time'>) => {
+    setDiagnostics((current) =>
+      [
+        {
+          ...entry,
+          id: Date.now() + Math.random(),
+          time: new Date().toLocaleTimeString(),
+        },
+        ...current,
+      ].slice(0, 200),
+    );
+  }, []);
+  const [worldName, setWorldName] = useState('Untitled World');
+  const [voxelWorldSettings, setVoxelWorldSettings] = useState<VoxelWorldSettings>({
+    voxelSize: 1,
+    chunkDimensions: { x: 16, y: 16, z: 16 },
+  });
+  const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
+  const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<string | null>(null);
   const [voxelCell, setVoxelCell] = useState({ x: 0, y: 1, z: 0 });
   const [voxelChunkTarget, setVoxelChunkTarget] = useState({
     x: 0,
     y: 0,
     z: 0,
   });
-  const [voxelMaterial, setVoxelMaterial] = useState("builtin:grass");
+  const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -416,23 +360,19 @@ export function EditorApp() {
   const assetImportServiceRef = useRef(new AssetImportService());
   const glbImporterRegisteredRef = useRef(false);
   const assetPayloadsRef = useRef(new Map<AssetId, WorldAssetPayload>());
-  const assetResourceCacheRef = useRef(
-    new AssetResourceCache<ImportedAsset<GlbAsset>>(),
-  );
-  const assetResourceLeasesRef = useRef<
-    AssetResourceLease<ImportedAsset<GlbAsset>>[]
-  >([]);
+  const assetResourceCacheRef = useRef(new AssetResourceCache<ImportedAsset<GlbAsset>>());
+  const assetResourceLeasesRef = useRef<AssetResourceLease<ImportedAsset<GlbAsset>>[]>([]);
   const activeGlbImportControllersRef = useRef(new AssetImportScope());
   useEffect(
     () => () => {
-      activeGlbImportControllersRef.current.abortAll("Editor unmounted");
+      activeGlbImportControllersRef.current.abortAll('Editor unmounted');
       for (const lease of assetResourceLeasesRef.current) lease.release();
       assetResourceLeasesRef.current = [];
     },
     [],
   );
   const [camera, setCamera] = useState(() => createDefaultCamera());
-  const [transformMode, setTransformMode] = useState<TransformMode>("position");
+  const [transformMode, setTransformMode] = useState<TransformMode>('position');
   const [transformAxis, setTransformAxis] = useState(0);
   const [isTransformPadCollapsed, setIsTransformPadCollapsed] = useState(false);
   const dragRef = useRef<{
@@ -449,16 +389,11 @@ export function EditorApp() {
   const selectedVoxelChunk =
     voxelChunks.find(
       (chunk) =>
-        chunk.coordinate.x +
-          "," +
-          chunk.coordinate.y +
-          "," +
-          chunk.coordinate.z ===
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z ===
         selectedVoxelChunkKey,
     ) ?? null;
   useEffect(() => {
-    if (selectedVoxelChunk)
-      setVoxelChunkTarget({ ...selectedVoxelChunk.coordinate });
+    if (selectedVoxelChunk) setVoxelChunkTarget({ ...selectedVoxelChunk.coordinate });
   }, [selectedVoxelChunk]);
 
   const voxelPaletteUsage = useMemo(() => {
@@ -473,18 +408,14 @@ export function EditorApp() {
   const voxelRenderObjects = useMemo<RenderObject[]>(() => {
     const byCoordinate = new Map(
       voxelChunks.map((chunk) => [
-        chunk.coordinate.x +
-          "," +
-          chunk.coordinate.y +
-          "," +
-          chunk.coordinate.z,
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
         chunk,
       ]),
     );
     return voxelChunks.flatMap((chunk) => {
       const { x, y, z } = chunk.coordinate;
       const neighbor = (dx: number, dy: number, dz: number) =>
-        byCoordinate.get(x + dx + "," + (y + dy) + "," + (z + dz));
+        byCoordinate.get(x + dx + ',' + (y + dy) + ',' + (z + dz));
       const neighbors = {
         ...(neighbor(1, 0, 0) ? { positiveX: neighbor(1, 0, 0)! } : {}),
         ...(neighbor(-1, 0, 0) ? { negativeX: neighbor(-1, 0, 0)! } : {}),
@@ -493,23 +424,19 @@ export function EditorApp() {
         ...(neighbor(0, 0, 1) ? { positiveZ: neighbor(0, 0, 1)! } : {}),
         ...(neighbor(0, 0, -1) ? { negativeZ: neighbor(0, 0, -1)! } : {}),
       };
-      const mesh = meshVoxelChunk(
-        chunk,
-        neighbors,
-        voxelWorldSettings.voxelSize,
-      );
+      const mesh = meshVoxelChunk(chunk, neighbors, voxelWorldSettings.voxelSize);
       const position: Vec3 = [
         x * voxelWorldSettings.chunkDimensions.x * voxelWorldSettings.voxelSize,
         y * voxelWorldSettings.chunkDimensions.y * voxelWorldSettings.voxelSize,
         z * voxelWorldSettings.chunkDimensions.z * voxelWorldSettings.voxelSize,
       ];
       return mesh.parts.map((part, index) => ({
-        id: "voxel:" + x + "," + y + "," + z + ":" + index,
+        id: 'voxel:' + x + ',' + y + ',' + z + ':' + index,
         geometry: part.geometry,
         material: createDefaultMaterial(
-          part.material.kind === "builtin" && part.material.key === "grass"
+          part.material.kind === 'builtin' && part.material.key === 'grass'
             ? 0x70ad62
-            : part.material.kind === "builtin" && part.material.key === "dirt"
+            : part.material.kind === 'builtin' && part.material.key === 'dirt'
               ? 0x9b7048
               : 0x8995a5,
         ),
@@ -547,7 +474,7 @@ export function EditorApp() {
     let observer: ResizeObserver | null = null;
     let renderer: ThreeWebGLRendererAdapter | null = null;
     let fpsTimer: number | null = null;
-    void import("@engine/renderer")
+    void import('@engine/renderer')
       .then(({ ThreeWebGLRendererAdapter: Renderer }) => {
         if (disposed) return;
         renderer = new Renderer(canvas);
@@ -574,21 +501,21 @@ export function EditorApp() {
           renderedFrameCountRef.current = 0;
           lastFpsSample = now;
         }, 500);
-        setRendererStatus("ready");
+        setRendererStatus('ready');
       })
       .catch((error: unknown) => {
         if (disposed) return;
         const message = error instanceof Error ? error.message : String(error);
         canvas.dataset.rendererError = message;
         setRendererError(message);
-        setRendererStatus("error");
+        setRendererStatus('error');
         pushDiagnostic({
-          level: "error",
-          source: "Renderer",
-          message: "WebGL2 renderer initialization failed",
+          level: 'error',
+          source: 'Renderer',
+          message: 'WebGL2 renderer initialization failed',
           details: message,
         });
-        console.error("WebGL2 renderer initialization failed", error);
+        console.error('WebGL2 renderer initialization failed', error);
       });
     return () => {
       disposed = true;
@@ -613,20 +540,18 @@ export function EditorApp() {
   const addEntity = useCallback(
     (primitive: Primitive) => {
       const id = `entity-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-      const count = entities.filter(
-        (item) => item.primitive === primitive,
-      ).length;
+      const count = entities.filter((item) => item.primitive === primitive).length;
       const entity: SceneEntity = {
         id,
         name: count ? `${primitive} ${count + 1}` : primitive,
         primitive,
         geometry: geometryFor[primitive](),
         material: createDefaultMaterial(
-          primitive === "Sphere"
+          primitive === 'Sphere'
             ? 0x80c8a0
-            : primitive === "Plane"
+            : primitive === 'Plane'
               ? 0xb4a0e8
-              : primitive === "Cylinder"
+              : primitive === 'Cylinder'
                 ? 0xe6a66c
                 : 0x6ea8fe,
         ),
@@ -643,16 +568,11 @@ export function EditorApp() {
   const addVoxelChunk = () => {
     const occupied = new Set(
       voxelChunks.map(
-        (chunk) =>
-          chunk.coordinate.x +
-          "," +
-          chunk.coordinate.y +
-          "," +
-          chunk.coordinate.z,
+        (chunk) => chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
       ),
     );
     let x = 0;
-    while (occupied.has(x + ",0,0")) x += 1;
+    while (occupied.has(x + ',0,0')) x += 1;
     const cells = new Uint16Array(16 * 16 * 16);
     for (let z = 0; z < 16; z += 1) {
       for (let cellX = 0; cellX < 16; cellX += 1) {
@@ -661,25 +581,21 @@ export function EditorApp() {
     }
     const chunk = createVoxelChunkSnapshot({
       coordinate: createChunkCoordinate({ x, y: 0, z: 0 }),
-      palette: [{ material: { kind: "builtin", key: "grass" } }],
+      palette: [{ material: { kind: 'builtin', key: 'grass' } }],
       cells,
     });
     setVoxelChunks([...voxelChunks, chunk]);
-    setSelectedVoxelChunkKey(x + ",0,0");
-    setSelectedId("");
+    setSelectedVoxelChunkKey(x + ',0,0');
+    setSelectedId('');
     setIsDirty(true);
     setIsAddMenuOpen(false);
   };
 
   const commitVoxelPalette = (
-    palette: VoxelChunkSnapshot["palette"],
+    palette: VoxelChunkSnapshot['palette'],
     remap: (value: number) => number,
   ) => {
-    if (
-      !selectedVoxelChunk ||
-      selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER
-    )
-      return;
+    if (!selectedVoxelChunk || selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
     const cells = selectedVoxelChunk.copyCells();
     for (let index = 0; index < cells.length; index += 1) {
       cells[index] = remap(cells[index]!);
@@ -692,28 +608,23 @@ export function EditorApp() {
     });
     const chunkKey =
       selectedVoxelChunk.coordinate.x +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.y +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.z;
     setVoxelChunks((current) =>
       current.map((chunk) =>
-        chunk.coordinate.x +
-          "," +
-          chunk.coordinate.y +
-          "," +
-          chunk.coordinate.z ===
-        chunkKey
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
           ? snapshot
           : chunk,
       ),
     );
     setIsDirty(true);
     pushDiagnostic({
-      level: "info",
-      source: "Voxel editor",
-      message: "Voxel material palette updated",
-      details: "Chunk " + chunkKey + ", revision " + snapshot.revision + ".",
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel material palette updated',
+      details: 'Chunk ' + chunkKey + ', revision ' + snapshot.revision + '.',
     });
   };
 
@@ -753,29 +664,23 @@ export function EditorApp() {
     const cells = selectedVoxelChunk.copyCells();
     const storedIndex = paletteIndex + 1;
     if (cells.some((value) => value === storedIndex)) return;
-    const palette = selectedVoxelChunk.palette.filter(
-      (_, index) => index !== paletteIndex,
-    );
-    commitVoxelPalette(palette, (value) =>
-      value > storedIndex ? value - 1 : value,
-    );
+    const palette = selectedVoxelChunk.palette.filter((_, index) => index !== paletteIndex);
+    commitVoxelPalette(palette, (value) => (value > storedIndex ? value - 1 : value));
   };
 
   const updateVoxelCell = (value: number) => {
     if (!selectedVoxelChunk) return;
-    const [kind, key] = voxelMaterial.split(":");
+    const [kind, key] = voxelMaterial.split(':');
     const material =
-      kind === "asset"
-        ? { kind: "asset" as const, assetId: key ?? "" }
-        : { kind: "builtin" as const, key: key ?? "grass" };
+      kind === 'asset'
+        ? { kind: 'asset' as const, assetId: key ?? '' }
+        : { kind: 'builtin' as const, key: key ?? 'grass' };
     const existingIndex = selectedVoxelChunk.palette.findIndex(
       (entry) =>
         entry.material.kind === material.kind &&
-        (entry.material.kind === "asset"
-          ? entry.material.assetId ===
-            (material.kind === "asset" ? material.assetId : "")
-          : entry.material.key ===
-            (material.kind === "builtin" ? material.key : "")),
+        (entry.material.kind === 'asset'
+          ? entry.material.assetId === (material.kind === 'asset' ? material.assetId : '')
+          : entry.material.key === (material.kind === 'builtin' ? material.key : '')),
     );
     let base = selectedVoxelChunk;
     let paletteIndex = existingIndex + 1;
@@ -789,45 +694,38 @@ export function EditorApp() {
       });
       paletteIndex = palette.length;
     }
-    const result = editVoxelChunk(base, [
-      { ...voxelCell, value: value === 0 ? 0 : paletteIndex },
-    ]);
+    const result = editVoxelChunk(base, [{ ...voxelCell, value: value === 0 ? 0 : paletteIndex }]);
     if (result.snapshot === selectedVoxelChunk) return;
     const chunkKey =
       selectedVoxelChunk.coordinate.x +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.y +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.z;
     setVoxelChunks((current) =>
       current.map((chunk) =>
-        chunk.coordinate.x +
-          "," +
-          chunk.coordinate.y +
-          "," +
-          chunk.coordinate.z ===
-        chunkKey
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
           ? result.snapshot
           : chunk,
       ),
     );
     setIsDirty(true);
     pushDiagnostic({
-      level: "info",
-      source: "Voxel editor",
-      message: value === 0 ? "Voxel cell cleared" : "Voxel cell painted",
+      level: 'info',
+      source: 'Voxel editor',
+      message: value === 0 ? 'Voxel cell cleared' : 'Voxel cell painted',
       details:
-        "Chunk " +
+        'Chunk ' +
         chunkKey +
-        ", cell (" +
+        ', cell (' +
         voxelCell.x +
-        ", " +
+        ', ' +
         voxelCell.y +
-        ", " +
+        ', ' +
         voxelCell.z +
-        "), revision " +
+        '), revision ' +
         result.snapshot.revision +
-        ".",
+        '.',
     });
   };
 
@@ -836,30 +734,25 @@ export function EditorApp() {
     const { x, y, z } = target;
     setVoxelChunkTarget({ x, y, z });
     if (![x, y, z].every(Number.isSafeInteger)) return;
-    const nextKey = x + "," + y + "," + z;
+    const nextKey = x + ',' + y + ',' + z;
     const currentKey =
       selectedVoxelChunk.coordinate.x +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.y +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.z;
     if (nextKey === currentKey) return;
     if (
       voxelChunks.some(
         (chunk) =>
-          chunk.coordinate.x +
-            "," +
-            chunk.coordinate.y +
-            "," +
-            chunk.coordinate.z ===
-          nextKey,
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === nextKey,
       )
     ) {
       pushDiagnostic({
-        level: "warning",
-        source: "Voxel editor",
-        message: "Cannot move chunk to an occupied coordinate",
-        details: "Chunk " + nextKey + " already exists.",
+        level: 'warning',
+        source: 'Voxel editor',
+        message: 'Cannot move chunk to an occupied coordinate',
+        details: 'Chunk ' + nextKey + ' already exists.',
       });
       return;
     }
@@ -872,12 +765,7 @@ export function EditorApp() {
     });
     setVoxelChunks((current) =>
       current.map((chunk) =>
-        chunk.coordinate.x +
-          "," +
-          chunk.coordinate.y +
-          "," +
-          chunk.coordinate.z ===
-        currentKey
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === currentKey
           ? snapshot
           : chunk,
       ),
@@ -885,11 +773,10 @@ export function EditorApp() {
     setSelectedVoxelChunkKey(nextKey);
     setIsDirty(true);
     pushDiagnostic({
-      level: "info",
-      source: "Voxel editor",
-      message: "Voxel chunk moved",
-      details:
-        currentKey + " → " + nextKey + ", revision " + snapshot.revision + ".",
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel chunk moved',
+      details: currentKey + ' → ' + nextKey + ', revision ' + snapshot.revision + '.',
     });
   };
 
@@ -897,41 +784,28 @@ export function EditorApp() {
     if (!selectedVoxelChunk) return;
     const chunkKey =
       selectedVoxelChunk.coordinate.x +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.y +
-      "," +
+      ',' +
       selectedVoxelChunk.coordinate.z;
     setVoxelChunks((current) =>
       current.filter(
         (chunk) =>
-          chunk.coordinate.x +
-            "," +
-            chunk.coordinate.y +
-            "," +
-            chunk.coordinate.z !==
-          chunkKey,
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z !== chunkKey,
       ),
     );
     setSelectedVoxelChunkKey(null);
     setIsDirty(true);
   };
 
-  const updateVector = (
-    key: "position" | "rotation" | "scale",
-    axis: number,
-    value: string,
-  ) => {
+  const updateVector = (key: 'position' | 'rotation' | 'scale', axis: number, value: string) => {
     const number = Number(value);
     if (!Number.isFinite(number) || !selected) return;
     commitEntities(
       entities.map((entity) => {
         if (entity.id !== selectedId) return entity;
-        if (key === "rotation") {
-          const euler = [...(entity.rotationEuler ?? [0, 0, 0])] as [
-            number,
-            number,
-            number,
-          ];
+        if (key === 'rotation') {
+          const euler = [...(entity.rotationEuler ?? [0, 0, 0])] as [number, number, number];
           euler[axis] = number;
           const half = euler.map((angle) => (angle * Math.PI) / 360);
           const [sx, sy, sz] = half.map(Math.sin);
@@ -953,8 +827,8 @@ export function EditorApp() {
 
   const nudgeSelected = (direction: -1 | 1) => {
     if (!selected && selectedVoxelChunk) {
-      if (transformMode !== "position") return;
-      const axis = (["x", "y", "z"] as const)[transformAxis]!;
+      if (transformMode !== 'position') return;
+      const axis = (['x', 'y', 'z'] as const)[transformAxis]!;
       moveSelectedVoxelChunk({
         ...selectedVoxelChunk.coordinate,
         [axis]: selectedVoxelChunk.coordinate[axis] + direction,
@@ -963,15 +837,15 @@ export function EditorApp() {
     }
     if (!selected) return;
     const current =
-      transformMode === "rotation"
+      transformMode === 'rotation'
         ? (selected.rotationEuler ?? [0, 0, 0])[transformAxis]!
         : selected[transformMode][transformAxis]!;
-    const step = transformMode === "rotation" ? 15 : 0.1;
+    const step = transformMode === 'rotation' ? 15 : 0.1;
     const next = current + direction * step;
     updateVector(
       transformMode,
       transformAxis,
-      String(transformMode === "scale" ? Math.max(0.05, next) : next),
+      String(transformMode === 'scale' ? Math.max(0.05, next) : next),
     );
   };
 
@@ -986,25 +860,15 @@ export function EditorApp() {
 
   const createWorldDocument = (): WorldDocument => {
     const worldDocument: WorldDocument = {
-      format: "universal-3d-world",
-      schemaVersion: "1.0.0",
-      engineVersion: "0.1.0",
+      format: 'universal-3d-world',
+      schemaVersion: '1.0.0',
+      engineVersion: '0.1.0',
       world: {
-        id: "world:editor-session",
+        id: 'world:editor-session',
         name: worldName,
         settings: { gravity: [0, -9.81, 0], environment: {} },
         entities: entities.map(
-          ({
-            id,
-            name,
-            primitive,
-            assetId,
-            position,
-            rotation,
-            scale,
-            material,
-            geometry,
-          }) => ({
+          ({ id, name, primitive, assetId, position, rotation, scale, material, geometry }) => ({
             id,
             name,
             parent: null,
@@ -1020,17 +884,14 @@ export function EditorApp() {
                   transparent: material.transparent,
                   wireframe: material.wireframe,
                   emissiveColor: material.emissiveColor ?? 0,
-                  alphaMode:
-                    material.alphaMode ??
-                    (material.transparent ? "BLEND" : "OPAQUE"),
+                  alphaMode: material.alphaMode ?? (material.transparent ? 'BLEND' : 'OPAQUE'),
                   alphaCutoff: material.alphaCutoff ?? 0.5,
                   doubleSided: material.doubleSided ?? false,
                   normalScale: material.normalScale ?? [1, 1],
                   occlusionStrength: material.occlusionStrength ?? 1,
                   ...(material.baseColorTexture
                     ? {
-                        baseColorTextureAssetId:
-                          material.baseColorTexture.assetId,
+                        baseColorTextureAssetId: material.baseColorTexture.assetId,
                         baseColorTextureSettings: {
                           ...(material.baseColorTexture.sampler
                             ? { sampler: material.baseColorTexture.sampler }
@@ -1043,19 +904,16 @@ export function EditorApp() {
                     : {}),
                   ...(material.metallicRoughnessTexture
                     ? {
-                        metallicRoughnessTextureAssetId:
-                          material.metallicRoughnessTexture.assetId,
+                        metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId,
                         metallicRoughnessTextureSettings: {
                           ...(material.metallicRoughnessTexture.sampler
                             ? {
-                                sampler:
-                                  material.metallicRoughnessTexture.sampler,
+                                sampler: material.metallicRoughnessTexture.sampler,
                               }
                             : {}),
                           ...(material.metallicRoughnessTexture.transform
                             ? {
-                                transform:
-                                  material.metallicRoughnessTexture.transform,
+                                transform: material.metallicRoughnessTexture.transform,
                               }
                             : {}),
                         },
@@ -1076,8 +934,7 @@ export function EditorApp() {
                     : {}),
                   ...(material.occlusionTexture
                     ? {
-                        occlusionTextureAssetId:
-                          material.occlusionTexture.assetId,
+                        occlusionTextureAssetId: material.occlusionTexture.assetId,
                         occlusionTextureSettings: {
                           ...(material.occlusionTexture.sampler
                             ? { sampler: material.occlusionTexture.sampler }
@@ -1090,8 +947,7 @@ export function EditorApp() {
                     : {}),
                   ...(material.emissiveTexture
                     ? {
-                        emissiveTextureAssetId:
-                          material.emissiveTexture.assetId,
+                        emissiveTextureAssetId: material.emissiveTexture.assetId,
                         emissiveTextureSettings: {
                           ...(material.emissiveTexture.sampler
                             ? { sampler: material.emissiveTexture.sampler }
@@ -1104,15 +960,13 @@ export function EditorApp() {
                     : {}),
                 },
                 ...(assetId ? { assetId } : {}),
-                ...(primitive === "GLB"
+                ...(primitive === 'GLB'
                   ? {
                       geometry: {
                         positions: Array.from(geometry.positions),
                         normals: Array.from(geometry.normals),
                         indices: Array.from(geometry.indices),
-                        ...(geometry.uvs
-                          ? { uvs: Array.from(geometry.uvs) }
-                          : {}),
+                        ...(geometry.uvs ? { uvs: Array.from(geometry.uvs) } : {}),
                       },
                     }
                   : {}),
@@ -1131,22 +985,21 @@ export function EditorApp() {
   const saveWorld = () => {
     if (voxelChunks.length > 0) {
       pushDiagnostic({
-        level: "warning",
-        source: "Voxel",
-        message: "Save the project folder to preserve voxel chunks",
-        details:
-          "A standalone .world file does not contain content-addressed voxel chunk blobs.",
+        level: 'warning',
+        source: 'Voxel',
+        message: 'Save the project folder to preserve voxel chunks',
+        details: 'A standalone .world file does not contain content-addressed voxel chunk blobs.',
       });
       return;
     }
     const worldDocument = createWorldDocument();
     const blob = new Blob([serializeWorld(worldDocument)], {
-      type: "application/json",
+      type: 'application/json',
     });
     const url = URL.createObjectURL(blob);
-    const anchor = window.document.createElement("a");
+    const anchor = window.document.createElement('a');
     anchor.href = url;
-    anchor.download = `${worldName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "world"}.world`;
+    anchor.download = `${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'world'}.world`;
     anchor.click();
     URL.revokeObjectURL(url);
     setIsDirty(false);
@@ -1164,34 +1017,27 @@ export function EditorApp() {
     } = {},
   ): Promise<boolean> => {
     if (!source) return false;
-    const sourceName = source instanceof File ? source.name : "main.world";
+    const sourceName = source instanceof File ? source.name : 'main.world';
     try {
-      const root =
-        source instanceof File ? parseWorld(await source.text()) : source;
+      const root = source instanceof File ? parseWorld(await source.text()) : source;
       if (root.extensions[VOXEL_WORLD_EXTENSION_KEY] && !options.voxelWorld) {
         throw new Error(
-          "This world contains external voxel chunk blobs. Open the project folder instead.",
+          'This world contains external voxel chunk blobs. Open the project folder instead.',
         );
       }
       const restoredAssetRegistry = mergeAssetRegistry(
         options.replaceAssets ? new AssetRegistry() : assetRegistryRef.current,
         root.assets,
       );
-      const restoredAssetPayloads = new Map(
-        options.replaceAssets ? [] : assetPayloadsRef.current,
-      );
+      const restoredAssetPayloads = new Map(options.replaceAssets ? [] : assetPayloadsRef.current);
       for (const payload of root.assetPayloads ?? []) {
         const assetId = payload.assetId as AssetId;
         if (!restoredAssetRegistry.has(assetId)) {
-          throw new Error(
-            `Embedded payload references an unknown asset: ${payload.assetId}`,
-          );
+          throw new Error(`Embedded payload references an unknown asset: ${payload.assetId}`);
         }
         const actualHash = await sha256(decodeBase64(payload.data));
         if (restoredAssetRegistry.require(assetId).contentHash !== actualHash) {
-          throw new Error(
-            `Embedded asset payload hash mismatch: ${payload.assetId}`,
-          );
+          throw new Error(`Embedded asset payload hash mismatch: ${payload.assetId}`);
         }
         const existingPayload = restoredAssetPayloads.get(assetId);
         if (existingPayload && existingPayload.data !== payload.data) {
@@ -1202,7 +1048,7 @@ export function EditorApp() {
         restoredAssetPayloads.set(assetId, payload);
       }
       const parsed: SceneEntity[] = root.world.entities.map((entry, index) => {
-        if (!entry || typeof entry !== "object")
+        if (!entry || typeof entry !== 'object')
           throw new Error(`Invalid entity at index ${index}`);
         const entity = entry as {
           id?: string;
@@ -1214,9 +1060,9 @@ export function EditorApp() {
               scale?: number[];
             };
             MeshRenderer?: {
-              primitive?: Primitive | "GLB";
+              primitive?: Primitive | 'GLB';
               assetId?: string;
-              material?: SceneEntity["material"] &
+              material?: SceneEntity['material'] &
                 Record<string, unknown> & {
                   readonly baseColorTextureAssetId?: string;
                 };
@@ -1233,7 +1079,7 @@ export function EditorApp() {
         const mesh = entity.components?.MeshRenderer;
         const primitive = mesh?.primitive;
         let geometry: MeshData;
-        if (primitive === "GLB") {
+        if (primitive === 'GLB') {
           const source = mesh?.geometry;
           if (
             !source ||
@@ -1241,18 +1087,12 @@ export function EditorApp() {
             !Array.isArray(source.normals) ||
             !Array.isArray(source.indices) ||
             (source.uvs !== undefined && !Array.isArray(source.uvs)) ||
-            ![
-              ...source.positions,
-              ...source.normals,
-              ...(source.uvs ?? []),
-            ].every(Number.isFinite) ||
-            !source.indices.every(
-              (index) => Number.isInteger(index) && index >= 0,
-            )
+            ![...source.positions, ...source.normals, ...(source.uvs ?? [])].every(
+              Number.isFinite,
+            ) ||
+            !source.indices.every((index) => Number.isInteger(index) && index >= 0)
           )
-            throw new Error(
-              `Entity ${entity.name} has invalid imported mesh buffers`,
-            );
+            throw new Error(`Entity ${entity.name} has invalid imported mesh buffers`);
           geometry = {
             positions: Float32Array.from(source.positions),
             normals: Float32Array.from(source.normals),
@@ -1266,23 +1106,13 @@ export function EditorApp() {
           throw new Error(`Entity ${index} has an unsupported geometry type`);
         }
         if (!entity.id || !entity.name || !transform || !mesh || !primitive)
-          throw new Error(
-            `Entity ${index} is missing supported Transform or MeshRenderer data`,
-          );
+          throw new Error(`Entity ${index} is missing supported Transform or MeshRenderer data`);
         if (mesh.assetId && !restoredAssetRegistry.has(mesh.assetId as AssetId))
-          throw new Error(
-            `Entity ${entity.name} references an unknown asset: ${mesh.assetId}`,
-          );
-        const vector = (
-          value: number[] | undefined,
-          length: number,
-          fallback: number[],
-        ) => {
+          throw new Error(`Entity ${entity.name} references an unknown asset: ${mesh.assetId}`);
+        const vector = (value: number[] | undefined, length: number, fallback: number[]) => {
           if (!value) return fallback;
           if (value.length !== length || value.some((n) => !Number.isFinite(n)))
-            throw new Error(
-              `Entity ${entity.name} has invalid transform values`,
-            );
+            throw new Error(`Entity ${entity.name} has invalid transform values`);
           return value;
         };
         const storedMaterialValue =
@@ -1291,59 +1121,35 @@ export function EditorApp() {
           storedMaterialValue,
           `$.world.entities[${index}].components.MeshRenderer.material`,
         );
-        const storedMaterial =
-          storedMaterialValue as SceneEntity["material"] & {
-            readonly baseColorTextureAssetId?: string;
-            readonly metallicRoughnessTextureAssetId?: string;
-            readonly normalTextureAssetId?: string;
-            readonly occlusionTextureAssetId?: string;
-            readonly emissiveTextureAssetId?: string;
-            readonly baseColorTextureSettings?: Pick<
-              TextureSource,
-              "sampler" | "transform"
-            >;
-            readonly metallicRoughnessTextureSettings?: Pick<
-              TextureSource,
-              "sampler" | "transform"
-            >;
-            readonly normalTextureSettings?: Pick<
-              TextureSource,
-              "sampler" | "transform"
-            >;
-            readonly occlusionTextureSettings?: Pick<
-              TextureSource,
-              "sampler" | "transform"
-            >;
-            readonly emissiveTextureSettings?: Pick<
-              TextureSource,
-              "sampler" | "transform"
-            >;
-          };
+        const storedMaterial = storedMaterialValue as SceneEntity['material'] & {
+          readonly baseColorTextureAssetId?: string;
+          readonly metallicRoughnessTextureAssetId?: string;
+          readonly normalTextureAssetId?: string;
+          readonly occlusionTextureAssetId?: string;
+          readonly emissiveTextureAssetId?: string;
+          readonly baseColorTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly metallicRoughnessTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly normalTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly occlusionTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+          readonly emissiveTextureSettings?: Pick<TextureSource, 'sampler' | 'transform'>;
+        };
         const restoreTexture = (
           assetId: string | undefined,
-          settings?: Pick<TextureSource, "sampler" | "transform">,
+          settings?: Pick<TextureSource, 'sampler' | 'transform'>,
         ) => {
           if (!assetId) return undefined;
-          const textureRecord = restoredAssetRegistry.require(
-            assetId as AssetId,
-          );
-          if (textureRecord.kind !== "texture")
-            throw new Error(
-              `Material reference is not a texture asset: ${assetId}`,
-            );
+          const textureRecord = restoredAssetRegistry.require(assetId as AssetId);
+          if (textureRecord.kind !== 'texture')
+            throw new Error(`Material reference is not a texture asset: ${assetId}`);
           const payload = restoredAssetPayloads.get(assetId as AssetId);
           if (!payload)
-            throw new Error(
-              `Material references a missing embedded texture payload: ${assetId}`,
-            );
+            throw new Error(`Material references a missing embedded texture payload: ${assetId}`);
           if (
-            payload.mimeType !== "image/png" &&
-            payload.mimeType !== "image/jpeg" &&
-            payload.mimeType !== "image/webp"
+            payload.mimeType !== 'image/png' &&
+            payload.mimeType !== 'image/jpeg' &&
+            payload.mimeType !== 'image/webp'
           )
-            throw new Error(
-              `Material references an unsupported texture payload: ${assetId}`,
-            );
+            throw new Error(`Material references an unsupported texture payload: ${assetId}`);
           return {
             assetId,
             cacheKey: textureRecord.contentHash,
@@ -1394,26 +1200,13 @@ export function EditorApp() {
           ...(mesh.assetId ? { assetId: mesh.assetId as AssetId } : {}),
           geometry,
           material,
-          position: vector(transform.position, 3, [0, 0, 0]) as [
-            number,
-            number,
-            number,
-          ],
-          rotation: vector(transform.rotation, 4, [0, 0, 0, 1]) as [
-            number,
-            number,
-            number,
-            number,
-          ],
-          scale: vector(transform.scale, 3, [1, 1, 1]) as [
-            number,
-            number,
-            number,
-          ],
+          position: vector(transform.position, 3, [0, 0, 0]) as [number, number, number],
+          rotation: vector(transform.rotation, 4, [0, 0, 0, 1]) as [number, number, number, number],
+          scale: vector(transform.scale, 3, [1, 1, 1]) as [number, number, number],
         };
       });
       if (new Set(parsed.map((item) => item.id)).size !== parsed.length)
-        throw new Error("World contains duplicate entity IDs");
+        throw new Error('World contains duplicate entity IDs');
       assetRegistryRef.current = restoredAssetRegistry;
       assetPayloadsRef.current = restoredAssetPayloads;
       commitEntities(parsed);
@@ -1421,8 +1214,8 @@ export function EditorApp() {
         for (const lease of assetResourceLeasesRef.current) lease.release();
         assetResourceLeasesRef.current = [];
       }
-      setSelectedId(parsed[0]?.id ?? "");
-      setWorldName(root.world.name || sourceName.replace(/\.world$/i, ""));
+      setSelectedId(parsed[0]?.id ?? '');
+      setWorldName(root.world.name || sourceName.replace(/\.world$/i, ''));
       setVoxelWorldSettings(
         options.voxelWorld?.settings ?? {
           voxelSize: 1,
@@ -1437,8 +1230,8 @@ export function EditorApp() {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       pushDiagnostic({
-        level: "error",
-        source: "World",
+        level: 'error',
+        source: 'World',
         message: `Could not open ${sourceName}`,
         details: message,
       });
@@ -1446,19 +1239,17 @@ export function EditorApp() {
     }
   };
 
-  const directoryPicker = () =>
-    (window as DirectoryPickerWindow).showDirectoryPicker;
+  const directoryPicker = () => (window as DirectoryPickerWindow).showDirectoryPicker;
 
   const saveProjectDirectory = async () => {
     try {
       const picker = directoryPicker();
       if (!projectDirectoryRef.current && !picker) {
         throw new Error(
-          "Directory projects are not supported in this browser. Use Save World instead.",
+          'Directory projects are not supported in this browser. Use Save World instead.',
         );
       }
-      const directory =
-        projectDirectoryRef.current ?? (await picker!({ mode: "readwrite" }));
+      const directory = projectDirectoryRef.current ?? (await picker!({ mode: 'readwrite' }));
       projectDirectoryRef.current = directory;
       await saveVoxelWorldProject(
         new BrowserProjectFileStore(directory),
@@ -1469,17 +1260,17 @@ export function EditorApp() {
       setIsDirty(false);
       setHasSaved(true);
       pushDiagnostic({
-        level: "info",
-        source: "Project",
-        message: "Project folder saved",
+        level: 'info',
+        source: 'Project',
+        message: 'Project folder saved',
         details: `Binary assets and ${voxelChunks.length} voxel chunks were hash-verified before worlds/main.world.`,
       });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       pushDiagnostic({
-        level: "error",
-        source: "Project",
-        message: "Could not save project folder",
+        level: 'error',
+        source: 'Project',
+        message: 'Could not save project folder',
         details: error instanceof Error ? error.message : String(error),
       });
     }
@@ -1490,9 +1281,9 @@ export function EditorApp() {
       const picker = directoryPicker();
       if (!picker)
         throw new Error(
-          "Directory projects are not supported in this browser. Use Open World instead.",
+          'Directory projects are not supported in this browser. Use Open World instead.',
         );
-      const directory = await picker({ mode: "readwrite" });
+      const directory = await picker({ mode: 'readwrite' });
       const store = new BrowserProjectFileStore(directory);
       const document = await loadDirectoryProject(store);
       const voxelWorld = document.extensions[VOXEL_WORLD_EXTENSION_KEY]
@@ -1514,17 +1305,17 @@ export function EditorApp() {
         return;
       projectDirectoryRef.current = directory;
       pushDiagnostic({
-        level: "info",
-        source: "Project",
-        message: "Project folder opened",
+        level: 'info',
+        source: 'Project',
+        message: 'Project folder opened',
         details: `External assets and ${voxelWorld?.chunks.length ?? 0} voxel chunks were hash-verified before the scene was committed.`,
       });
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       pushDiagnostic({
-        level: "error",
-        source: "Project",
-        message: "Could not open project folder",
+        level: 'error',
+        source: 'Project',
+        message: 'Could not open project folder',
         details: error instanceof Error ? error.message : String(error),
       });
     }
@@ -1535,12 +1326,11 @@ export function EditorApp() {
     const controller = new AbortController();
     activeGlbImportControllersRef.current.add(controller);
     const ensureImportActive = () => {
-      if (controller.signal.aborted)
-        throw new Error("GLB import was cancelled");
+      if (controller.signal.aborted) throw new Error('GLB import was cancelled');
     };
     let pendingLease: AssetResourceLease<ImportedAsset<GlbAsset>> | null = null;
     try {
-      const three = await import("three");
+      const three = await import('three');
       ensureImportActive();
       const { Matrix4, Quaternion, Vector3 } = three;
       const importer = new WorkerGlbImporter();
@@ -1550,8 +1340,7 @@ export function EditorApp() {
       }
       let sourceBytes = await file.arrayBuffer();
       ensureImportActive();
-      const safeFileName =
-        file.name.replace(/[\\/]/g, "_").replace(/^\.+/, "") || "import.glb";
+      const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'import.glb';
       const uri = `imports/${safeFileName}`;
       const contentHash = await sha256(sourceBytes);
       ensureImportActive();
@@ -1575,14 +1364,13 @@ export function EditorApp() {
       const parentOf = new Map<number, number>();
       asset.nodes.forEach((node, parent) =>
         node.children.forEach((child) => {
-          if (parentOf.has(child))
-            throw new Error(`GLB node ${child} has more than one parent`);
+          if (parentOf.has(child)) throw new Error(`GLB node ${child} has more than one parent`);
           parentOf.set(child, parent);
         }),
       );
       const sources: {
         name: string;
-        primitive: (typeof asset.meshes)[number]["primitives"][number];
+        primitive: (typeof asset.meshes)[number]['primitives'][number];
         position: readonly [number, number, number];
         rotation: readonly [number, number, number, number];
         scale: readonly [number, number, number];
@@ -1592,9 +1380,7 @@ export function EditorApp() {
       const active = new Set<number>();
       const visitNode = (nodeIndex: number, parentWorld: Matrix4Type) => {
         if (active.has(nodeIndex))
-          throw new Error(
-            `GLB node hierarchy contains a cycle at node ${nodeIndex}`,
-          );
+          throw new Error(`GLB node hierarchy contains a cycle at node ${nodeIndex}`);
         if (visited.has(nodeIndex))
           throw new Error(`GLB node ${nodeIndex} is referenced more than once`);
         const node = asset.nodes[nodeIndex];
@@ -1614,8 +1400,7 @@ export function EditorApp() {
         const reconstructed = new Matrix4().compose(position, rotation, scale);
         if (
           world.elements.some(
-            (value, index) =>
-              Math.abs(value - reconstructed.elements[index]!) > 1e-4,
+            (value, index) => Math.abs(value - reconstructed.elements[index]!) > 1e-4,
           )
         ) {
           throw new Error(
@@ -1624,10 +1409,7 @@ export function EditorApp() {
         }
         if (node.mesh !== null) {
           const mesh = asset.meshes[node.mesh];
-          if (!mesh)
-            throw new Error(
-              `GLB node ${nodeIndex} references missing mesh ${node.mesh}`,
-            );
+          if (!mesh) throw new Error(`GLB node ${nodeIndex} references missing mesh ${node.mesh}`);
           mesh.primitives.forEach((primitive, primitiveIndex) =>
             sources.push({
               name: node.name || mesh.name,
@@ -1647,9 +1429,7 @@ export function EditorApp() {
         .filter((index) => !parentOf.has(index));
       rootNodes.forEach((root) => visitNode(root, new Matrix4()));
       if (visited.size !== asset.nodes.length)
-        throw new Error(
-          "GLB node hierarchy contains a cycle or nodes without a root",
-        );
+        throw new Error('GLB node hierarchy contains a cycle or nodes without a root');
       if (!asset.nodes.length) {
         asset.meshes.forEach((mesh, meshIndex) =>
           mesh.primitives.forEach((primitive, primitiveIndex) =>
@@ -1664,63 +1444,49 @@ export function EditorApp() {
           ),
         );
       }
-      if (!sources.length)
-        throw new Error("The GLB contains no renderable triangle meshes");
-      const importedEntitiesWithoutAsset: SceneEntity[] = sources.map(
-        (source, index) => {
-          const pbr =
-            source.primitive.material === null
-              ? undefined
-              : asset.materials[source.primitive.material];
-          const factor = pbr?.baseColorFactor ?? [0.72, 0.76, 0.82, 1];
-          const toSrgb = (value: number) => {
-            const linear = Math.min(1, Math.max(0, value));
-            return linear <= 0.0031308
-              ? linear * 12.92
-              : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
-          };
-          const color = factor
-            .slice(0, 3)
-            .reduce(
-              (hex, value) => (hex << 8) | Math.round(toSrgb(value!) * 255),
-              0,
-            );
-          const alpha = Math.min(1, Math.max(0, factor[3] ?? 1));
-          const emissiveColor = (pbr?.emissiveFactor ?? [0, 0, 0]).reduce(
-            (hex, value) => (hex << 8) | Math.round(toSrgb(value) * 255),
-            0,
-          );
-          return {
-            id: `glb-${Date.now()}-${index}-${source.key}`,
-            name:
-              sources.length === 1
-                ? source.name
-                : `${source.name} · ${index + 1}`,
-            primitive: "GLB",
-            geometry: source.primitive.mesh,
-            material: {
-              color,
-              roughness: pbr?.roughnessFactor ?? 1,
-              metalness: pbr?.metallicFactor ?? 1,
-              opacity:
-                pbr?.alphaMode === "BLEND" || pbr?.alphaMode === "MASK"
-                  ? alpha
-                  : 1,
-              transparent: pbr?.alphaMode === "BLEND",
-              wireframe: false,
-              emissiveColor,
-              alphaMode: pbr?.alphaMode ?? "OPAQUE",
-              alphaCutoff: pbr?.alphaCutoff ?? 0.5,
-              doubleSided: pbr?.doubleSided ?? false,
-              normalScale: [pbr?.normalScale ?? 1, pbr?.normalScale ?? 1],
-              occlusionStrength: pbr?.occlusionStrength ?? 1,
-            },
-            position: source.position,
-            rotation: source.rotation,
-            scale: source.scale,
-          };
-        },
-      );
+      if (!sources.length) throw new Error('The GLB contains no renderable triangle meshes');
+      const importedEntitiesWithoutAsset: SceneEntity[] = sources.map((source, index) => {
+        const pbr =
+          source.primitive.material === null
+            ? undefined
+            : asset.materials[source.primitive.material];
+        const factor = pbr?.baseColorFactor ?? [0.72, 0.76, 0.82, 1];
+        const toSrgb = (value: number) => {
+          const linear = Math.min(1, Math.max(0, value));
+          return linear <= 0.0031308 ? linear * 12.92 : 1.055 * Math.pow(linear, 1 / 2.4) - 0.055;
+        };
+        const color = factor
+          .slice(0, 3)
+          .reduce((hex, value) => (hex << 8) | Math.round(toSrgb(value!) * 255), 0);
+        const alpha = Math.min(1, Math.max(0, factor[3] ?? 1));
+        const emissiveColor = (pbr?.emissiveFactor ?? [0, 0, 0]).reduce(
+          (hex, value) => (hex << 8) | Math.round(toSrgb(value) * 255),
+          0,
+        );
+        return {
+          id: `glb-${Date.now()}-${index}-${source.key}`,
+          name: sources.length === 1 ? source.name : `${source.name} · ${index + 1}`,
+          primitive: 'GLB',
+          geometry: source.primitive.mesh,
+          material: {
+            color,
+            roughness: pbr?.roughnessFactor ?? 1,
+            metalness: pbr?.metallicFactor ?? 1,
+            opacity: pbr?.alphaMode === 'BLEND' || pbr?.alphaMode === 'MASK' ? alpha : 1,
+            transparent: pbr?.alphaMode === 'BLEND',
+            wireframe: false,
+            emissiveColor,
+            alphaMode: pbr?.alphaMode ?? 'OPAQUE',
+            alphaCutoff: pbr?.alphaCutoff ?? 0.5,
+            doubleSided: pbr?.doubleSided ?? false,
+            normalScale: [pbr?.normalScale ?? 1, pbr?.normalScale ?? 1],
+            occlusionStrength: pbr?.occlusionStrength ?? 1,
+          },
+          position: source.position,
+          rotation: source.rotation,
+          scale: source.scale,
+        };
+      });
       // Stage embedded texture assets and the model record in a project-scoped copy.
       // This keeps registry/payload state unchanged if any image hash or registration fails.
       const stagedRegistry = mergeAssetRegistry(assetRegistryRef.current, []);
@@ -1732,24 +1498,20 @@ export function EditorApp() {
         const imageHash = await sha256(imageBuffer);
         ensureImportActive();
         const extension =
-          image.mimeType === "image/png"
-            ? "png"
-            : image.mimeType === "image/webp"
-              ? "webp"
-              : "jpg";
+          image.mimeType === 'image/png' ? 'png' : image.mimeType === 'image/webp' ? 'webp' : 'jpg';
         const textureRecord = stagedRegistry.register({
           name: image.name,
-          kind: "texture",
+          kind: 'texture',
           uri: `${uri}.image-${imageIndex}.${extension}`,
           contentHash: imageHash,
           importer: {
-            id: "engine.gltf.embedded-image",
+            id: 'engine.gltf.embedded-image',
             version: importer.version,
             settings: {},
           },
           dependencies: [],
           metadata: {
-            sourceFormat: "glb",
+            sourceFormat: 'glb',
             imageIndex,
             mimeType: image.mimeType,
           },
@@ -1758,7 +1520,7 @@ export function EditorApp() {
         stagedPayloads.set(textureRecord.id, {
           assetId: textureRecord.id,
           mimeType: image.mimeType,
-          encoding: "base64",
+          encoding: 'base64',
           data: encodeBase64(imageBuffer),
         });
       }
@@ -1768,20 +1530,12 @@ export function EditorApp() {
         uri,
         contentHash,
         importer: { id: importer.id, version: importer.version, settings: {} },
-        dependencies: [
-          ...(imported.dependencies as AssetId[]),
-          ...textureRecords,
-        ],
+        dependencies: [...(imported.dependencies as AssetId[]), ...textureRecords],
         metadata: { ...imported.metadata, fileSize: file.size },
       });
       const resolveTextureSource = (
         textureIndex: number | undefined,
-        channel:
-          | "baseColor"
-          | "metallicRoughness"
-          | "normal"
-          | "occlusion"
-          | "emissive",
+        channel: 'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive',
         transform?: {
           offset: readonly [number, number];
           rotation: number;
@@ -1791,76 +1545,68 @@ export function EditorApp() {
         if (textureIndex === undefined) return undefined;
         const texture = asset.textures[textureIndex];
         if (!texture || texture.source === null)
-          throw new Error(
-            `GLB material references an unavailable texture: ${textureIndex}`,
-          );
+          throw new Error(`GLB material references an unavailable texture: ${textureIndex}`);
         const image = asset.images[texture.source];
         const textureAssetId = textureRecords[texture.source];
         if (!image || !textureAssetId)
-          throw new Error(
-            `GLB material references an unavailable image: ${textureIndex}`,
-          );
+          throw new Error(`GLB material references an unavailable image: ${textureIndex}`);
         return {
           assetId: textureAssetId,
           cacheKey: stagedRegistry.require(textureAssetId).contentHash,
           mimeType: image.mimeType,
           data: image.data,
-          ...(texture.sampler === null
-            ? {}
-            : { sampler: asset.samplers[texture.sampler]! }),
+          ...(texture.sampler === null ? {} : { sampler: asset.samplers[texture.sampler]! }),
           ...(transform ? { transform } : {}),
         } as const;
       };
-      const importedEntities = importedEntitiesWithoutAsset.map(
-        (entity, entityIndex) => {
-          const source = sources[entityIndex]!;
-          const pbr =
-            source.primitive.material === null
-              ? undefined
-              : asset.materials[source.primitive.material];
-          const baseColorTexture = resolveTextureSource(
-            pbr?.baseColorTexture,
-            "baseColor",
-            pbr?.textureTransforms?.baseColor,
-          );
-          const metallicRoughnessTexture = resolveTextureSource(
-            pbr?.metallicRoughnessTexture,
-            "metallicRoughness",
-            pbr?.textureTransforms?.metallicRoughness,
-          );
-          const normalTexture = resolveTextureSource(
-            pbr?.normalTexture,
-            "normal",
-            pbr?.textureTransforms?.normal,
-          );
-          const occlusionTexture = resolveTextureSource(
-            pbr?.occlusionTexture,
-            "occlusion",
-            pbr?.textureTransforms?.occlusion,
-          );
-          const emissiveTexture = resolveTextureSource(
-            pbr?.emissiveTexture,
-            "emissive",
-            pbr?.textureTransforms?.emissive,
-          );
-          return {
-            ...entity,
-            assetId: assetRecord.id,
-            material: {
-              ...entity.material,
-              ...(baseColorTexture ? { baseColorTexture } : {}),
-              ...(metallicRoughnessTexture ? { metallicRoughnessTexture } : {}),
-              ...(normalTexture ? { normalTexture } : {}),
-              ...(occlusionTexture ? { occlusionTexture } : {}),
-              ...(emissiveTexture ? { emissiveTexture } : {}),
-            },
-          };
-        },
-      );
+      const importedEntities = importedEntitiesWithoutAsset.map((entity, entityIndex) => {
+        const source = sources[entityIndex]!;
+        const pbr =
+          source.primitive.material === null
+            ? undefined
+            : asset.materials[source.primitive.material];
+        const baseColorTexture = resolveTextureSource(
+          pbr?.baseColorTexture,
+          'baseColor',
+          pbr?.textureTransforms?.baseColor,
+        );
+        const metallicRoughnessTexture = resolveTextureSource(
+          pbr?.metallicRoughnessTexture,
+          'metallicRoughness',
+          pbr?.textureTransforms?.metallicRoughness,
+        );
+        const normalTexture = resolveTextureSource(
+          pbr?.normalTexture,
+          'normal',
+          pbr?.textureTransforms?.normal,
+        );
+        const occlusionTexture = resolveTextureSource(
+          pbr?.occlusionTexture,
+          'occlusion',
+          pbr?.textureTransforms?.occlusion,
+        );
+        const emissiveTexture = resolveTextureSource(
+          pbr?.emissiveTexture,
+          'emissive',
+          pbr?.textureTransforms?.emissive,
+        );
+        return {
+          ...entity,
+          assetId: assetRecord.id,
+          material: {
+            ...entity.material,
+            ...(baseColorTexture ? { baseColorTexture } : {}),
+            ...(metallicRoughnessTexture ? { metallicRoughnessTexture } : {}),
+            ...(normalTexture ? { normalTexture } : {}),
+            ...(occlusionTexture ? { occlusionTexture } : {}),
+            ...(emissiveTexture ? { emissiveTexture } : {}),
+          },
+        };
+      });
       stagedPayloads.set(assetRecord.id, {
         assetId: assetRecord.id,
-        mimeType: "model/gltf-binary",
-        encoding: "base64",
+        mimeType: 'model/gltf-binary',
+        encoding: 'base64',
         data: encodeBase64(sourceBytes),
       });
       ensureImportActive();
@@ -1871,8 +1617,8 @@ export function EditorApp() {
       commitEntities([...entitiesRef.current, ...importedEntities]);
       setSelectedId(importedEntities[0]!.id);
       pushDiagnostic({
-        level: "info",
-        source: "GLB Importer",
+        level: 'info',
+        source: 'GLB Importer',
         message: `Imported ${file.name}`,
         details: `${importedEntities.length} scene object(s) created`,
       });
@@ -1881,9 +1627,9 @@ export function EditorApp() {
       if (!controller.signal.aborted) {
         const message = error instanceof Error ? error.message : String(error);
         pushDiagnostic({
-          level: "error",
-          source: "GLB Importer",
-          message: "Importer engine.gltf.glb failed",
+          level: 'error',
+          source: 'GLB Importer',
+          message: 'Importer engine.gltf.glb failed',
           details: `${file.name}\n${message}`,
         });
       }
@@ -1898,11 +1644,11 @@ export function EditorApp() {
     if (!selected) return;
     const next = entities.filter((entity) => entity.id !== selectedId);
     commitEntities(next);
-    setSelectedId(next[0]?.id ?? "");
+    setSelectedId(next[0]?.id ?? '');
   };
 
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (event.button !== 0 && event.pointerType !== "touch") return;
+    if (event.button !== 0 && event.pointerType !== 'touch') return;
     const pointers = activePointersRef.current;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -1910,10 +1656,7 @@ export function EditorApp() {
       multiTouchRef.current = true;
       dragRef.current = null;
       const [first, second] = [...pointers.values()];
-      pinchDistanceRef.current = Math.hypot(
-        first!.x - second!.x,
-        first!.y - second!.y,
-      );
+      pinchDistanceRef.current = Math.hypot(first!.x - second!.x, first!.y - second!.y);
       return;
     }
     dragRef.current = {
@@ -1962,8 +1705,7 @@ export function EditorApp() {
       const [x, y, z] = current.position;
       const radius = Math.max(1.5, Math.hypot(x, y, z));
       const theta = Math.atan2(x, z) - dx * 0.008;
-      let phi =
-        Math.acos(Math.min(0.98, Math.max(-0.98, y / radius))) - dy * 0.008;
+      let phi = Math.acos(Math.min(0.98, Math.max(-0.98, y / radius))) - dy * 0.008;
       phi = Math.min(Math.PI - 0.08, Math.max(0.08, phi));
       const position: Vec3 = [
         radius * Math.sin(phi) * Math.sin(theta),
@@ -1998,45 +1740,42 @@ export function EditorApp() {
       <header className="topbar">
         <div className="brand-mark">◇</div>
         <strong>CHOREON</strong>
-        <details className="file-menu" style={{ position: "relative" }}>
-          <summary
-            className="toolbar-button"
-            style={{ cursor: "pointer", listStyle: "none" }}
-          >
+        <details className="file-menu" style={{ position: 'relative' }}>
+          <summary className="toolbar-button" style={{ cursor: 'pointer', listStyle: 'none' }}>
             File ▾
           </summary>
           <div
             className="file-menu-content"
             style={{
-              position: "absolute",
-              top: "calc(100% + 6px)",
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
               left: 0,
               zIndex: 20,
               minWidth: 180,
               padding: 6,
-              border: "1px solid var(--panel-border, #354052)",
+              border: '1px solid var(--panel-border, #354052)',
               borderRadius: 8,
-              background: "var(--panel-bg, #202936)",
-              boxShadow: "0 8px 24px rgba(0,0,0,.3)",
+              background: 'var(--panel-bg, #202936)',
+              boxShadow: '0 8px 24px rgba(0,0,0,.3)',
             }}
           >
             <button
               className="toolbar-button"
-              style={{ display: "block", width: "100%", textAlign: "left" }}
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
               onClick={() => glbInputRef.current?.click()}
             >
               Import GLB…
             </button>
             <button
               className="toolbar-button"
-              style={{ display: "block", width: "100%", textAlign: "left" }}
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
               onClick={() => fileInputRef.current?.click()}
             >
               Open World…
             </button>
             <button
               className="toolbar-button"
-              style={{ display: "block", width: "100%", textAlign: "left" }}
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
               onClick={saveWorld}
             >
               Save World…
@@ -2045,14 +1784,14 @@ export function EditorApp() {
               <>
                 <button
                   className="toolbar-button"
-                  style={{ display: "block", width: "100%", textAlign: "left" }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left' }}
                   onClick={() => void openProjectDirectory()}
                 >
                   Open Project Folder…
                 </button>
                 <button
                   className="toolbar-button"
-                  style={{ display: "block", width: "100%", textAlign: "left" }}
+                  style={{ display: 'block', width: '100%', textAlign: 'left' }}
                   onClick={() => void saveProjectDirectory()}
                 >
                   Save Project Folder…
@@ -2093,7 +1832,7 @@ export function EditorApp() {
           accept=".glb,model/gltf-binary"
           onChange={(event) => {
             void importGlb(event.target.files?.[0]);
-            event.currentTarget.value = "";
+            event.currentTarget.value = '';
           }}
         />
         <input
@@ -2103,7 +1842,7 @@ export function EditorApp() {
           accept=".world,application/json"
           onChange={(event) => {
             void loadWorld(event.target.files?.[0]);
-            event.currentTarget.value = "";
+            event.currentTarget.value = '';
           }}
         />
         <button
@@ -2111,25 +1850,25 @@ export function EditorApp() {
           onClick={() => setIsDiagnosticsOpen((open) => !open)}
           aria-expanded={isDiagnosticsOpen}
         >
-          Console{" "}
-          {diagnostics.filter((entry) => entry.level === "error").length
-            ? `· ${diagnostics.filter((entry) => entry.level === "error").length}`
-            : ""}
+          Console{' '}
+          {diagnostics.filter((entry) => entry.level === 'error').length
+            ? `· ${diagnostics.filter((entry) => entry.level === 'error').length}`
+            : ''}
         </button>
         <span className="spacer" />
         <span className="status">
           <i className={`renderer-dot renderer-${rendererStatus}`} />
-          {rendererStatus === "ready"
-            ? "RENDERER ONLINE"
-            : rendererStatus === "error"
-              ? "RENDERER ERROR"
-              : "RENDERER LOADING"}
+          {rendererStatus === 'ready'
+            ? 'RENDERER ONLINE'
+            : rendererStatus === 'error'
+              ? 'RENDERER ERROR'
+              : 'RENDERER LOADING'}
         </span>
       </header>
       <div className="workspace">
         <aside className="panel hierarchy">
           <div className="panel-heading">
-            HIERARCHY{" "}
+            HIERARCHY{' '}
             <button
               aria-label="Add object"
               aria-expanded={isAddMenuOpen}
@@ -2140,25 +1879,19 @@ export function EditorApp() {
             </button>
           </div>
           {isAddMenuOpen ? (
-            <div
-              className="hierarchy-add-menu"
-              id="hierarchy-add-menu"
-              aria-label="Add object"
-            >
-              {(["Box", "Sphere", "Plane", "Cylinder"] as const).map(
-                (primitive) => (
-                  <button
-                    key={primitive}
-                    onClick={() => {
-                      addEntity(primitive);
-                      setIsAddMenuOpen(false);
-                    }}
-                  >
-                    <span>{primitive}</span>
-                    <small>3D primitive</small>
-                  </button>
-                ),
-              )}
+            <div className="hierarchy-add-menu" id="hierarchy-add-menu" aria-label="Add object">
+              {(['Box', 'Sphere', 'Plane', 'Cylinder'] as const).map((primitive) => (
+                <button
+                  key={primitive}
+                  onClick={() => {
+                    addEntity(primitive);
+                    setIsAddMenuOpen(false);
+                  }}
+                >
+                  <span>{primitive}</span>
+                  <small>3D primitive</small>
+                </button>
+              ))}
               <button onClick={addVoxelChunk}>
                 <span>Voxel chunk</span>
                 <small>16×16 grass surface</small>
@@ -2166,12 +1899,12 @@ export function EditorApp() {
             </div>
           ) : null}
           <div className="tree-row active">
-            ▣ <span>{worldName || "Untitled World"}</span>
+            ▣ <span>{worldName || 'Untitled World'}</span>
           </div>
           {entities.map((entity) => (
             <button
               key={entity.id}
-              className={`tree-row entity-row ${entity.id === selectedId ? "selected" : ""}`}
+              className={`tree-row entity-row ${entity.id === selectedId ? 'selected' : ''}`}
               onClick={() => {
                 setSelectedVoxelChunkKey(null);
                 setSelectedId(entity.id);
@@ -2181,22 +1914,16 @@ export function EditorApp() {
             </button>
           ))}
           {voxelChunks.map((chunk) => {
-            const key =
-              chunk.coordinate.x +
-              "," +
-              chunk.coordinate.y +
-              "," +
-              chunk.coordinate.z;
+            const key = chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z;
             return (
               <button
                 key={key}
                 className={
-                  "tree-row entity-row " +
-                  (key === selectedVoxelChunkKey ? "selected" : "")
+                  'tree-row entity-row ' + (key === selectedVoxelChunkKey ? 'selected' : '')
                 }
                 onClick={() => {
                   setSelectedVoxelChunkKey(key);
-                  setSelectedId("");
+                  setSelectedId('');
                 }}
               >
                 ▦ <span>Voxel chunk ({key})</span>
@@ -2210,79 +1937,60 @@ export function EditorApp() {
         </aside>
         <section className="viewport">
           <div className="viewport-label">
-            SCENE VIEW{" "}
-            <span>
-              {rendererStatus === "ready"
-                ? "WEBGL2"
-                : rendererStatus.toUpperCase()}
-            </span>
+            SCENE VIEW{' '}
+            <span>{rendererStatus === 'ready' ? 'WEBGL2' : rendererStatus.toUpperCase()}</span>
             <button onClick={resetCamera}>Reset Camera</button>
           </div>
           <div
-            className={`transform-pad ${isTransformPadCollapsed ? "is-collapsed" : ""}`}
+            className={`transform-pad ${isTransformPadCollapsed ? 'is-collapsed' : ''}`}
             aria-label="Transform controls"
           >
             <button
               className="transform-collapse-toggle"
               aria-label={
-                isTransformPadCollapsed
-                  ? "Expand transform panel"
-                  : "Collapse transform panel"
+                isTransformPadCollapsed ? 'Expand transform panel' : 'Collapse transform panel'
               }
               aria-expanded={!isTransformPadCollapsed}
-              onClick={() =>
-                setIsTransformPadCollapsed((collapsed) => !collapsed)
-              }
+              onClick={() => setIsTransformPadCollapsed((collapsed) => !collapsed)}
             >
-              {isTransformPadCollapsed ? "›" : "‹"}
+              {isTransformPadCollapsed ? '›' : '‹'}
             </button>
             {!isTransformPadCollapsed ? (
               <>
-                <div
-                  className="transform-modes"
-                  role="group"
-                  aria-label="Transform mode"
-                >
+                <div className="transform-modes" role="group" aria-label="Transform mode">
                   {(
                     [
-                      ["position", "Move"],
-                      ["rotation", "Rotate"],
-                      ["scale", "Scale"],
+                      ['position', 'Move'],
+                      ['rotation', 'Rotate'],
+                      ['scale', 'Scale'],
                     ] as const
                   ).map(([mode, label]) => (
                     <button
                       key={mode}
                       aria-label={`${label} mode`}
                       aria-pressed={transformMode === mode}
-                      className={transformMode === mode ? "active" : ""}
-                      disabled={
-                        !selected &&
-                        (!selectedVoxelChunk || mode !== "position")
-                      }
+                      className={transformMode === mode ? 'active' : ''}
+                      disabled={!selected && (!selectedVoxelChunk || mode !== 'position')}
                       onClick={() => setTransformMode(mode)}
                     >
                       {label}
                     </button>
                   ))}
                 </div>
-                <div
-                  className="transform-adjust"
-                  role="group"
-                  aria-label="Transform axis controls"
-                >
+                <div className="transform-adjust" role="group" aria-label="Transform axis controls">
                   <span className="transform-axis-label">
-                    {transformMode === "position"
-                      ? "MOVE"
-                      : transformMode === "rotation"
-                        ? "ROT"
-                        : "SCALE"}
+                    {transformMode === 'position'
+                      ? 'MOVE'
+                      : transformMode === 'rotation'
+                        ? 'ROT'
+                        : 'SCALE'}
                   </span>
-                  {(["X", "Y", "Z"] as const).map((axis, index) => (
+                  {(['X', 'Y', 'Z'] as const).map((axis, index) => (
                     <button
                       key={axis}
                       aria-label={`${axis} axis`}
                       aria-pressed={transformAxis === index}
-                      className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? "active" : ""}`}
+                      className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
                       disabled={!selected && !selectedVoxelChunk}
                       onClick={() => setTransformAxis(index)}
                     >
@@ -2291,14 +1999,14 @@ export function EditorApp() {
                   ))}
                   <span className="transform-pad-spacer" />
                   <button
-                    aria-label={`Decrease ${"XYZ"[transformAxis]}`}
+                    aria-label={`Decrease ${'XYZ'[transformAxis]}`}
                     disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(-1)}
                   >
                     −
                   </button>
                   <button
-                    aria-label={`Increase ${"XYZ"[transformAxis]}`}
+                    aria-label={`Increase ${'XYZ'[transformAxis]}`}
                     disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(1)}
                   >
@@ -2320,14 +2028,9 @@ export function EditorApp() {
               const drag = dragRef.current;
               dragRef.current = null;
               pinchDistanceRef.current = null;
-              if (activePointersRef.current.size === 0)
-                multiTouchRef.current = false;
-              if (wasMultiTouch || !drag || drag.pointerId !== event.pointerId)
-                return;
-              const moved = Math.hypot(
-                event.clientX - drag.startX,
-                event.clientY - drag.startY,
-              );
+              if (activePointersRef.current.size === 0) multiTouchRef.current = false;
+              if (wasMultiTouch || !drag || drag.pointerId !== event.pointerId) return;
+              const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
               if (moved > 4) return;
               const canvas = event.currentTarget;
               const bounds = canvas.getBoundingClientRect();
@@ -2346,24 +2049,17 @@ export function EditorApp() {
               activePointersRef.current.delete(event.pointerId);
               dragRef.current = null;
               pinchDistanceRef.current = null;
-              if (activePointersRef.current.size === 0)
-                multiTouchRef.current = false;
+              if (activePointersRef.current.size === 0) multiTouchRef.current = false;
             }}
             onWheel={onWheel}
           />
-          <output
-            ref={fpsRef}
-            className="viewport-fps"
-            aria-label="Frames per second"
-          >
+          <output ref={fpsRef} className="viewport-fps" aria-label="Frames per second">
             FPS --
           </output>
           {entities.length === 0 && voxelChunks.length === 0 ? (
             <div className="viewport-empty-state">
               <strong>Empty scene</strong>
-              <span>
-                Use + in Hierarchy to add a primitive, or File → Import GLB.
-              </span>
+              <span>Use + in Hierarchy to add a primitive, or File → Import GLB.</span>
             </div>
           ) : null}
           <div className="axis">
@@ -2371,14 +2067,12 @@ export function EditorApp() {
           </div>
           <div className="viewport-help">
             Drag · Orbit <span>Pinch / Scroll · Zoom</span>
-            {rendererError ? (
-              <span className="error-text">{rendererError}</span>
-            ) : null}
+            {rendererError ? <span className="error-text">{rendererError}</span> : null}
           </div>
         </section>
         <aside className="panel inspector">
           <div className="panel-heading">
-            INSPECTOR{" "}
+            INSPECTOR{' '}
             <button
               aria-label="Delete selected object"
               disabled={!selected}
@@ -2388,32 +2082,28 @@ export function EditorApp() {
             </button>
           </div>
           {selectedVoxelChunk ? (
-            <section
-              className="voxel-inspector"
-              aria-label="Voxel chunk editor"
-            >
+            <section className="voxel-inspector" aria-label="Voxel chunk editor">
               <div className="inspector-title">
                 ▦ <strong>Voxel chunk</strong>
               </div>
               <div className="object-source">
                 <span>
-                  Chunk ({selectedVoxelChunk.coordinate.x},{" "}
-                  {selectedVoxelChunk.coordinate.y},{" "}
+                  Chunk ({selectedVoxelChunk.coordinate.x}, {selectedVoxelChunk.coordinate.y},{' '}
                   {selectedVoxelChunk.coordinate.z})
                 </span>
                 <small>
-                  Revision {selectedVoxelChunk.revision} ·{" "}
-                  {selectedVoxelChunk.palette.length} materials
+                  Revision {selectedVoxelChunk.revision} · {selectedVoxelChunk.palette.length}{' '}
+                  materials
                 </small>
               </div>
               <label>CELL COORDINATES</label>
               <div className="vector-field">
                 <span>XYZ</span>
                 <div>
-                  {(["x", "y", "z"] as const).map((axis) => (
+                  {(['x', 'y', 'z'] as const).map((axis) => (
                     <TransformNumberInput
                       key={axis}
-                      label={"Voxel cell " + axis.toUpperCase()}
+                      label={'Voxel cell ' + axis.toUpperCase()}
                       value={voxelCell[axis]}
                       onCommit={(nextValue) => {
                         const next = Number(nextValue);
@@ -2432,10 +2122,10 @@ export function EditorApp() {
               <div className="vector-field">
                 <span>XYZ</span>
                 <div>
-                  {(["x", "y", "z"] as const).map((axis) => (
+                  {(['x', 'y', 'z'] as const).map((axis) => (
                     <TransformNumberInput
                       key={axis}
-                      label={"Chunk " + axis.toUpperCase()}
+                      label={'Chunk ' + axis.toUpperCase()}
                       value={voxelChunkTarget[axis]}
                       onCommit={(nextValue) => {
                         const next = Number(nextValue);
@@ -2475,8 +2165,7 @@ export function EditorApp() {
                   onClick={() => updateVoxelCell(1)}
                   disabled={
                     ![voxelCell.x, voxelCell.y, voxelCell.z].every(
-                      (value) =>
-                        Number.isInteger(value) && value >= 0 && value < 16,
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
                     )
                   }
                 >
@@ -2486,8 +2175,7 @@ export function EditorApp() {
                   onClick={() => updateVoxelCell(0)}
                   disabled={
                     ![voxelCell.x, voxelCell.y, voxelCell.z].every(
-                      (value) =>
-                        Number.isInteger(value) && value >= 0 && value < 16,
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
                     )
                   }
                 >
@@ -2498,36 +2186,32 @@ export function EditorApp() {
               <ul className="voxel-palette">
                 {selectedVoxelChunk.palette.map((entry, index) => {
                   const materialName =
-                    entry.material.kind === "builtin"
-                      ? entry.material.key
-                      : entry.material.assetId;
+                    entry.material.kind === 'builtin' ? entry.material.key : entry.material.assetId;
                   const usage = voxelPaletteUsage[index] ?? 0;
                   return (
                     <li
-                      key={entry.material.kind + ":" + materialName}
+                      key={entry.material.kind + ':' + materialName}
                       className="voxel-palette-entry"
                     >
                       <span>{index + 1}</span>
                       <strong>{materialName}</strong>
                       <small>{usage} cells</small>
                       <button
-                        aria-label={"Move " + materialName + " up"}
+                        aria-label={'Move ' + materialName + ' up'}
                         disabled={index === 0}
                         onClick={() => moveVoxelPaletteEntry(index, index - 1)}
                       >
                         ↑
                       </button>
                       <button
-                        aria-label={"Move " + materialName + " down"}
-                        disabled={
-                          index === selectedVoxelChunk.palette.length - 1
-                        }
+                        aria-label={'Move ' + materialName + ' down'}
+                        disabled={index === selectedVoxelChunk.palette.length - 1}
                         onClick={() => moveVoxelPaletteEntry(index, index + 1)}
                       >
                         ↓
                       </button>
                       <button
-                        aria-label={"Remove " + materialName}
+                        aria-label={'Remove ' + materialName}
                         disabled={usage > 0}
                         onClick={() => removeVoxelPaletteEntry(index)}
                       >
@@ -2537,17 +2221,14 @@ export function EditorApp() {
                   );
                 })}
               </ul>
-              <button
-                className="voxel-delete"
-                onClick={removeSelectedVoxelChunk}
-              >
+              <button className="voxel-delete" onClick={removeSelectedVoxelChunk}>
                 Delete voxel chunk
               </button>
             </section>
           ) : selected ? (
             <>
               <div className="inspector-title">
-                ◈{" "}
+                ◈{' '}
                 <input
                   aria-label="Object name"
                   value={selected.name}
@@ -2555,21 +2236,19 @@ export function EditorApp() {
                 />
               </div>
               <label>TRANSFORM</label>
-              {(["position", "rotation", "scale"] as const).map((key) => (
+              {(['position', 'rotation', 'scale'] as const).map((key) => (
                 <div className="vector-field" key={key}>
                   <span>{key[0]!.toUpperCase() + key.slice(1)}</span>
                   <div>
-                    {(key === "rotation"
+                    {(key === 'rotation'
                       ? (selected.rotationEuler ?? [0, 0, 0])
                       : selected[key]
                     ).map((value, axis) => (
                       <TransformNumberInput
                         key={axis}
-                        label={`${key} ${"XYZ"[axis]}`}
+                        label={`${key} ${'XYZ'[axis]}`}
                         value={value}
-                        onCommit={(nextValue) =>
-                          updateVector(key, axis, nextValue)
-                        }
+                        onCommit={(nextValue) => updateVector(key, axis, nextValue)}
                       />
                     ))}
                   </div>
@@ -2578,8 +2257,8 @@ export function EditorApp() {
               <label>OBJECT SOURCE</label>
               <div className="object-source">
                 <span>
-                  {selected.primitive === "GLB"
-                    ? "Imported GLB mesh"
+                  {selected.primitive === 'GLB'
+                    ? 'Imported GLB mesh'
                     : `Built-in ${selected.primitive} primitive`}
                 </span>
                 {selected.assetId ? (
@@ -2591,36 +2270,25 @@ export function EditorApp() {
             </>
           ) : (
             <div className="empty-inspector">
-              Select an object or voxel chunk in the Hierarchy, or add content
-              to begin.
+              Select an object or voxel chunk in the Hierarchy, or add content to begin.
             </div>
           )}
         </aside>
       </div>
       {isDiagnosticsOpen ? (
-        <section
-          className="diagnostics-panel"
-          aria-label="Technical console"
-          aria-live="polite"
-        >
+        <section className="diagnostics-panel" aria-label="Technical console" aria-live="polite">
           <div className="diagnostics-heading">
             <strong>CONSOLE / DIAGNOSTICS</strong>
             <span>{diagnostics.length} EVENTS</span>
             <button onClick={() => setDiagnostics([])}>Clear</button>
-            <button
-              aria-label="Close console"
-              onClick={() => setIsDiagnosticsOpen(false)}
-            >
+            <button aria-label="Close console" onClick={() => setIsDiagnosticsOpen(false)}>
               ×
             </button>
           </div>
           <div className="diagnostics-list">
             {diagnostics.length ? (
               diagnostics.map((entry) => (
-                <article
-                  className={`diagnostic-entry level-${entry.level}`}
-                  key={entry.id}
-                >
+                <article className={`diagnostic-entry level-${entry.level}`} key={entry.id}>
                   <time>{entry.time}</time>
                   <b>{entry.level.toUpperCase()}</b>
                   <span className="diagnostic-source">{entry.source}</span>
@@ -2640,23 +2308,23 @@ export function EditorApp() {
       ) : null}
       <footer className="bottombar">
         <span className={`renderer-state renderer-${rendererStatus}`}>
-          ●{" "}
-          {rendererStatus === "ready"
-            ? "RENDERER ONLINE"
-            : rendererStatus === "error"
-              ? "RENDERER ERROR"
-              : "RENDERER LOADING"}
+          ●{' '}
+          {rendererStatus === 'ready'
+            ? 'RENDERER ONLINE'
+            : rendererStatus === 'error'
+              ? 'RENDERER ERROR'
+              : 'RENDERER LOADING'}
         </span>
         <span>
-          {rendererStatus === "ready"
-            ? "WebGL2 · Three.js adapter"
-            : rendererStatus === "error"
-              ? "Renderer unavailable"
-              : "Renderer initializing"}
+          {rendererStatus === 'ready'
+            ? 'WebGL2 · Three.js adapter'
+            : rendererStatus === 'error'
+              ? 'Renderer unavailable'
+              : 'Renderer initializing'}
         </span>
         <span className="spacer" />
-        <span className={isDirty ? "save-state is-dirty" : "save-state"}>
-          {isDirty ? "UNSAVED CHANGES" : hasSaved ? "SAVED" : "NEW SCENE"}
+        <span className={isDirty ? 'save-state is-dirty' : 'save-state'}>
+          {isDirty ? 'UNSAVED CHANGES' : hasSaved ? 'SAVED' : 'NEW SCENE'}
         </span>
         <span>{entities.length} objects</span>
       </footer>
