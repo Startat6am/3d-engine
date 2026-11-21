@@ -13,7 +13,15 @@ import {
 import type { Matrix4 as Matrix4Type } from 'three';
 import type { GlbAsset } from '@engine/gltf-importer';
 import type { WorldAssetPayload } from '@engine/serialization';
+import {
+  loadVoxelWorldProject,
+  saveVoxelWorldProject,
+  VOXEL_WORLD_EXTENSION_KEY,
+  type VoxelWorldSettings,
+  type VoxelChunkSnapshot,
+} from '@engine/project-storage';
 import { EditorHistory } from './EditorHistory.js';
+import { resolveVoxelBrushCell } from './voxelBrush.js';
 import { readPbrMaterialState } from './materialValidation.js';
 import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
@@ -31,11 +39,12 @@ import {
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
 import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
+import { createVoxelChunkSnapshot, editVoxelChunk, meshVoxelChunk } from '@engine/voxel';
+import { createChunkCoordinate } from '@engine/world';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 import {
   BrowserProjectFileStore,
   loadDirectoryProject,
-  saveDirectoryProject,
   type DirectoryHandleLike,
 } from '../project/ProjectAssetStore.js';
 
@@ -321,12 +330,30 @@ export function EditorApp() {
   const pushDiagnostic = useCallback((entry: Omit<DiagnosticEntry, 'id' | 'time'>) => {
     setDiagnostics((current) =>
       [
-        { ...entry, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString() },
+        {
+          ...entry,
+          id: Date.now() + Math.random(),
+          time: new Date().toLocaleTimeString(),
+        },
         ...current,
       ].slice(0, 200),
     );
   }, []);
   const [worldName, setWorldName] = useState('Untitled World');
+  const [voxelWorldSettings, setVoxelWorldSettings] = useState<VoxelWorldSettings>({
+    voxelSize: 1,
+    chunkDimensions: { x: 16, y: 16, z: 16 },
+  });
+  const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
+  const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<string | null>(null);
+  const [voxelCell, setVoxelCell] = useState({ x: 0, y: 1, z: 0 });
+  const [voxelChunkTarget, setVoxelChunkTarget] = useState({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
+  const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
+  const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -361,17 +388,78 @@ export function EditorApp() {
   const pinchDistanceRef = useRef<number | null>(null);
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
+  const selectedVoxelChunk =
+    voxelChunks.find(
+      (chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z ===
+        selectedVoxelChunkKey,
+    ) ?? null;
+  useEffect(() => {
+    if (selectedVoxelChunk) setVoxelChunkTarget({ ...selectedVoxelChunk.coordinate });
+  }, [selectedVoxelChunk]);
 
+  const voxelPaletteUsage = useMemo(() => {
+    if (!selectedVoxelChunk) return [];
+    const counts = new Array<number>(selectedVoxelChunk.palette.length).fill(0);
+    for (const value of selectedVoxelChunk.copyCells()) {
+      if (value > 0) counts[value - 1] = (counts[value - 1] ?? 0) + 1;
+    }
+    return counts;
+  }, [selectedVoxelChunk]);
+
+  const voxelRenderObjects = useMemo<RenderObject[]>(() => {
+    const byCoordinate = new Map(
+      voxelChunks.map((chunk) => [
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
+        chunk,
+      ]),
+    );
+    return voxelChunks.flatMap((chunk) => {
+      const { x, y, z } = chunk.coordinate;
+      const neighbor = (dx: number, dy: number, dz: number) =>
+        byCoordinate.get(x + dx + ',' + (y + dy) + ',' + (z + dz));
+      const neighbors = {
+        ...(neighbor(1, 0, 0) ? { positiveX: neighbor(1, 0, 0)! } : {}),
+        ...(neighbor(-1, 0, 0) ? { negativeX: neighbor(-1, 0, 0)! } : {}),
+        ...(neighbor(0, 1, 0) ? { positiveY: neighbor(0, 1, 0)! } : {}),
+        ...(neighbor(0, -1, 0) ? { negativeY: neighbor(0, -1, 0)! } : {}),
+        ...(neighbor(0, 0, 1) ? { positiveZ: neighbor(0, 0, 1)! } : {}),
+        ...(neighbor(0, 0, -1) ? { negativeZ: neighbor(0, 0, -1)! } : {}),
+      };
+      const mesh = meshVoxelChunk(chunk, neighbors, voxelWorldSettings.voxelSize);
+      const position: Vec3 = [
+        x * voxelWorldSettings.chunkDimensions.x * voxelWorldSettings.voxelSize,
+        y * voxelWorldSettings.chunkDimensions.y * voxelWorldSettings.voxelSize,
+        z * voxelWorldSettings.chunkDimensions.z * voxelWorldSettings.voxelSize,
+      ];
+      return mesh.parts.map((part, index) => ({
+        id: 'voxel:' + x + ',' + y + ',' + z + ':' + index,
+        geometry: part.geometry,
+        material: createDefaultMaterial(
+          part.material.kind === 'builtin' && part.material.key === 'grass'
+            ? 0x70ad62
+            : part.material.kind === 'builtin' && part.material.key === 'dirt'
+              ? 0x9b7048
+              : 0x8995a5,
+        ),
+        position,
+        rotation: [0, 0, 0, 1] as const,
+        scale: [1, 1, 1] as const,
+      }));
+    });
+  }, [voxelChunks, voxelWorldSettings]);
   const renderObjects = useMemo(
-    () =>
-      entities.map((entity) => ({
+    () => [
+      ...entities.map((entity) => ({
         ...entity,
         material:
           entity.id === selectedId
             ? { ...entity.material, color: entity.material.color }
             : entity.material,
       })),
-    [entities, selectedId],
+      ...voxelRenderObjects,
+    ],
+    [entities, selectedId, voxelRenderObjects],
   );
   const renderScene = useMemo(
     () => ({ camera, background: 0x151a23, objects: renderObjects }),
@@ -479,6 +567,239 @@ export function EditorApp() {
     [entities],
   );
 
+  const addVoxelChunk = () => {
+    const occupied = new Set(
+      voxelChunks.map(
+        (chunk) => chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
+      ),
+    );
+    let x = 0;
+    while (occupied.has(x + ',0,0')) x += 1;
+    const cells = new Uint16Array(16 * 16 * 16);
+    for (let z = 0; z < 16; z += 1) {
+      for (let cellX = 0; cellX < 16; cellX += 1) {
+        cells[cellX + 16 * (z * 16)] = 1;
+      }
+    }
+    const chunk = createVoxelChunkSnapshot({
+      coordinate: createChunkCoordinate({ x, y: 0, z: 0 }),
+      palette: [{ material: { kind: 'builtin', key: 'grass' } }],
+      cells,
+    });
+    setVoxelChunks([...voxelChunks, chunk]);
+    setSelectedVoxelChunkKey(x + ',0,0');
+    setSelectedId('');
+    setIsDirty(true);
+    setIsAddMenuOpen(false);
+  };
+
+  const commitVoxelPalette = (
+    palette: VoxelChunkSnapshot['palette'],
+    remap: (value: number) => number,
+  ) => {
+    if (!selectedVoxelChunk || selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
+    const cells = selectedVoxelChunk.copyCells();
+    for (let index = 0; index < cells.length; index += 1) {
+      cells[index] = remap(cells[index]!);
+    }
+    const snapshot = createVoxelChunkSnapshot({
+      coordinate: selectedVoxelChunk.coordinate,
+      revision: selectedVoxelChunk.revision + 1,
+      palette,
+      cells,
+    });
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    setVoxelChunks((current) =>
+      current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
+          ? snapshot
+          : chunk,
+      ),
+    );
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel material palette updated',
+      details: 'Chunk ' + chunkKey + ', revision ' + snapshot.revision + '.',
+    });
+  };
+
+  const moveVoxelPaletteEntry = (from: number, to: number) => {
+    if (
+      !selectedVoxelChunk ||
+      from < 0 ||
+      to < 0 ||
+      from >= selectedVoxelChunk.palette.length ||
+      to >= selectedVoxelChunk.palette.length ||
+      from === to
+    )
+      return;
+    const palette = [...selectedVoxelChunk.palette];
+    const [entry] = palette.splice(from, 1);
+    if (!entry) return;
+    palette.splice(to, 0, entry);
+    commitVoxelPalette(palette, (value) => {
+      if (value === 0) return 0;
+      const oldIndex = value - 1;
+      const newIndex = palette.findIndex((item) => item === entry);
+      if (oldIndex === from) return newIndex + 1;
+      if (from < to && oldIndex > from && oldIndex <= to) return oldIndex;
+      if (from > to && oldIndex >= to && oldIndex < from) return oldIndex + 2;
+      return value;
+    });
+  };
+
+  const removeVoxelPaletteEntry = (paletteIndex: number) => {
+    if (
+      !selectedVoxelChunk ||
+      paletteIndex < 0 ||
+      paletteIndex >= selectedVoxelChunk.palette.length
+    ) {
+      return;
+    }
+    const cells = selectedVoxelChunk.copyCells();
+    const storedIndex = paletteIndex + 1;
+    if (cells.some((value) => value === storedIndex)) return;
+    const palette = selectedVoxelChunk.palette.filter((_, index) => index !== paletteIndex);
+    commitVoxelPalette(palette, (value) => (value > storedIndex ? value - 1 : value));
+  };
+
+  const updateVoxelCell = (value: number, cell = voxelCell) => {
+    if (!selectedVoxelChunk) return;
+    const [kind, key] = voxelMaterial.split(':');
+    const material =
+      kind === 'asset'
+        ? { kind: 'asset' as const, assetId: key ?? '' }
+        : { kind: 'builtin' as const, key: key ?? 'grass' };
+    const existingIndex = selectedVoxelChunk.palette.findIndex(
+      (entry) =>
+        entry.material.kind === material.kind &&
+        (entry.material.kind === 'asset'
+          ? entry.material.assetId === (material.kind === 'asset' ? material.assetId : '')
+          : entry.material.key === (material.kind === 'builtin' ? material.key : '')),
+    );
+    let base = selectedVoxelChunk;
+    let paletteIndex = existingIndex + 1;
+    if (value > 0 && existingIndex < 0) {
+      const palette = [...selectedVoxelChunk.palette, { material }];
+      base = createVoxelChunkSnapshot({
+        coordinate: selectedVoxelChunk.coordinate,
+        revision: selectedVoxelChunk.revision,
+        palette,
+        cells: selectedVoxelChunk.copyCells(),
+      });
+      paletteIndex = palette.length;
+    }
+    const result = editVoxelChunk(base, [{ ...cell, value: value === 0 ? 0 : paletteIndex }]);
+    if (result.snapshot === selectedVoxelChunk) return;
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    setVoxelChunks((current) =>
+      current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
+          ? result.snapshot
+          : chunk,
+      ),
+    );
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: value === 0 ? 'Voxel cell cleared' : 'Voxel cell painted',
+      details:
+        'Chunk ' +
+        chunkKey +
+        ', cell (' +
+        cell.x +
+        ', ' +
+        cell.y +
+        ', ' +
+        cell.z +
+        '), revision ' +
+        result.snapshot.revision +
+        '.',
+    });
+  };
+
+  const moveSelectedVoxelChunk = (target = voxelChunkTarget) => {
+    if (!selectedVoxelChunk) return;
+    const { x, y, z } = target;
+    setVoxelChunkTarget({ x, y, z });
+    if (![x, y, z].every(Number.isSafeInteger)) return;
+    const nextKey = x + ',' + y + ',' + z;
+    const currentKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    if (nextKey === currentKey) return;
+    if (
+      voxelChunks.some(
+        (chunk) =>
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === nextKey,
+      )
+    ) {
+      pushDiagnostic({
+        level: 'warning',
+        source: 'Voxel editor',
+        message: 'Cannot move chunk to an occupied coordinate',
+        details: 'Chunk ' + nextKey + ' already exists.',
+      });
+      return;
+    }
+    if (selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
+    const snapshot = createVoxelChunkSnapshot({
+      coordinate: createChunkCoordinate({ x, y, z }),
+      revision: selectedVoxelChunk.revision + 1,
+      palette: selectedVoxelChunk.palette,
+      cells: selectedVoxelChunk.copyCells(),
+    });
+    setVoxelChunks((current) =>
+      current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === currentKey
+          ? snapshot
+          : chunk,
+      ),
+    );
+    setSelectedVoxelChunkKey(nextKey);
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel chunk moved',
+      details: currentKey + ' → ' + nextKey + ', revision ' + snapshot.revision + '.',
+    });
+  };
+
+  const removeSelectedVoxelChunk = () => {
+    if (!selectedVoxelChunk) return;
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    setVoxelChunks((current) =>
+      current.filter(
+        (chunk) =>
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z !== chunkKey,
+      ),
+    );
+    setSelectedVoxelChunkKey(null);
+    setIsDirty(true);
+  };
+
   const updateVector = (key: 'position' | 'rotation' | 'scale', axis: number, value: string) => {
     const number = Number(value);
     if (!Number.isFinite(number) || !selected) return;
@@ -507,6 +828,15 @@ export function EditorApp() {
   };
 
   const nudgeSelected = (direction: -1 | 1) => {
+    if (!selected && selectedVoxelChunk) {
+      if (transformMode !== 'position') return;
+      const axis = (['x', 'y', 'z'] as const)[transformAxis]!;
+      moveSelectedVoxelChunk({
+        ...selectedVoxelChunk.coordinate,
+        [axis]: selectedVoxelChunk.coordinate[axis] + direction,
+      });
+      return;
+    }
     if (!selected) return;
     const current =
       transformMode === 'rotation'
@@ -579,10 +909,14 @@ export function EditorApp() {
                         metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId,
                         metallicRoughnessTextureSettings: {
                           ...(material.metallicRoughnessTexture.sampler
-                            ? { sampler: material.metallicRoughnessTexture.sampler }
+                            ? {
+                                sampler: material.metallicRoughnessTexture.sampler,
+                              }
                             : {}),
                           ...(material.metallicRoughnessTexture.transform
-                            ? { transform: material.metallicRoughnessTexture.transform }
+                            ? {
+                                transform: material.metallicRoughnessTexture.transform,
+                              }
                             : {}),
                         },
                       }
@@ -651,8 +985,19 @@ export function EditorApp() {
   };
 
   const saveWorld = () => {
+    if (voxelChunks.length > 0) {
+      pushDiagnostic({
+        level: 'warning',
+        source: 'Voxel',
+        message: 'Save the project folder to preserve voxel chunks',
+        details: 'A standalone .world file does not contain content-addressed voxel chunk blobs.',
+      });
+      return;
+    }
     const worldDocument = createWorldDocument();
-    const blob = new Blob([serializeWorld(worldDocument)], { type: 'application/json' });
+    const blob = new Blob([serializeWorld(worldDocument)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
     const anchor = window.document.createElement('a');
     anchor.href = url;
@@ -665,12 +1010,23 @@ export function EditorApp() {
 
   const loadWorld = async (
     source?: File | WorldDocument,
-    options: { readonly replaceAssets?: boolean } = {},
+    options: {
+      readonly replaceAssets?: boolean;
+      readonly voxelWorld?: {
+        readonly settings: VoxelWorldSettings;
+        readonly chunks: readonly VoxelChunkSnapshot[];
+      };
+    } = {},
   ): Promise<boolean> => {
     if (!source) return false;
     const sourceName = source instanceof File ? source.name : 'main.world';
     try {
       const root = source instanceof File ? parseWorld(await source.text()) : source;
+      if (root.extensions[VOXEL_WORLD_EXTENSION_KEY] && !options.voxelWorld) {
+        throw new Error(
+          'This world contains external voxel chunk blobs. Open the project folder instead.',
+        );
+      }
       const restoredAssetRegistry = mergeAssetRegistry(
         options.replaceAssets ? new AssetRegistry() : assetRegistryRef.current,
         root.assets,
@@ -700,7 +1056,11 @@ export function EditorApp() {
           id?: string;
           name?: string;
           components?: {
-            Transform?: { position?: number[]; rotation?: number[]; scale?: number[] };
+            Transform?: {
+              position?: number[];
+              rotation?: number[];
+              scale?: number[];
+            };
             MeshRenderer?: {
               primitive?: Primitive | 'GLB';
               assetId?: string;
@@ -858,6 +1218,13 @@ export function EditorApp() {
       }
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || sourceName.replace(/\.world$/i, ''));
+      setVoxelWorldSettings(
+        options.voxelWorld?.settings ?? {
+          voxelSize: 1,
+          chunkDimensions: { x: 16, y: 16, z: 16 },
+        },
+      );
+      setVoxelChunks(options.voxelWorld?.chunks ?? []);
       projectDirectoryRef.current = null;
       setIsDirty(false);
       setHasSaved(true);
@@ -886,14 +1253,19 @@ export function EditorApp() {
       }
       const directory = projectDirectoryRef.current ?? (await picker!({ mode: 'readwrite' }));
       projectDirectoryRef.current = directory;
-      await saveDirectoryProject(new BrowserProjectFileStore(directory), createWorldDocument());
+      await saveVoxelWorldProject(
+        new BrowserProjectFileStore(directory),
+        createWorldDocument(),
+        voxelWorldSettings,
+        voxelChunks,
+      );
       setIsDirty(false);
       setHasSaved(true);
       pushDiagnostic({
         level: 'info',
         source: 'Project',
         message: 'Project folder saved',
-        details: 'Binary assets were written and hash-verified before worlds/main.world.',
+        details: `Binary assets and ${voxelChunks.length} voxel chunks were hash-verified before worlds/main.world.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -914,14 +1286,31 @@ export function EditorApp() {
           'Directory projects are not supported in this browser. Use Open World instead.',
         );
       const directory = await picker({ mode: 'readwrite' });
-      const document = await loadDirectoryProject(new BrowserProjectFileStore(directory));
-      if (!(await loadWorld(document, { replaceAssets: true }))) return;
+      const store = new BrowserProjectFileStore(directory);
+      const document = await loadDirectoryProject(store);
+      const voxelWorld = document.extensions[VOXEL_WORLD_EXTENSION_KEY]
+        ? await loadVoxelWorldProject(store)
+        : null;
+      if (
+        !(await loadWorld(document, {
+          replaceAssets: true,
+          ...(voxelWorld
+            ? {
+                voxelWorld: {
+                  settings: voxelWorld.settings,
+                  chunks: voxelWorld.chunks,
+                },
+              }
+            : {}),
+        }))
+      )
+        return;
       projectDirectoryRef.current = directory;
       pushDiagnostic({
         level: 'info',
         source: 'Project',
         message: 'Project folder opened',
-        details: 'All external asset files were hash-verified before the scene was committed.',
+        details: `External assets and ${voxelWorld?.chunks.length ?? 0} voxel chunks were hash-verified before the scene was committed.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -1117,9 +1506,17 @@ export function EditorApp() {
           kind: 'texture',
           uri: `${uri}.image-${imageIndex}.${extension}`,
           contentHash: imageHash,
-          importer: { id: 'engine.gltf.embedded-image', version: importer.version, settings: {} },
+          importer: {
+            id: 'engine.gltf.embedded-image',
+            version: importer.version,
+            settings: {},
+          },
           dependencies: [],
-          metadata: { sourceFormat: 'glb', imageIndex, mimeType: image.mimeType },
+          metadata: {
+            sourceFormat: 'glb',
+            imageIndex,
+            mimeType: image.mimeType,
+          },
         });
         textureRecords.push(textureRecord.id);
         stagedPayloads.set(textureRecord.id, {
@@ -1290,7 +1687,11 @@ export function EditorApp() {
           const radius = Math.min(40, Math.max(1.5, currentRadius * factor));
           const scale = radius / currentRadius;
           const position: Vec3 = [x * scale, y * scale, z * scale];
-          return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+          return {
+            ...current,
+            position,
+            rotation: lookAtQuaternion(position, [0, 0, 0]),
+          };
         });
       }
       return;
@@ -1313,7 +1714,11 @@ export function EditorApp() {
         radius * Math.cos(phi),
         radius * Math.sin(phi) * Math.cos(theta),
       ];
-      return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+      return {
+        ...current,
+        position,
+        rotation: lookAtQuaternion(position, [0, 0, 0]),
+      };
     });
   };
   const onWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1324,7 +1729,11 @@ export function EditorApp() {
       const radius = Math.min(40, Math.max(1.5, Math.hypot(x, y, z) * factor));
       const scale = radius / Math.hypot(x, y, z);
       const position: Vec3 = [x * scale, y * scale, z * scale];
-      return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+      return {
+        ...current,
+        position,
+        rotation: lookAtQuaternion(position, [0, 0, 0]),
+      };
     });
   };
 
@@ -1485,6 +1894,10 @@ export function EditorApp() {
                   <small>3D primitive</small>
                 </button>
               ))}
+              <button onClick={addVoxelChunk}>
+                <span>Voxel chunk</span>
+                <small>16×16 grass surface</small>
+              </button>
             </div>
           ) : null}
           <div className="tree-row active">
@@ -1494,12 +1907,35 @@ export function EditorApp() {
             <button
               key={entity.id}
               className={`tree-row entity-row ${entity.id === selectedId ? 'selected' : ''}`}
-              onClick={() => setSelectedId(entity.id)}
+              onClick={() => {
+                setSelectedVoxelChunkKey(null);
+                setSelectedId(entity.id);
+              }}
             >
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          <div className="panel-foot">{entities.length} OBJECTS</div>
+          {voxelChunks.map((chunk) => {
+            const key = chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z;
+            return (
+              <button
+                key={key}
+                className={
+                  'tree-row entity-row ' + (key === selectedVoxelChunkKey ? 'selected' : '')
+                }
+                onClick={() => {
+                  setSelectedVoxelChunkKey(key);
+                  setSelectedId('');
+                }}
+              >
+                ▦ <span>Voxel chunk ({key})</span>
+              </button>
+            );
+          })}
+          <div className="panel-foot">
+            <span>{entities.length} OBJECTS</span>
+            <span>{voxelChunks.length} VOXEL CHUNKS</span>
+          </div>
         </aside>
         <section className="viewport">
           <div className="viewport-label">
@@ -1536,7 +1972,7 @@ export function EditorApp() {
                       aria-label={`${label} mode`}
                       aria-pressed={transformMode === mode}
                       className={transformMode === mode ? 'active' : ''}
-                      disabled={!selected}
+                      disabled={!selected && (!selectedVoxelChunk || mode !== 'position')}
                       onClick={() => setTransformMode(mode)}
                     >
                       {label}
@@ -1557,7 +1993,7 @@ export function EditorApp() {
                       aria-label={`${axis} axis`}
                       aria-pressed={transformAxis === index}
                       className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
-                      disabled={!selected}
+                      disabled={!selected && !selectedVoxelChunk}
                       onClick={() => setTransformAxis(index)}
                     >
                       {axis}
@@ -1566,14 +2002,14 @@ export function EditorApp() {
                   <span className="transform-pad-spacer" />
                   <button
                     aria-label={`Decrease ${'XYZ'[transformAxis]}`}
-                    disabled={!selected}
+                    disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(-1)}
                   >
                     −
                   </button>
                   <button
                     aria-label={`Increase ${'XYZ'[transformAxis]}`}
-                    disabled={!selected}
+                    disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(1)}
                   >
                     ＋
@@ -1600,13 +2036,43 @@ export function EditorApp() {
               if (moved > 4) return;
               const canvas = event.currentTarget;
               const bounds = canvas.getBoundingClientRect();
-              const hit = rendererRef.current?.pick(
-                event.clientX - bounds.left,
-                event.clientY - bounds.top,
-                bounds.width,
-                bounds.height,
-              );
-              if (hit) setSelectedId(hit);
+              const localX = event.clientX - bounds.left;
+              const localY = event.clientY - bounds.top;
+              const renderer = rendererRef.current;
+              const surface = renderer?.pickSurface(localX, localY, bounds.width, bounds.height);
+              if (surface?.entityId.startsWith('voxel:')) {
+                const match = /^voxel:(-?\d+),(-?\d+),(-?\d+):/.exec(surface.entityId);
+                if (!match) return;
+                const key = `${match[1]},${match[2]},${match[3]}`;
+                if (
+                  !selectedVoxelChunk ||
+                  key !==
+                    `${selectedVoxelChunk.coordinate.x},${selectedVoxelChunk.coordinate.y},${selectedVoxelChunk.coordinate.z}`
+                ) {
+                  setSelectedVoxelChunkKey(key);
+                  setSelectedId('');
+                  return;
+                }
+                const cell = resolveVoxelBrushCell(
+                  surface,
+                  selectedVoxelChunk,
+                  voxelWorldSettings,
+                  voxelBrushMode,
+                );
+                if (cell) {
+                  setVoxelCell(cell);
+                  updateVoxelCell(voxelBrushMode === 'paint' ? 1 : 0, cell);
+                } else {
+                  pushDiagnostic({
+                    level: 'warning',
+                    source: 'Voxel editor',
+                    message: 'Brush target is outside the selected chunk',
+                  });
+                }
+              } else if (surface) {
+                setSelectedVoxelChunkKey(null);
+                setSelectedId(surface.entityId);
+              }
             }}
             onPointerCancel={(event) => {
               activePointersRef.current.delete(event.pointerId);
@@ -1619,7 +2085,7 @@ export function EditorApp() {
           <output ref={fpsRef} className="viewport-fps" aria-label="Frames per second">
             FPS --
           </output>
-          {entities.length === 0 ? (
+          {entities.length === 0 && voxelChunks.length === 0 ? (
             <div className="viewport-empty-state">
               <strong>Empty scene</strong>
               <span>Use + in Hierarchy to add a primitive, or File → Import GLB.</span>
@@ -1644,7 +2110,167 @@ export function EditorApp() {
               ⌫
             </button>
           </div>
-          {selected ? (
+          {selectedVoxelChunk ? (
+            <section className="voxel-inspector" aria-label="Voxel chunk editor">
+              <div className="inspector-title">
+                ▦ <strong>Voxel chunk</strong>
+              </div>
+              <div className="object-source">
+                <span>
+                  Chunk ({selectedVoxelChunk.coordinate.x}, {selectedVoxelChunk.coordinate.y},{' '}
+                  {selectedVoxelChunk.coordinate.z})
+                </span>
+                <small>
+                  Revision {selectedVoxelChunk.revision} · {selectedVoxelChunk.palette.length}{' '}
+                  materials
+                </small>
+              </div>
+              <label>CELL COORDINATES</label>
+              <div className="vector-field">
+                <span>XYZ</span>
+                <div>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <TransformNumberInput
+                      key={axis}
+                      label={'Voxel cell ' + axis.toUpperCase()}
+                      value={voxelCell[axis]}
+                      onCommit={(nextValue) => {
+                        const next = Number(nextValue);
+                        if (Number.isInteger(next) && next >= 0 && next < 16) {
+                          setVoxelCell((current) => ({
+                            ...current,
+                            [axis]: next,
+                          }));
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <label>CHUNK COORDINATES</label>
+              <div className="vector-field">
+                <span>XYZ</span>
+                <div>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <TransformNumberInput
+                      key={axis}
+                      label={'Chunk ' + axis.toUpperCase()}
+                      value={voxelChunkTarget[axis]}
+                      onCommit={(nextValue) => {
+                        const next = Number(nextValue);
+                        if (Number.isSafeInteger(next)) {
+                          setVoxelChunkTarget((current) => ({
+                            ...current,
+                            [axis]: next,
+                          }));
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => moveSelectedVoxelChunk()}
+                disabled={
+                  voxelChunkTarget.x === selectedVoxelChunk.coordinate.x &&
+                  voxelChunkTarget.y === selectedVoxelChunk.coordinate.y &&
+                  voxelChunkTarget.z === selectedVoxelChunk.coordinate.z
+                }
+              >
+                Move chunk
+              </button>
+              <label>VIEWPORT BRUSH</label>
+              <div className="voxel-edit-actions">
+                <button
+                  aria-pressed={voxelBrushMode === 'paint'}
+                  onClick={() => setVoxelBrushMode('paint')}
+                >
+                  Paint tool
+                </button>
+                <button
+                  aria-pressed={voxelBrushMode === 'erase'}
+                  onClick={() => setVoxelBrushMode('erase')}
+                >
+                  Erase tool
+                </button>
+              </div>
+              <small>Click a visible voxel face in the viewport to edit it</small>
+              <label>PAINT MATERIAL</label>
+              <select
+                aria-label="Voxel material"
+                value={voxelMaterial}
+                onChange={(event) => setVoxelMaterial(event.target.value)}
+              >
+                <option value="builtin:grass">Grass</option>
+                <option value="builtin:dirt">Dirt</option>
+                <option value="builtin:stone">Stone</option>
+              </select>
+              <div className="voxel-edit-actions">
+                <button
+                  onClick={() => updateVoxelCell(1)}
+                  disabled={
+                    ![voxelCell.x, voxelCell.y, voxelCell.z].every(
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
+                    )
+                  }
+                >
+                  Paint cell
+                </button>
+                <button
+                  onClick={() => updateVoxelCell(0)}
+                  disabled={
+                    ![voxelCell.x, voxelCell.y, voxelCell.z].every(
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
+                    )
+                  }
+                >
+                  Erase cell
+                </button>
+              </div>
+              <label>PALETTE</label>
+              <ul className="voxel-palette">
+                {selectedVoxelChunk.palette.map((entry, index) => {
+                  const materialName =
+                    entry.material.kind === 'builtin' ? entry.material.key : entry.material.assetId;
+                  const usage = voxelPaletteUsage[index] ?? 0;
+                  return (
+                    <li
+                      key={entry.material.kind + ':' + materialName}
+                      className="voxel-palette-entry"
+                    >
+                      <span>{index + 1}</span>
+                      <strong>{materialName}</strong>
+                      <small>{usage} cells</small>
+                      <button
+                        aria-label={'Move ' + materialName + ' up'}
+                        disabled={index === 0}
+                        onClick={() => moveVoxelPaletteEntry(index, index - 1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        aria-label={'Move ' + materialName + ' down'}
+                        disabled={index === selectedVoxelChunk.palette.length - 1}
+                        onClick={() => moveVoxelPaletteEntry(index, index + 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        aria-label={'Remove ' + materialName}
+                        disabled={usage > 0}
+                        onClick={() => removeVoxelPaletteEntry(index)}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button className="voxel-delete" onClick={removeSelectedVoxelChunk}>
+                Delete voxel chunk
+              </button>
+            </section>
+          ) : selected ? (
             <>
               <div className="inspector-title">
                 ◈{' '}
@@ -1689,7 +2315,7 @@ export function EditorApp() {
             </>
           ) : (
             <div className="empty-inspector">
-              Select an object in the Hierarchy or add a primitive to begin.
+              Select an object or voxel chunk in the Hierarchy, or add content to begin.
             </div>
           )}
         </aside>

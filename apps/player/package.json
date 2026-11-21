@@ -10,11 +10,16 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@engine/assets": "workspace:*",
     "@engine/core": "workspace:*",
     "@engine/geometry": "workspace:*",
-    "@engine/renderer": "workspace:*",
+    "@engine/gltf-importer": "workspace:*",
     "@engine/input": "workspace:*",
-    "@engine/physics": "workspace:*"
+    "@engine/physics": "workspace:*",
+    "@engine/project-storage": "workspace:*",
+    "@engine/renderer": "workspace:*",
+    "@engine/serialization": "workspace:*",
+    "@engine/voxel": "workspace:*"
   },
   "devDependencies": {
     "vite": "7.3.8"

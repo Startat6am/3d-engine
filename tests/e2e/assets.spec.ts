@@ -435,6 +435,21 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     Object.defineProperty(window, '__projectFiles', { value: files, configurable: true });
     Object.defineProperty(window, '__projectWrites', { value: writes, configurable: true });
   });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__glbImageBitmapUploads', {
+      configurable: true,
+      writable: true,
+      value: 0,
+    });
+    const original = WebGL2RenderingContext.prototype.texSubImage2D;
+    WebGL2RenderingContext.prototype.texSubImage2D = function (...args) {
+      if (args.at(-1) instanceof ImageBitmap) {
+        const scope = window as Window & { __glbImageBitmapUploads: number };
+        scope.__glbImageBitmapUploads += 1;
+      }
+      return original.apply(this, args);
+    };
+  });
   await page.goto('/');
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'project.glb',
@@ -442,6 +457,19 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     buffer: makeTriangleGlb(),
   });
   await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
+  await expect(page.getByText(/VOXEL CHUNKS/)).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('2');
+  await page.getByLabel('Voxel cell Y').fill('2');
+  await page.getByLabel('Voxel cell Z').fill('3');
+  await page.getByLabel('Voxel material').selectOption('builtin:stone');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 2 materials')).toBeVisible();
 
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
@@ -461,10 +489,22 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
       assets: Array<{ id: string; kind: string; uri: string }>;
       assetPayloads?: unknown[];
+      extensions?: {
+        'com.choreon.voxel-world'?: {
+          chunks: Array<{
+            revision: number;
+            palette: Array<{ material: { kind: string; key?: string } }>;
+          }>;
+        };
+      };
     };
     return {
       paths: [...files.keys()].sort(),
       writes: [...scope.__projectWrites!],
+      fileData: [...files.entries()].map(([path, node]) => ({
+        path,
+        bytes: Array.from(node.bytes),
+      })),
       manifest,
     };
   });
@@ -472,7 +512,12 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   expect(saved.manifest.assets).toHaveLength(2);
   expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
   expect(saved.paths).toContain('worlds/main.world');
-  expect(saved.paths).toHaveLength(3);
+  expect(saved.paths.some((path) => path.startsWith('voxel/chunks/sha256/'))).toBe(true);
+  expect(saved.paths).toHaveLength(4);
+  const savedVoxelChunk = saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks[0];
+  expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
+  expect(savedVoxelChunk?.revision).toBe(1);
+  expect(savedVoxelChunk?.palette.map((entry) => entry.material.key)).toEqual(['grass', 'stone']);
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
 
   // Change the active scene, then reopen the folder. The directory loader should
@@ -524,6 +569,76 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect.poll(() => openProjectError.count()).toBeGreaterThan(previousOpenErrorCount);
   await expect(page.getByText(/Project file not found:/)).toBeVisible();
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
+
+  // The exact saved Editor folder must also load in Player as a mixed voxel/mesh
+  // scene, including the GLB geometry, PBR material, embedded image and static voxel collider.
+  await page.goto('http://127.0.0.1:5174');
+  await page.evaluate((entries) => {
+    (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads = 0;
+    const files = new Map(
+      entries.map(({ path, bytes }) => [path, { bytes: new Uint8Array(bytes) }]),
+    );
+    const directories = new Set<string>(['']);
+    for (const { path } of entries) {
+      const segments = path.split('/');
+      for (let index = 1; index < segments.length; index += 1) {
+        directories.add(segments.slice(0, index).join('/'));
+      }
+    }
+    const makeDirectory = (prefix: string) => ({
+      async getDirectoryHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!directories.has(path)) {
+          if (!options?.create) throw new DOMException('Directory not found', 'NotFoundError');
+          directories.add(path);
+        }
+        return makeDirectory(path);
+      },
+      async getFileHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!files.has(path)) {
+          if (!options?.create) throw new DOMException('File not found', 'NotFoundError');
+          files.set(path, { bytes: new Uint8Array() });
+        }
+        return {
+          async getFile() {
+            const node = files.get(path)!;
+            return new File([node.bytes.slice().buffer as ArrayBuffer], name);
+          },
+          async createWritable() {
+            let pending = new Uint8Array();
+            return {
+              async write(data: Uint8Array) {
+                pending = new Uint8Array(data);
+              },
+              async close() {
+                files.set(path, { bytes: pending });
+              },
+              async abort() {},
+            };
+          },
+        };
+      },
+    });
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => makeDirectory(''),
+    });
+  }, saved.fileData);
+  await page.getByRole('button', { name: 'Open project folder' }).click();
+  const playerStatus = page.locator('#project-status');
+  await expect(playerStatus).toContainText('Loaded');
+  await expect(playerStatus).toContainText('rendered mesh parts');
+  await expect(playerStatus).toContainText('2 voxel mesh parts');
+  await expect(playerStatus).toContainText('static voxel colliders');
+  await expect(playerStatus).not.toContainText('unsupported');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads,
+      ),
+    )
+    .toBeGreaterThan(0);
 });
 
 test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({

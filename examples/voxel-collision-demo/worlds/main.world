@@ -1,0 +1,203 @@
+{
+  "assets": [],
+  "engineVersion": "0.1.0",
+  "extensions": {
+    "com.choreon.voxel-world": {
+      "chunks": [
+        {
+          "coordinate": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "revision": 1,
+          "palette": [
+            {
+              "material": {
+                "key": "stone",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "dirt",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "grass",
+                "kind": "builtin"
+              }
+            }
+          ],
+          "payload": {
+            "assetId": "voxel-chunk:f0700ea4032f825d98925d5f4d8ccaf35391e858c4466b7ec28fb976f8fdff0a",
+            "byteLength": 8192,
+            "codecVersion": 1,
+            "contentHash": "sha256:f0700ea4032f825d98925d5f4d8ccaf35391e858c4466b7ec28fb976f8fdff0a"
+          }
+        },
+        {
+          "coordinate": {
+            "x": 1,
+            "y": 0,
+            "z": 0
+          },
+          "revision": 1,
+          "palette": [
+            {
+              "material": {
+                "key": "stone",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "dirt",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "grass",
+                "kind": "builtin"
+              }
+            }
+          ],
+          "payload": {
+            "assetId": "voxel-chunk:f1bdc62d94bafa96efe5df706831aa80dace1298c45f1c00e48e104c11d224cf",
+            "byteLength": 8192,
+            "codecVersion": 1,
+            "contentHash": "sha256:f1bdc62d94bafa96efe5df706831aa80dace1298c45f1c00e48e104c11d224cf"
+          }
+        },
+        {
+          "coordinate": {
+            "x": 0,
+            "y": 0,
+            "z": 1
+          },
+          "revision": 1,
+          "palette": [
+            {
+              "material": {
+                "key": "stone",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "dirt",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "grass",
+                "kind": "builtin"
+              }
+            }
+          ],
+          "payload": {
+            "assetId": "voxel-chunk:c4f984fa83669c33fd3af1f5cc9a522f77f6fbc238d77fc254dc4afcc5349b89",
+            "byteLength": 8192,
+            "codecVersion": 1,
+            "contentHash": "sha256:c4f984fa83669c33fd3af1f5cc9a522f77f6fbc238d77fc254dc4afcc5349b89"
+          }
+        },
+        {
+          "coordinate": {
+            "x": 1,
+            "y": 0,
+            "z": 1
+          },
+          "revision": 1,
+          "palette": [
+            {
+              "material": {
+                "key": "stone",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "dirt",
+                "kind": "builtin"
+              }
+            },
+            {
+              "material": {
+                "key": "grass",
+                "kind": "builtin"
+              }
+            }
+          ],
+          "payload": {
+            "assetId": "voxel-chunk:fea925c97ebf6b3576bf35f9365136f67638734ac3a64697de40af5ec08ed286",
+            "byteLength": 8192,
+            "codecVersion": 1,
+            "contentHash": "sha256:fea925c97ebf6b3576bf35f9365136f67638734ac3a64697de40af5ec08ed286"
+          }
+        }
+      ],
+      "schemaVersion": 1,
+      "settings": {
+        "voxelSize": 1,
+        "chunkDimensions": {
+          "x": 16,
+          "y": 16,
+          "z": 16
+        }
+      }
+    }
+  },
+  "format": "universal-3d-world",
+  "schemaVersion": "1.0.0",
+  "world": {
+    "id": "world:voxel-collision-demo",
+    "name": "Voxel Collision Playground",
+    "entities": [
+      {
+        "id": "entity:conventional-marker",
+        "name": "Conventional mesh marker",
+        "parent": null,
+        "components": {
+          "Transform": {
+            "position": [
+              8,
+              3,
+              8
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ]
+          },
+          "MeshRenderer": {
+            "primitive": "Box",
+            "material": {
+              "color": 15105570,
+              "roughness": 0.65,
+              "metalness": 0
+            }
+          }
+        }
+      }
+    ],
+    "settings": {
+      "gravity": [
+        0,
+        -9.81,
+        0
+      ]
+    }
+  }
+}

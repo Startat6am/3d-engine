@@ -77,6 +77,11 @@ export interface RenderScene {
   readonly objects: readonly RenderObject[];
   readonly background: number;
 }
+export interface RendererPickHit {
+  readonly entityId: string;
+  readonly point: Vec3;
+  readonly normal: Vec3;
+}
 export interface RendererCapabilities {
   readonly backend: 'webgl2';
   readonly maxTextureSize: number;
@@ -88,6 +93,8 @@ export interface RendererAdapter {
   render(scene: RenderScene): void;
   /** Return the nearest entity under viewport-local CSS pixel coordinates, or null. */
   pick(x: number, y: number, width: number, height: number): string | null;
+  /** Return the nearest surface hit in world space, or null. */
+  pickSurface(x: number, y: number, width: number, height: number): RendererPickHit | null;
   dispose(): void;
 }
 export interface RendererOptions {

@@ -19,7 +19,10 @@
     "three": "catalog:",
     "@engine/serialization": "workspace:*",
     "@engine/gltf-importer": "workspace:*",
-    "@engine/assets": "workspace:*"
+    "@engine/assets": "workspace:*",
+    "@engine/project-storage": "workspace:*",
+    "@engine/voxel": "workspace:*",
+    "@engine/world": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "19.2.14",

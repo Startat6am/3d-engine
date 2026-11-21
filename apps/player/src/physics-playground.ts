@@ -33,6 +33,7 @@ const physicsState = document.querySelector<HTMLElement>('#physics-wasm');
 const status = document.querySelector<HTMLElement>('#playground-status');
 const bodyCount = document.querySelector<HTMLElement>('#body-count');
 const playerPosition = document.querySelector<HTMLElement>('#player-position');
+const characterState = document.querySelector<HTMLElement>('#character-state');
 const pauseButton = document.querySelector<HTMLButtonElement>('#pause');
 const stepButton = document.querySelector<HTMLButtonElement>('#step');
 const raycastButton = document.querySelector<HTMLButtonElement>('#raycast');
@@ -67,6 +68,13 @@ let renderer: ThreeWebGLRendererAdapter | null = null;
 let physics: PhysicsWorld | null = null;
 let physicsSystem: PhysicsSystem | null = null;
 let playerEntity: EntityId | null = null;
+let playerBodyHandle: ReturnType<PhysicsWorld['createBody']> | null = null;
+let playerControllerHandle: ReturnType<PhysicsWorld['createCharacterController']> | null = null;
+let characterVerticalVelocity = 0;
+let characterGrounded = false;
+let characterCollisionCount = 0;
+let characterHorizontalSpeed = 0;
+let characterResetPending = false;
 let inputSystem: InputSystem | null = null;
 let animationFrame = 0;
 let previousFrame = 0;
@@ -219,7 +227,6 @@ const runtime = new EngineRuntime({ fixedDeltaTime: 1 / 60 });
 const updateFps = attachFpsCounter(canvas);
 const camera = createDefaultCamera();
 let cameraOrbitEnabled = false;
-let cameraOrbitPointerId: number | null = null;
 let cameraOrbitPointerX = 0;
 let cameraOrbitPointerY = 0;
 let cameraAzimuth = Math.atan2(camera.position[0], camera.position[2]);
@@ -227,7 +234,7 @@ let cameraElevation = Math.atan2(
   camera.position[1],
   Math.hypot(camera.position[0], camera.position[2]),
 );
-const cameraOrbitRadius = Math.hypot(camera.position[0], camera.position[2]);
+const cameraOrbitRadius = Math.hypot(camera.position[0], camera.position[1], camera.position[2]);
 const cameraOrbitSensitivity = 0.006;
 const cameraOrbitMinElevation = -1.2;
 const cameraOrbitMaxElevation = 1.2;
@@ -252,53 +259,67 @@ function updateOrbitCamera() {
 
 function setCameraOrbitEnabled(enabled: boolean) {
   cameraOrbitEnabled = enabled;
-  cameraOrbitPointerId = null;
   cameraModeButton!.dataset.active = String(enabled);
   cameraModeButton!.setAttribute('aria-pressed', String(enabled));
   cameraModeButton!.textContent = enabled ? 'CAMERA ON' : 'CAMERA';
   canvas!.dataset.cameraMode = String(enabled);
+  if (enabled) updateOrbitCamera();
 }
-cameraModeButton.addEventListener('click', () => {
-  setCameraOrbitEnabled(!cameraOrbitEnabled);
-});
 
-canvas.addEventListener('pointerdown', (event) => {
-  if (!cameraOrbitEnabled || cameraOrbitPointerId !== null || event.button !== 0) return;
-  cameraOrbitPointerId = event.pointerId;
+let cameraHoldPointerId: number | null = null;
+cameraModeButton.addEventListener('pointerdown', (event) => {
+  if (cameraHoldPointerId !== null || (event.pointerType === 'mouse' && event.button !== 0)) return;
+  event.preventDefault();
+  cameraHoldPointerId = event.pointerId;
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
+  setCameraOrbitEnabled(true);
   try {
-    canvas.setPointerCapture(event.pointerId);
+    cameraModeButton!.setPointerCapture(event.pointerId);
   } catch {
     // Pointer capture may be unavailable for synthetic test events.
   }
 });
-canvas.addEventListener('pointermove', (event) => {
-  if (!cameraOrbitEnabled || cameraOrbitPointerId !== event.pointerId) return;
-  event.preventDefault();
+const releaseCameraHold = (event: PointerEvent) => {
+  if (cameraHoldPointerId !== event.pointerId) return;
+  cameraHoldPointerId = null;
+  setCameraOrbitEnabled(false);
+};
+cameraModeButton.addEventListener('pointerup', releaseCameraHold);
+cameraModeButton.addEventListener('pointercancel', releaseCameraHold);
+cameraModeButton.addEventListener('lostpointercapture', releaseCameraHold);
+cameraModeButton.addEventListener('keydown', (event) => {
+  if ((event.code === 'Space' || event.code === 'Enter') && !event.repeat) {
+    event.preventDefault();
+    setCameraOrbitEnabled(true);
+  }
+});
+cameraModeButton.addEventListener('keyup', (event) => {
+  if (event.code === 'Space' || event.code === 'Enter') setCameraOrbitEnabled(false);
+});
+window.addEventListener('pointermove', (event) => {
+  if (!cameraOrbitEnabled) return;
+  // While the camera button is held, pointer movement anywhere rotates the view.
   const deltaX = event.clientX - cameraOrbitPointerX;
   const deltaY = event.clientY - cameraOrbitPointerY;
   cameraOrbitPointerX = event.clientX;
   cameraOrbitPointerY = event.clientY;
   cameraAzimuth -= deltaX * cameraOrbitSensitivity;
-  canvas.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
+  canvas!.dataset.cameraAzimuth = cameraAzimuth.toFixed(3);
   cameraElevation = Math.max(
     cameraOrbitMinElevation,
     Math.min(cameraOrbitMaxElevation, cameraElevation + deltaY * cameraOrbitSensitivity),
   );
 });
-const releaseCameraOrbitPointer = (event: PointerEvent) => {
-  if (cameraOrbitPointerId === event.pointerId) cameraOrbitPointerId = null;
-};
-canvas.addEventListener('pointerup', releaseCameraOrbitPointer);
-canvas.addEventListener('pointercancel', releaseCameraOrbitPointer);
-canvas.addEventListener('lostpointercapture', releaseCameraOrbitPointer);
 window.addEventListener('blur', () => {
-  cameraOrbitPointerId = null;
+  cameraHoldPointerId = null;
+  setCameraOrbitEnabled(false);
 });
-
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') cameraOrbitPointerId = null;
+  if (document.visibilityState !== 'visible') {
+    cameraHoldPointerId = null;
+    setCameraOrbitEnabled(false);
+  }
 });
 
 const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
@@ -347,10 +368,16 @@ function renderFrame(now: number) {
   const delta = previousFrame === 0 ? 0 : Math.min(0.25, Math.max(0, (now - previousFrame) / 1000));
   previousFrame = now;
   runtime.advance(delta);
-  if (playerEntity) {
+  if (playerEntity && playerBodyHandle && physics) {
     const transform = runtime.world.get(playerEntity, Transform);
-    if (transform)
-      playerPosition!.textContent = `PLAYER X ${transform.position[0].toFixed(3)} · Y ${transform.position[1].toFixed(3)} · Z ${transform.position[2].toFixed(3)}`;
+    const pose = physics.getPose(playerBodyHandle);
+    if (transform) {
+      transform.position = [...pose.position];
+      transform.rotation = [...pose.rotation];
+      playerPosition!.textContent = `PLAYER X ${pose.position[0].toFixed(2)} · Y ${pose.position[1].toFixed(2)} · Z ${pose.position[2].toFixed(2)}`;
+      characterState!.textContent = `${characterGrounded ? 'GROUNDED' : 'AIRBORNE'} · ${characterHorizontalSpeed.toFixed(2)} m/s · ${characterCollisionCount} contacts`;
+      characterState!.dataset.state = characterGrounded ? 'grounded' : 'airborne';
+    }
   }
   const currentStepCount = physicsSystem?.stepCount ?? 0;
   if (!simulationReady && currentStepCount > 0) {
@@ -403,15 +430,63 @@ async function start() {
       type: 'box',
       halfExtents: [10, 0.5, 10],
     });
-    playerEntity = addBody([0, 2.5, 0], createUvSphereGeometry(0.5, 24, 16), 0xf0a64b, 'dynamic', {
-      type: 'sphere',
-      radius: 0.5,
+    // The player is a real kinematic capsule. Rapier's character controller resolves
+    // terrain contacts and autostep; the stretched sphere is only its visible shell.
+    playerEntity = runtime.world.createEntity();
+    const spawnPosition = [-3, 0.91, 0] as const;
+    runtime.world.add(playerEntity, Transform, {
+      position: spawnPosition,
+      rotation: [0, 0, 0, 1],
+      scale: [0.72, 1.8, 0.72],
+      parent: null,
     });
-    addBody([-1.5, 1, 0], createBoxGeometry(), 0x6fa9ed, 'dynamic', {
+    runtime.world.add(playerEntity, Renderable, {
+      geometry: createUvSphereGeometry(0.5, 24, 16),
+      material: createDefaultMaterial(0xf0a64b),
+    });
+    playerBodyHandle = physics.createBody(playerEntity, {
+      type: 'kinematic',
+      position: spawnPosition,
+      canSleep: false,
+    });
+    const playerCollider = physics.createCollider(playerBodyHandle, {
+      shape: { type: 'capsule', halfHeight: 0.55, radius: 0.35 },
+      friction: 0.8,
+      restitution: 0,
+    });
+    playerControllerHandle = physics.createCharacterController(playerCollider, {
+      offset: 0.02,
+      maxSlopeClimbAngle: Math.PI / 4,
+      minSlopeSlideAngle: Math.PI / 4,
+      autostep: { maxHeight: 0.34, minWidth: 0.22 },
+      snapToGroundDistance: 0.18,
+    });
+
+    // A compact voxel-like obstacle course: four climbable blocks, a raised deck,
+    // and two columns for checking side and corner collisions.
+    for (let index = 0; index < 4; index += 1) {
+      const height = 0.3 * (index + 1);
+      addBody(
+        [2 + index * 1.2, height / 2, 0],
+        createBoxGeometry(1.2, height, 2.4),
+        [0x6fa9ed, 0x70c5a0, 0x9a8de0, 0xd49a65][index]!,
+        'static',
+        { type: 'box', halfExtents: [0.6, height / 2, 1.2] },
+      );
+    }
+    addBody([1, 0.45, -3], createBoxGeometry(1.4, 0.9, 1.4), 0x78909c, 'static', {
+      type: 'box',
+      halfExtents: [0.7, 0.45, 0.7],
+    });
+    addBody([4.5, 1, -3], createBoxGeometry(1.4, 2, 1.4), 0x78909c, 'static', {
+      type: 'box',
+      halfExtents: [0.7, 1, 0.7],
+    });
+    addBody([-1.5, 1, 3], createBoxGeometry(), 0x6fa9ed, 'dynamic', {
       type: 'box',
       halfExtents: [0.5, 0.5, 0.5],
     });
-    addBody([1.5, 1.5, 0], createBoxGeometry(), 0x70c5a0, 'dynamic', {
+    addBody([1.5, 1.5, 3], createBoxGeometry(), 0x70c5a0, 'dynamic', {
       type: 'box',
       halfExtents: [0.5, 0.5, 0.5],
     });
@@ -452,32 +527,32 @@ async function start() {
       update: () => {
         if (physics!.paused) return;
         const snapshot = inputSystem!.snapshot('gameplay');
-        const handle = physicsSystem!.getBodyHandle(playerEntity!);
-        if (!handle) return;
-        const [x, z] = snapshot.getAxis2D('Move');
-        // Set horizontal speed from input directly: no acceleration buildup or residual drift.
-        const magnitude = Math.hypot(x, z);
-        const velocity = physics!.getLinearVelocity(handle);
-        const speed = 1.0;
-        physics!.setLinearVelocity(
-          handle,
-          magnitude > 0
-            ? [
-                (x / Math.max(1, magnitude)) * speed,
-                velocity[1],
-                -(z / Math.max(1, magnitude)) * speed,
-              ]
-            : [0, velocity[1], 0],
-        );
-        if (snapshot.wasPressed('Jump')) {
-          const pose = physics!.getPose(handle);
-          const ground = physics!.raycast(
-            { origin: pose.position, direction: [0, -1, 0], maxDistance: 0.56 },
-            { excludeEntities: [playerEntity!] },
-          );
-          if (ground && ground.normal[1] > 0.5)
-            physics!.applyImpulse(handle, [0, 1.2 * Math.sqrt(2.5), 0]);
+        if (!playerControllerHandle || !playerBodyHandle) return;
+        if (characterResetPending) {
+          characterResetPending = false;
+          return;
         }
+        const [x, z] = snapshot.getAxis2D('Move');
+        const magnitude = Math.hypot(x, z);
+        const speed = 4.2;
+        const directionX = magnitude > 1 ? x / magnitude : x;
+        const directionZ = magnitude > 1 ? z / magnitude : z;
+        if (snapshot.wasPressed('Jump') && characterGrounded) {
+          characterVerticalVelocity = 6.2;
+          characterGrounded = false;
+        }
+        characterVerticalVelocity = Math.max(-24, characterVerticalVelocity - 9.81 / 60);
+        const movement = physics!.moveCharacterController(playerControllerHandle, [
+          (directionX * speed) / 60,
+          characterVerticalVelocity / 60,
+          (-directionZ * speed) / 60,
+        ]);
+        characterGrounded = movement.grounded;
+        characterCollisionCount = movement.collisions.length;
+        if (characterGrounded && characterVerticalVelocity < 0) characterVerticalVelocity = 0;
+        characterHorizontalSpeed =
+          Math.hypot(movement.translation[0], movement.translation[2]) * 60;
+        if (characterState) characterState.dataset.speed = characterHorizontalSpeed.toFixed(2);
       },
     });
     runtime.scheduler.add(physicsSystem);
@@ -486,7 +561,7 @@ async function start() {
     runtime.world.query(RigidBody).forEach(() => {
       count += 1;
     });
-    bodyCount!.textContent = `${count} bodies`;
+    bodyCount!.textContent = `${count + (playerBodyHandle ? 1 : 0)} bodies`;
     status!.dataset.state = 'initializing';
     status!.textContent = 'WAITING FOR FIRST FIXED TICK';
     animationFrame = window.requestAnimationFrame(renderFrame);
@@ -494,6 +569,8 @@ async function start() {
     const message = error instanceof Error ? error.message : String(error);
     inputSystem?.dispose();
     physicsSystem?.dispose();
+    if (playerControllerHandle && physics)
+      physics.removeCharacterController(playerControllerHandle);
     physics?.dispose();
     void engine.dispose();
     status!.dataset.state = 'error';
@@ -534,6 +611,17 @@ stepButton.addEventListener('click', () => {
 
 resetSceneButton.addEventListener('click', () => {
   if (!physics || !physicsSystem) return;
+  if (playerBodyHandle && playerEntity && physics) {
+    const spawn = { position: [-3, 0.91, 0] as const, rotation: [0, 0, 0, 1] as const };
+    physics.setKinematicTarget(playerBodyHandle, spawn);
+    const transform = runtime.world.get(playerEntity, Transform);
+    if (transform) transform.position = [...spawn.position];
+    characterVerticalVelocity = 0;
+    characterGrounded = false;
+    characterCollisionCount = 0;
+    characterHorizontalSpeed = 0;
+    characterResetPending = true;
+  }
   for (const [entity, pose] of initialDynamicPoses) {
     const handle = physicsSystem.getBodyHandle(entity);
     if (!handle) continue;
@@ -568,6 +656,8 @@ window.addEventListener(
     window.cancelAnimationFrame(animationFrame);
     inputSystem?.dispose();
     physicsSystem?.dispose();
+    if (playerControllerHandle && physics)
+      physics.removeCharacterController(playerControllerHandle);
     physics?.dispose();
     void engine.dispose();
   },

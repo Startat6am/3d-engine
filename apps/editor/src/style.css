@@ -963,3 +963,97 @@ input:focus-visible {
     display: none;
   }
 }
+
+.voxel-inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 16px;
+}
+.voxel-inspector select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--border, #343b49);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: inherit;
+  background: var(--panel, #202631);
+}
+.voxel-inspector .vector-field input {
+  min-width: 0;
+  width: 100%;
+}
+.voxel-edit-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.voxel-edit-actions button,
+.voxel-delete {
+  min-height: 34px;
+  border: 1px solid var(--border, #343b49);
+  border-radius: 5px;
+  padding: 5px 8px;
+  color: inherit;
+  background: var(--panel, #202631);
+  cursor: pointer;
+}
+.voxel-edit-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.voxel-palette {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted, #a1aab8);
+  font-size: 12px;
+}
+.voxel-palette li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  text-transform: capitalize;
+}
+.voxel-palette li span {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--surface, #303846);
+  color: inherit;
+}
+.voxel-delete {
+  color: #ef9292;
+}
+
+.voxel-palette-entry {
+  display: grid !important;
+  grid-template-columns: 20px minmax(0, 1fr) auto 24px 24px 24px;
+  gap: 4px !important;
+}
+.voxel-palette-entry strong {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+.voxel-palette-entry small {
+  align-self: center;
+  white-space: nowrap;
+}
+.voxel-palette-entry button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border, #343b49);
+  border-radius: 4px;
+  color: inherit;
+  background: var(--panel, #202631);
+  cursor: pointer;
+}
+.voxel-palette-entry button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

@@ -177,7 +177,65 @@ test('empty scenes show an actionable state instead of an empty placeholder insp
   await page.getByRole('button', { name: 'Delete selected object' }).click();
   await expect(page.getByText('Empty scene')).toBeVisible();
   await expect(
-    page.getByText('Select an object in the Hierarchy or add a primitive to begin.'),
+    page.getByText('Select an object or voxel chunk in the Hierarchy, or add content to begin.'),
   ).toBeVisible();
   await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
+});
+
+test('editor can author and render a voxel chunk beside conventional mesh entities', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  const menu = page.locator('#hierarchy-add-menu');
+  await menu.getByRole('button', { name: /Voxel chunk/ }).click();
+
+  await expect(page.getByText('1 OBJECTS', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
+  await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
+  await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
+  await expect(page.getByLabel('Voxel chunk editor')).toBeVisible();
+  await expect(page.getByText('Revision 0 · 1 materials')).toBeVisible();
+
+  const cellX = page.getByLabel('Voxel cell X');
+  await cellX.fill('');
+  await cellX.pressSequentially('5');
+  await page.getByLabel('Voxel material').focus();
+  await expect(cellX).toHaveValue('5');
+  await cellX.fill('2');
+  await page.getByLabel('Voxel cell Y').fill('2');
+  await page.getByLabel('Voxel cell Z').fill('3');
+
+  const chunkX = page.getByLabel('Chunk X');
+  await chunkX.fill('2');
+  await chunkX.press('Enter');
+  await page.getByRole('button', { name: 'Move chunk' }).click();
+  await expect(page.getByText('Chunk (2, 0, 0)')).toBeVisible();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+
+  await page.getByLabel('Voxel material').selectOption('builtin:stone');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
+  await expect(page.locator('.voxel-palette')).toContainText('grass');
+  await expect(page.locator('.voxel-palette')).toContainText('stone');
+
+  await page.getByRole('button', { name: 'Move stone up' }).click();
+  await expect(page.getByText('Revision 3 · 2 materials')).toBeVisible();
+  await expect(page.locator('.voxel-palette-entry').nth(0)).toContainText('stone');
+  await expect(page.locator('.voxel-palette-entry').nth(1)).toContainText('grass');
+  await expect(page.getByRole('button', { name: 'Move grass up' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Move stone down' })).toBeEnabled();
+
+  await page.getByRole('button', { name: 'Erase cell' }).click();
+  await expect(page.getByText('Revision 4 · 2 materials')).toBeVisible();
+  await page.getByRole('button', { name: 'Remove stone' }).click();
+  await expect(page.getByText('Revision 5 · 1 materials')).toBeVisible();
+  await expect(page.locator('.voxel-palette')).toContainText('grass');
+  await expect(page.locator('.voxel-palette')).not.toContainText('stone');
+
+  await page.getByLabel('Y axis').click();
+  await page.getByRole('button', { name: 'Increase Y' }).click();
+  await expect(page.getByText('Chunk (2, 1, 0)')).toBeVisible();
+  await expect(page.getByText('Revision 6 · 1 materials')).toBeVisible();
+  await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
 });
