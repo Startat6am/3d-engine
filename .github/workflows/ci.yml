@@ -32,6 +32,18 @@ jobs:
           GLB_STRESS_TEXTURE_BYTES: 16777216
           GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB: 128
         run: node --expose-gc benchmarks/glb-import-stress.mjs
+      - name: Voxel world stress benchmark
+        run: |
+          mkdir -p benchmark-results
+          node benchmarks/voxel-world-stress.mjs > benchmark-results/voxel-world-stress.json
+          cat benchmark-results/voxel-world-stress.json
+      - name: Upload voxel benchmark results
+        if: always() && hashFiles('benchmark-results/voxel-world-stress.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxel-world-stress-results
+          path: benchmark-results/voxel-world-stress.json
+          retention-days: 30
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm e2e
       - name: Upload Playwright diagnostics on failure

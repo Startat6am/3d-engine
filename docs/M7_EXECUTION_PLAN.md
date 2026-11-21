@@ -69,7 +69,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Baseline exact-head quality gates passed in GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, both GLB benchmarks and Playwright Chromium E2E.
 - [x] Local `pnpm check` passed after voxel cell editor changes: Prettier, ESLint, TypeScript, 257/257 Vitest tests and package/app builds. Local Playwright cannot launch Chromium because the sandbox lacks `libglib-2.0.so.0`; exact-head Chromium acceptance passed in CI #615.
 - [x] Exact-head quality gates and Chromium E2E for the painted multi-material round-trip passed in CI #615.
-- [ ] Add voxel correctness, streaming, lifecycle and performance benchmarks with raw output.
+- [ ] Review exact-head `voxel-world-stress-results` CI artifact and record the Node/browser/host metadata and raw voxel benchmark measurements.
 - [ ] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
 - [ ] Add viewport ray-based voxel brush interaction after coordinate-based editing and palette management are validated.
 - [ ] Obtain owner acceptance of M7 scope and measured exit gates before closing M7.
@@ -95,4 +95,4 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 
 - Added `packages/engine-voxel/src/world-lifecycle.integration.test.ts` to exercise the generic world scheduler with actual voxel snapshots, revisioned edits, and asynchronous meshing. The test covers resident publication, explicit idempotent eviction, release callback ownership, scheduler disposal, and post-disposal rejection.
 - Exact-head GitHub Actions for the preceding E2E expectation corrections is running on `1ed5204678a554efd0ece3893f9e3ddba06dd6da`; do not treat it as passed until the run completes.
-- Remaining closeout work includes migration fixtures, voxel-specific correctness/streaming/performance benchmark evidence, asset-backed custom material/texture authoring, and owner acceptance.
+- Remaining closeout work includes migration fixtures, review of the CI voxel correctness/streaming/performance benchmark artifact, asset-backed custom material/texture authoring, browser-level streaming acceptance, and owner acceptance.
