@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { AssetRecord } from '@engine/assets';
 import voxelWorldV1Fixture from '../fixtures/voxel-world-v1.json' with { type: 'json' };
 import { createVoxelChunkSnapshot } from '@engine/voxel';
 import type { WorldDocument } from '@engine/serialization';
@@ -57,6 +58,64 @@ describe('voxel world project persistence', () => {
       chunkDimensions: { x: 16, y: 16, z: 16 },
     });
     expect(loaded.chunks).toEqual([]);
+  });
+
+  it('round-trips custom voxel material assets and their embedded source payloads', async () => {
+    const source = new TextEncoder().encode(
+      JSON.stringify({ schemaVersion: 1, name: 'Copper Alloy', color: 0xb87333, roughness: 0.9 }),
+    );
+    const digest = await crypto.subtle.digest('SHA-256', source.slice().buffer as ArrayBuffer);
+    const contentHash = `sha256:${Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+    const assetId = 'asset:voxel-material-copper';
+    const asset: AssetRecord = {
+      id: assetId as AssetRecord['id'],
+      name: 'Copper Alloy',
+      kind: 'material',
+      uri: 'materials/voxel/copper.json',
+      contentHash,
+      importer: { id: 'choreon.voxel-material', version: '1', settings: {} },
+      dependencies: [],
+      metadata: {
+        role: 'voxel-material',
+        color: 0xb87333,
+        roughness: 0.9,
+        mimeType: 'application/vnd.choreon.voxel-material+json',
+      },
+    };
+    const materialDocument: WorldDocument = {
+      ...document,
+      assets: [asset],
+      assetPayloads: [
+        {
+          assetId,
+          mimeType: 'application/vnd.choreon.voxel-material+json',
+          encoding: 'base64',
+          data: btoa(String.fromCharCode(...source)),
+        },
+      ],
+    };
+    const customMaterialChunk = createVoxelChunkSnapshot({
+      coordinate: { x: 0, y: 0, z: 0 },
+      palette: [{ material: { kind: 'asset', assetId } }],
+      cells: new Uint16Array(4096).fill(1),
+    });
+    const store = new MemoryProjectFileStore();
+    await saveVoxelWorldProject(store, materialDocument, settings, [customMaterialChunk]);
+    const loaded = await loadVoxelWorldProject(store);
+    expect(loaded.document.assets).toHaveLength(1);
+    expect(loaded.document.assets[0]).toMatchObject({
+      id: assetId,
+      kind: 'material',
+      contentHash,
+      metadata: { role: 'voxel-material', color: 0xb87333, roughness: 0.9 },
+    });
+    expect(loaded.chunks[0]?.palette).toEqual([{ material: { kind: 'asset', assetId } }]);
+    expect(loaded.document.assetPayloads?.[0]).toMatchObject({
+      assetId,
+      mimeType: 'application/vnd.choreon.voxel-material+json',
+      encoding: 'base64',
+      data: btoa(String.fromCharCode(...source)),
+    });
   });
 
   it('round-trips chunk metadata and cells using content-addressed blobs', async () => {

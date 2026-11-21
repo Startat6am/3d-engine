@@ -21,7 +21,8 @@ import {
   type RenderObject,
   type TextureSource,
 } from '@engine/renderer';
-import { meshVoxelChunk, type VoxelMaterialReference } from '@engine/voxel';
+import { meshVoxelChunk } from '@engine/voxel';
+import { resolveVoxelMaterialStyle } from './voxel-material.js';
 import { createPhysicsWorld, StaticMeshColliderSet, type PhysicsWorld } from '@engine/physics';
 import { createVoxelChunkColliderInputs } from './voxel-collision.js';
 import type { WorldDocument } from '@engine/serialization';
@@ -52,20 +53,6 @@ function readVector(
 
 function chunkKey(x: number, y: number, z: number): string {
   return `${x},${y},${z}`;
-}
-
-function materialColor(reference: VoxelMaterialReference): number {
-  if (reference.kind === 'asset') return 0x9ca3af;
-  const colors: Readonly<Record<string, number>> = {
-    grass: 0x65a30d,
-    dirt: 0x92400e,
-    stone: 0x94a3b8,
-    sand: 0xe7c77a,
-    wood: 0x9a6338,
-    water: 0x3b82f6,
-    snow: 0xe2e8f0,
-  };
-  return colors[reference.key.toLowerCase()] ?? 0x9ca3af;
 }
 
 const canvas = document.querySelector<HTMLCanvasElement>('#player');
@@ -554,7 +541,13 @@ async function openProjectFolder(): Promise<void> {
       return mesh.parts.map((part) => ({
         position: origin,
         geometry: part.geometry,
-        material: createDefaultMaterial(materialColor(part.material)),
+        material: (() => {
+          const style = resolveVoxelMaterialStyle(
+            part.material,
+            project.document.assets as readonly AssetRecord[],
+          );
+          return { ...createDefaultMaterial(style.color), roughness: style.roughness };
+        })(),
       }));
     });
 

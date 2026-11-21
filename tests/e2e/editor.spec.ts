@@ -182,6 +182,30 @@ test('empty scenes show an actionable state instead of an empty placeholder insp
   await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
 });
 
+test('editor creates project-backed voxel material assets and paints with them', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
+  await page.getByLabel('New voxel material name').fill('Copper Alloy');
+  await page.getByLabel('New voxel material color').fill('#b87333');
+  await page.getByRole('button', { name: 'Create material' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Select Copper Alloy voxel material' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Select Copper Alloy voxel material' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await expect(page.locator('.voxel-palette')).toContainText('Copper Alloy');
+  await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
+});
+
 test('editor can author and render a voxel chunk beside conventional mesh entities', async ({
   page,
 }) => {

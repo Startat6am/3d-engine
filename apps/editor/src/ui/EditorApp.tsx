@@ -359,6 +359,11 @@ export function EditorApp() {
     z: 0,
   });
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
+  const [voxelAssetMaterials, setVoxelAssetMaterials] = useState<
+    readonly { assetId: string; name: string; color: number; roughness: number }[]
+  >([]);
+  const [newVoxelMaterialName, setNewVoxelMaterialName] = useState('Custom Material');
+  const [newVoxelMaterialColor, setNewVoxelMaterialColor] = useState('#a87952');
   const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
   const [cameraTool, setCameraTool] = useState<'select' | 'pan' | 'rotate'>('select');
   const [brushPreview, setBrushPreview] = useState<{
@@ -452,9 +457,18 @@ export function EditorApp() {
             part.material.kind === 'builtin'
               ? getBuiltinVoxelMaterial(part.material.key)
               : undefined;
+          const assetMaterial =
+            part.material.kind === 'asset'
+              ? assetRegistryRef.current.get(part.material.assetId as AssetId)
+              : undefined;
+          const assetColor = assetMaterial?.metadata.color;
+          const assetRoughness = assetMaterial?.metadata.roughness;
           return {
-            ...createDefaultMaterial(builtin?.color ?? 0x8995a5),
+            ...createDefaultMaterial(
+              builtin?.color ?? (typeof assetColor === 'number' ? assetColor : 0x8995a5),
+            ),
             ...(builtin ? { roughness: builtin.roughness } : {}),
+            ...(typeof assetRoughness === 'number' ? { roughness: assetRoughness } : {}),
           };
         })(),
         position,
@@ -462,7 +476,7 @@ export function EditorApp() {
         scale: [1, 1, 1] as const,
       }));
     });
-  }, [voxelChunks, voxelWorldSettings]);
+  }, [voxelChunks, voxelWorldSettings, voxelAssetMaterials]);
   const brushPreviewObject = useMemo<RenderObject | null>(() => {
     if (!brushPreview || cameraTool !== 'select') return null;
     const chunk = voxelChunks.find(
@@ -715,13 +729,64 @@ export function EditorApp() {
     commitVoxelPalette(palette, (value) => (value > storedIndex ? value - 1 : value));
   };
 
+  const createVoxelMaterialAsset = async () => {
+    const name = newVoxelMaterialName.trim();
+    if (!name || !/^#[0-9a-fA-F]{6}$/.test(newVoxelMaterialColor)) return;
+    const color = Number.parseInt(newVoxelMaterialColor.slice(1), 16);
+    const roughness = 0.9;
+    const assetId = ('asset:voxel-material-' + crypto.randomUUID()) as AssetId;
+    const source = new TextEncoder().encode(
+      JSON.stringify({ schemaVersion: 1, name, color, roughness }),
+    );
+    const sourceBuffer = source.buffer.slice(
+      source.byteOffset,
+      source.byteOffset + source.byteLength,
+    ) as ArrayBuffer;
+    const contentHash = await sha256(sourceBuffer);
+    const record = assetRegistryRef.current.register({
+      id: assetId,
+      name,
+      kind: 'material',
+      uri: 'materials/voxel/' + assetId.slice('asset:'.length) + '.json',
+      contentHash,
+      importer: { id: 'choreon.voxel-material', version: '1', settings: {} },
+      metadata: {
+        role: 'voxel-material',
+        color,
+        roughness,
+        mimeType: 'application/vnd.choreon.voxel-material+json',
+      },
+    });
+    assetPayloadsRef.current.set(assetId, {
+      assetId,
+      mimeType: 'application/vnd.choreon.voxel-material+json',
+      encoding: 'base64',
+      data: encodeBase64(sourceBuffer),
+    });
+    setVoxelAssetMaterials((current) => [
+      ...current,
+      { assetId: record.id, name: record.name, color, roughness },
+    ]);
+    setVoxelMaterial('asset:' + assetId);
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel materials',
+      message: 'Custom voxel material created',
+      details: name + ' is stored as a project asset and can be shared by chunks.',
+    });
+  };
+
   const updateVoxelCell = (value: number, cell = voxelCell) => {
     if (!selectedVoxelChunk) return;
-    const [kind, key] = voxelMaterial.split(':');
-    const material =
-      kind === 'asset'
-        ? { kind: 'asset' as const, assetId: key ?? '' }
-        : { kind: 'builtin' as const, key: key ?? 'grass' };
+    const material = voxelMaterial.startsWith('asset:')
+      ? { kind: 'asset' as const, assetId: voxelMaterial.slice('asset:'.length) }
+      : {
+          kind: 'builtin' as const,
+          key: voxelMaterial.startsWith('builtin:')
+            ? voxelMaterial.slice('builtin:'.length)
+            : 'grass',
+        };
     const existingIndex = selectedVoxelChunk.palette.findIndex(
       (entry) =>
         entry.material.kind === material.kind &&
@@ -1256,6 +1321,18 @@ export function EditorApp() {
         throw new Error('World contains duplicate entity IDs');
       assetRegistryRef.current = restoredAssetRegistry;
       assetPayloadsRef.current = restoredAssetPayloads;
+      setVoxelAssetMaterials(
+        restoredAssetRegistry
+          .list('material')
+          .filter((record) => record.metadata.role === 'voxel-material')
+          .map((record) => ({
+            assetId: record.id,
+            name: record.name,
+            color: typeof record.metadata.color === 'number' ? record.metadata.color : 0x8995a5,
+            roughness:
+              typeof record.metadata.roughness === 'number' ? record.metadata.roughness : 0.9,
+          })),
+      );
       commitEntities(parsed);
       if (options.replaceAssets) {
         for (const lease of assetResourceLeasesRef.current) lease.release();
@@ -2383,7 +2460,57 @@ export function EditorApp() {
                     </button>
                   );
                 })}
+                {voxelAssetMaterials.map((material) => {
+                  const materialRef = 'asset:' + material.assetId;
+                  const selected = voxelMaterial === materialRef;
+                  return (
+                    <button
+                      key={material.assetId}
+                      type="button"
+                      className={
+                        selected ? 'voxel-material-swatch selected' : 'voxel-material-swatch'
+                      }
+                      aria-pressed={selected}
+                      aria-label={'Select ' + material.name + ' voxel material'}
+                      title={material.name}
+                      onClick={() => setVoxelMaterial(materialRef)}
+                    >
+                      <span
+                        className="voxel-material-color"
+                        style={{
+                          backgroundColor: '#' + material.color.toString(16).padStart(6, '0'),
+                        }}
+                      />
+                      <span>{material.name}</span>
+                    </button>
+                  );
+                })}
               </div>
+              <div className="voxel-material-authoring">
+                <input
+                  aria-label="New voxel material name"
+                  value={newVoxelMaterialName}
+                  onChange={(event) => setNewVoxelMaterialName(event.target.value)}
+                  placeholder="Material name"
+                />
+                <input
+                  aria-label="New voxel material color"
+                  type="color"
+                  value={newVoxelMaterialColor}
+                  onChange={(event) => setNewVoxelMaterialColor(event.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => void createVoxelMaterialAsset()}
+                  disabled={!newVoxelMaterialName.trim()}
+                >
+                  Create material
+                </button>
+              </div>
+              <small>
+                Built-ins and custom project materials share the world library. Custom materials are
+                embedded in the project and referenced by stable asset ID.
+              </small>
               <small>
                 Choose a shared world material. A chunk adds its reference only after you paint with
                 it.
@@ -2413,8 +2540,14 @@ export function EditorApp() {
               <label>PALETTE</label>
               <ul className="voxel-palette">
                 {selectedVoxelChunk.palette.map((entry, index) => {
-                  const materialName =
-                    entry.material.kind === 'builtin' ? entry.material.key : entry.material.assetId;
+                  const isBuiltinMaterial = entry.material.kind === 'builtin';
+                  const materialName = isBuiltinMaterial
+                    ? entry.material.key
+                    : entry.material.assetId;
+                  const materialLabel = isBuiltinMaterial
+                    ? (getBuiltinVoxelMaterial(entry.material.key)?.label ?? materialName)
+                    : (voxelAssetMaterials.find((material) => material.assetId === materialName)
+                        ?.name ?? materialName);
                   const usage = voxelPaletteUsage[index] ?? 0;
                   return (
                     <li
@@ -2422,11 +2555,7 @@ export function EditorApp() {
                       className="voxel-palette-entry"
                     >
                       <span>{index + 1}</span>
-                      <strong>
-                        {entry.material.kind === 'builtin'
-                          ? (getBuiltinVoxelMaterial(entry.material.key)?.label ?? materialName)
-                          : materialName}
-                      </strong>
+                      <strong>{materialLabel}</strong>
                       <small>{usage} cells</small>
                       <button
                         aria-label={'Move ' + materialName + ' up'}
