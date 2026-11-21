@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import voxelWorldV1Fixture from '../fixtures/voxel-world-v1.json' with { type: 'json' };
 import { createVoxelChunkSnapshot } from '@engine/voxel';
 import type { WorldDocument } from '@engine/serialization';
 import {
@@ -42,6 +43,22 @@ class RecordingStore extends MemoryProjectFileStore {
 }
 
 describe('voxel world project persistence', () => {
+  it('loads the checked-in v1 voxel-world compatibility fixture', async () => {
+    const store = new MemoryProjectFileStore();
+    await store.writeFile(
+      'worlds/main.world',
+      new TextEncoder().encode(JSON.stringify(voxelWorldV1Fixture)),
+    );
+
+    const loaded = await loadVoxelWorldProject(store);
+    expect(loaded.document.world.name).toBe('Voxel World v1 Fixture');
+    expect(loaded.settings).toEqual({
+      voxelSize: 1,
+      chunkDimensions: { x: 16, y: 16, z: 16 },
+    });
+    expect(loaded.chunks).toEqual([]);
+  });
+
   it('round-trips chunk metadata and cells using content-addressed blobs', async () => {
     const store = new RecordingStore();
     await saveVoxelWorldProject(store, document, settings, [chunk(-1), chunk(1)]);

@@ -1,0 +1,22 @@
+{
+  "format": "universal-3d-world",
+  "schemaVersion": "1.0.0",
+  "engineVersion": "0.1.0",
+  "world": {
+    "id": "world:voxel-v1-fixture",
+    "name": "Voxel World v1 Fixture",
+    "settings": {},
+    "entities": []
+  },
+  "assets": [],
+  "extensions": {
+    "com.choreon.voxel-world": {
+      "schemaVersion": 1,
+      "settings": {
+        "voxelSize": 1,
+        "chunkDimensions": { "x": 16, "y": 16, "z": 16 }
+      },
+      "chunks": []
+    }
+  }
+}
