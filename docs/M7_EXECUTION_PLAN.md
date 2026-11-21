@@ -67,6 +67,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Pass exact-head CI for the custom material + texture + roughness Editor→Player round-trip. Full exact-head GitHub Actions [run #44954649654](https://github.com/Startat6am/3d-engine/actions/runs/44954649654) passed on `0f509be5c83f063d0be5687a4c6e2dd8d913846b`: 269 unit tests, package/app builds, both GLB benchmarks, voxel stress benchmark, and 25 Chromium E2E tests.
 - [x] Pass exact-head Chromium E2E for palette reorder/removal, usage protection and cell-index remapping; covered by exact-head CI #44950812077.
 - [x] Pass exact-head Chromium E2E for painted multi-material chunk save/reopen, verifying revision, palette and Player voxel mesh output; passed in [CI #615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`.
+- [ ] Pass exact-head Chromium E2E for a loaded voxel + textured-asset Player scene releasing GPU buffers/textures and stopping its render loop on `pagehide`; the focused local Chromium round-trip passes. This verifies loaded-world shutdown ownership, not camera-driven chunk streaming.
 
 ## Phase 5 — verification and closeout
 

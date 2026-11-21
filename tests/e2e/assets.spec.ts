@@ -602,7 +602,31 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   // scene, including the GLB geometry, PBR material, embedded image and static voxel collider.
   await page.goto('http://127.0.0.1:5174');
   await page.evaluate((entries) => {
-    (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads = 0;
+    const state = window as Window & {
+      __glbImageBitmapUploads: number;
+      __playerDeletedBuffers: number;
+      __playerDeletedTextures: number;
+      __playerDrawCalls: number;
+    };
+    state.__glbImageBitmapUploads = 0;
+    state.__playerDeletedBuffers = 0;
+    state.__playerDeletedTextures = 0;
+    state.__playerDrawCalls = 0;
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (...args) {
+      state.__playerDrawCalls += 1;
+      return drawElements.apply(this, args);
+    };
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__playerDeletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
+    const deleteTexture = WebGL2RenderingContext.prototype.deleteTexture;
+    WebGL2RenderingContext.prototype.deleteTexture = function (texture) {
+      state.__playerDeletedTextures += 1;
+      return deleteTexture.call(this, texture);
+    };
     const files = new Map(
       entries.map(({ path, bytes }) => [path, { bytes: new Uint8Array(bytes) }]),
     );
@@ -666,7 +690,45 @@ test('directory project saves content-addressed blobs and opens atomically', asy
         () => (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads,
       ),
     )
+    .toBeGreaterThanOrEqual(2);
+
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
+    )
     .toBeGreaterThan(0);
+  const beforeDispose = await page.evaluate(() => {
+    const state = window as Window & {
+      __playerDeletedBuffers: number;
+      __playerDeletedTextures: number;
+    };
+    return { ...state };
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__playerDeletedBuffers);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerDeletedTextures: number }).__playerDeletedTextures,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__playerDeletedTextures);
+  await page.waitForTimeout(100);
+  const settledDrawCalls = await page.evaluate(
+    () => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls,
+  );
+  await page.waitForTimeout(100);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
+    )
+    .toBe(settledDrawCalls);
 });
 
 test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
