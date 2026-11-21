@@ -2141,7 +2141,7 @@ export function EditorApp() {
                 </div>
               </div>
               <button
-                onClick={moveSelectedVoxelChunk}
+                onClick={() => moveSelectedVoxelChunk()}
                 disabled={
                   voxelChunkTarget.x === selectedVoxelChunk.coordinate.x &&
                   voxelChunkTarget.y === selectedVoxelChunk.coordinate.y &&
