@@ -469,9 +469,16 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await page.getByLabel('Voxel cell Z').fill('3');
   await page.getByRole('button', { name: 'Paint cell' }).click();
   await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('3');
   await page.getByRole('button', { name: 'Select Stone voxel material' }).click();
   await page.getByRole('button', { name: 'Paint cell' }).click();
   await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('4');
+  await page.getByLabel('New voxel material name').fill('Copper Alloy');
+  await page.getByLabel('New voxel material color').fill('#b87333');
+  await page.getByRole('button', { name: 'Create material' }).click();
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 3 · 3 materials')).toBeVisible();
 
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
@@ -511,15 +518,24 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     };
   });
   expect(saved.manifest.assetPayloads).toBeUndefined();
-  expect(saved.manifest.assets).toHaveLength(2);
+  expect(saved.manifest.assets).toHaveLength(3);
+  expect(saved.manifest.assets.some((asset) => asset.kind === 'material')).toBe(true);
   expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
   expect(saved.paths).toContain('worlds/main.world');
   expect(saved.paths.some((path) => path.startsWith('voxel/chunks/sha256/'))).toBe(true);
-  expect(saved.paths).toHaveLength(4);
+  expect(saved.paths).toHaveLength(5);
   const savedVoxelChunk = saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks[0];
   expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
-  expect(savedVoxelChunk?.revision).toBe(2);
-  expect(savedVoxelChunk?.palette.map((entry) => entry.material.key)).toEqual(['grass', 'stone']);
+  expect(savedVoxelChunk?.revision).toBe(3);
+  expect(savedVoxelChunk?.palette.map((entry) => entry.material.key)).toEqual([
+    'grass',
+    'stone',
+    undefined,
+  ]);
+  expect(savedVoxelChunk?.palette[2]?.material).toMatchObject({
+    kind: 'asset',
+    assetId: expect.stringMatching(/^asset:voxel-material-/),
+  });
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
 
   // Change the active scene, then reopen the folder. The directory loader should
@@ -631,7 +647,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   const playerStatus = page.locator('#project-status');
   await expect(playerStatus).toContainText('Loaded');
   await expect(playerStatus).toContainText('rendered mesh parts');
-  await expect(playerStatus).toContainText('1 voxel mesh parts');
+  await expect(playerStatus).toContainText('3 voxel mesh parts');
   await expect(playerStatus).toContainText('static voxel colliders');
   await expect(playerStatus).not.toContainText('unsupported');
   await expect
