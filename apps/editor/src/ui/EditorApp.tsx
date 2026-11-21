@@ -342,6 +342,7 @@ export function EditorApp() {
   const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
   const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<string | null>(null);
   const [voxelCell, setVoxelCell] = useState({ x: 0, y: 1, z: 0 });
+  const [voxelChunkTarget, setVoxelChunkTarget] = useState({ x: 0, y: 0, z: 0 });
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -383,6 +384,10 @@ export function EditorApp() {
         chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z ===
         selectedVoxelChunkKey,
     ) ?? null;
+  useEffect(() => {
+    if (selectedVoxelChunk) setVoxelChunkTarget({ ...selectedVoxelChunk.coordinate });
+  }, [selectedVoxelChunk]);
+
   const voxelPaletteUsage = useMemo(() => {
     if (!selectedVoxelChunk) return [];
     const counts = new Array<number>(selectedVoxelChunk.palette.length).fill(0);
@@ -713,6 +718,54 @@ export function EditorApp() {
         '), revision ' +
         result.snapshot.revision +
         '.',
+    });
+  };
+
+  const moveSelectedVoxelChunk = () => {
+    if (!selectedVoxelChunk) return;
+    const { x, y, z } = voxelChunkTarget;
+    if (![x, y, z].every(Number.isSafeInteger)) return;
+    const nextKey = x + ',' + y + ',' + z;
+    const currentKey =
+      selectedVoxelChunk.coordinate.x + ',' +
+      selectedVoxelChunk.coordinate.y + ',' +
+      selectedVoxelChunk.coordinate.z;
+    if (nextKey === currentKey) return;
+    if (
+      voxelChunks.some(
+        (chunk) =>
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === nextKey,
+      )
+    ) {
+      pushDiagnostic({
+        level: 'warning',
+        source: 'Voxel editor',
+        message: 'Cannot move chunk to an occupied coordinate',
+        details: 'Chunk ' + nextKey + ' already exists.',
+      });
+      return;
+    }
+    if (selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
+    const snapshot = createVoxelChunkSnapshot({
+      coordinate: createChunkCoordinate({ x, y, z }),
+      revision: selectedVoxelChunk.revision + 1,
+      palette: selectedVoxelChunk.palette,
+      cells: selectedVoxelChunk.copyCells(),
+    });
+    setVoxelChunks((current) =>
+      current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === currentKey
+          ? snapshot
+          : chunk,
+      ),
+    );
+    setSelectedVoxelChunkKey(nextKey);
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel chunk moved',
+      details: currentKey + ' → ' + nextKey + ', revision ' + snapshot.revision + '.',
     });
   };
 
@@ -1993,24 +2046,49 @@ export function EditorApp() {
                 <span>XYZ</span>
                 <div>
                   {(['x', 'y', 'z'] as const).map((axis) => (
-                    <input
+                    <TransformNumberInput
                       key={axis}
-                      aria-label={'Voxel cell ' + axis.toUpperCase()}
-                      type="number"
-                      min="0"
-                      max="15"
-                      step="1"
+                      label={'Voxel cell ' + axis.toUpperCase()}
                       value={voxelCell[axis]}
-                      onChange={(event) =>
-                        setVoxelCell((current) => ({
-                          ...current,
-                          [axis]: Number(event.target.value),
-                        }))
-                      }
+                      onCommit={(nextValue) => {
+                        const next = Number(nextValue);
+                        if (Number.isInteger(next) && next >= 0 && next < 16) {
+                          setVoxelCell((current) => ({ ...current, [axis]: next }));
+                        }
+                      }}
                     />
                   ))}
                 </div>
               </div>
+              <label>CHUNK COORDINATES</label>
+              <div className="vector-field">
+                <span>XYZ</span>
+                <div>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <TransformNumberInput
+                      key={axis}
+                      label={'Chunk ' + axis.toUpperCase()}
+                      value={voxelChunkTarget[axis]}
+                      onCommit={(nextValue) => {
+                        const next = Number(nextValue);
+                        if (Number.isSafeInteger(next)) {
+                          setVoxelChunkTarget((current) => ({ ...current, [axis]: next }));
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={moveSelectedVoxelChunk}
+                disabled={
+                  voxelChunkTarget.x === selectedVoxelChunk.coordinate.x &&
+                  voxelChunkTarget.y === selectedVoxelChunk.coordinate.y &&
+                  voxelChunkTarget.z === selectedVoxelChunk.coordinate.z
+                }
+              >
+                Move chunk
+              </button>
               <label>PAINT MATERIAL</label>
               <select
                 aria-label="Voxel material"
