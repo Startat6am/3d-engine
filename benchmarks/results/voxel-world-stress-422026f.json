@@ -2,11 +2,7 @@
   "benchmark": "choreon-voxel-world-stress-v1",
   "generatedFixtures": true,
   "configuration": {
-    "chunkDimensions": [
-      16,
-      16,
-      16
-    ],
+    "chunkDimensions": [16, 16, 16],
     "chunkCells": 4096,
     "voxelSize": 1,
     "repeats": 8,
