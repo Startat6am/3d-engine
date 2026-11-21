@@ -195,7 +195,7 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
   await expect(page.getByLabel('Voxel chunk editor')).toBeVisible();
-  await expect(page.getByText('Revision 0 · 1 materials')).toBeVisible();
+  await expect(page.getByText('Revision 0 · 0 materials')).toBeVisible();
 
   const cellX = page.getByLabel('Voxel cell X');
   await cellX.fill('');
@@ -211,11 +211,13 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await chunkX.press('Enter');
   await page.getByRole('button', { name: 'Move chunk' }).click();
   await expect(page.getByText('Chunk (2, 0, 0)')).toBeVisible();
-  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await expect(page.getByText('Revision 1 · 0 materials')).toBeVisible();
 
-  await page.getByLabel('Voxel material').selectOption('builtin:stone');
   await page.getByRole('button', { name: 'Paint cell' }).click();
-  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
+  await expect(page.getByText('Revision 2 · 1 materials')).toBeVisible();
+  await page.getByRole('button', { name: 'Select Stone voxel material' }).click();
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 5 · 2 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette')).toContainText('grass');
   await expect(page.locator('.voxel-palette')).toContainText('stone');
 
@@ -229,7 +231,7 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await page.getByRole('button', { name: 'Erase cell' }).click();
   await expect(page.getByText('Revision 4 · 2 materials')).toBeVisible();
   await page.getByRole('button', { name: 'Remove stone' }).click();
-  await expect(page.getByText('Revision 5 · 1 materials')).toBeVisible();
+  await expect(page.getByText('Revision 7 · 1 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette')).toContainText('grass');
   await expect(page.locator('.voxel-palette')).not.toContainText('stone');
 

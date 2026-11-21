@@ -467,9 +467,11 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await page.getByLabel('Voxel cell X').fill('2');
   await page.getByLabel('Voxel cell Y').fill('2');
   await page.getByLabel('Voxel cell Z').fill('3');
-  await page.getByLabel('Voxel material').selectOption('builtin:stone');
   await page.getByRole('button', { name: 'Paint cell' }).click();
-  await expect(page.getByText('Revision 1 · 2 materials')).toBeVisible();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await page.getByRole('button', { name: 'Select Stone voxel material' }).click();
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
 
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
@@ -516,7 +518,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   expect(saved.paths).toHaveLength(4);
   const savedVoxelChunk = saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks[0];
   expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
-  expect(savedVoxelChunk?.revision).toBe(1);
+  expect(savedVoxelChunk?.revision).toBe(2);
   expect(savedVoxelChunk?.palette.map((entry) => entry.material.key)).toEqual(['grass', 'stone']);
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
 
