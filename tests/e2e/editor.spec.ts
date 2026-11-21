@@ -230,5 +230,10 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await expect(page.getByText('Revision 5 · 1 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette')).toContainText('grass');
   await expect(page.locator('.voxel-palette')).not.toContainText('stone');
+
+  await page.getByLabel('Y axis').click();
+  await page.getByRole('button', { name: 'Increase Y' }).click();
+  await expect(page.getByText('Chunk (2, 1, 0)')).toBeVisible();
+  await expect(page.getByText('Revision 6 · 1 materials')).toBeVisible();
   await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
 });
