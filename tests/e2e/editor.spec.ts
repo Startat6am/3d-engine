@@ -206,7 +206,9 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await page.getByLabel('Voxel cell Y').fill('2');
   await page.getByLabel('Voxel cell Z').fill('3');
 
-  await page.getByLabel('Chunk X').fill('2');
+  const chunkX = page.getByLabel('Chunk X');
+  await chunkX.fill('2');
+  await chunkX.press('Enter');
   await page.getByRole('button', { name: 'Move chunk' }).click();
   await expect(page.getByText('Chunk (2, 0, 0)')).toBeVisible();
   await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
