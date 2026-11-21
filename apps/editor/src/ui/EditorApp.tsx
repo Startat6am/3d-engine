@@ -21,6 +21,7 @@ import {
   type VoxelChunkSnapshot,
 } from '@engine/project-storage';
 import { EditorHistory } from './EditorHistory.js';
+import { resolveVoxelBrushCell } from './voxelBrush.js';
 import { readPbrMaterialState } from './materialValidation.js';
 import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
@@ -352,6 +353,7 @@ export function EditorApp() {
     z: 0,
   });
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
+  const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -668,7 +670,7 @@ export function EditorApp() {
     commitVoxelPalette(palette, (value) => (value > storedIndex ? value - 1 : value));
   };
 
-  const updateVoxelCell = (value: number) => {
+  const updateVoxelCell = (value: number, cell = voxelCell) => {
     if (!selectedVoxelChunk) return;
     const [kind, key] = voxelMaterial.split(':');
     const material =
@@ -694,7 +696,7 @@ export function EditorApp() {
       });
       paletteIndex = palette.length;
     }
-    const result = editVoxelChunk(base, [{ ...voxelCell, value: value === 0 ? 0 : paletteIndex }]);
+    const result = editVoxelChunk(base, [{ ...cell, value: value === 0 ? 0 : paletteIndex }]);
     if (result.snapshot === selectedVoxelChunk) return;
     const chunkKey =
       selectedVoxelChunk.coordinate.x +
@@ -718,11 +720,11 @@ export function EditorApp() {
         'Chunk ' +
         chunkKey +
         ', cell (' +
-        voxelCell.x +
+        cell.x +
         ', ' +
-        voxelCell.y +
+        cell.y +
         ', ' +
-        voxelCell.z +
+        cell.z +
         '), revision ' +
         result.snapshot.revision +
         '.',
@@ -2034,15 +2036,42 @@ export function EditorApp() {
               if (moved > 4) return;
               const canvas = event.currentTarget;
               const bounds = canvas.getBoundingClientRect();
-              const hit = rendererRef.current?.pick(
-                event.clientX - bounds.left,
-                event.clientY - bounds.top,
-                bounds.width,
-                bounds.height,
-              );
-              if (hit) {
+              const localX = event.clientX - bounds.left;
+              const localY = event.clientY - bounds.top;
+              const renderer = rendererRef.current;
+              const surface = renderer?.pickSurface(localX, localY, bounds.width, bounds.height);
+              if (surface?.entityId.startsWith('voxel:')) {
+                const match = /^voxel:(-?\d+),(-?\d+),(-?\d+):/.exec(surface.entityId);
+                if (!match) return;
+                const key = `${match[1]},${match[2]},${match[3]}`;
+                if (
+                  !selectedVoxelChunk ||
+                  key !==
+                    `${selectedVoxelChunk.coordinate.x},${selectedVoxelChunk.coordinate.y},${selectedVoxelChunk.coordinate.z}`
+                ) {
+                  setSelectedVoxelChunkKey(key);
+                  setSelectedId('');
+                  return;
+                }
+                const cell = resolveVoxelBrushCell(
+                  surface,
+                  selectedVoxelChunk,
+                  voxelWorldSettings,
+                  voxelBrushMode,
+                );
+                if (cell) {
+                  setVoxelCell(cell);
+                  updateVoxelCell(voxelBrushMode === 'paint' ? 1 : 0, cell);
+                } else {
+                  pushDiagnostic({
+                    level: 'warning',
+                    source: 'Voxel editor',
+                    message: 'Brush target is outside the selected chunk',
+                  });
+                }
+              } else if (surface) {
                 setSelectedVoxelChunkKey(null);
-                setSelectedId(hit);
+                setSelectedId(surface.entityId);
               }
             }}
             onPointerCancel={(event) => {
@@ -2150,6 +2179,22 @@ export function EditorApp() {
               >
                 Move chunk
               </button>
+              <label>VIEWPORT BRUSH</label>
+              <div className="voxel-edit-actions">
+                <button
+                  aria-pressed={voxelBrushMode === 'paint'}
+                  onClick={() => setVoxelBrushMode('paint')}
+                >
+                  Paint tool
+                </button>
+                <button
+                  aria-pressed={voxelBrushMode === 'erase'}
+                  onClick={() => setVoxelBrushMode('erase')}
+                >
+                  Erase tool
+                </button>
+              </div>
+              <small>Click a visible voxel face in the viewport to edit it</small>
               <label>PAINT MATERIAL</label>
               <select
                 aria-label="Voxel material"
