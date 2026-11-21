@@ -1,9 +1,9 @@
 # M7 Execution Plan — World & Voxels
 
-**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player loads voxel project folders, restores primitive entities, and imports saved GLB assets through the shared importer, including node transforms, mesh primitives, PBR factors and embedded texture channels. Player integrates bounded voxel collision geometry with the public PhysicsWorld API through `createVoxelChunkColliderInputs` and `StaticMeshColliderSet`, including source/neighbor revision tokens, configured chunk origins, pre-allocation mesh budgets, replacement and page-disposal cleanup. Editor now provides a voxel editor that supports selecting chunks, painting/erasing cells by local XYZ coordinates, selecting built-in Grass/Dirt/Stone materials, and revisioned palette updates alongside conventional entities. Cross-app E2E verifies painted multi-material chunk persistence and Player mesh reconstruction; exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) passed on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`. Viewport ray-based brush painting, migration fixtures, full streaming lifecycle acceptance and voxel benchmarks remain open. Palette entries can now be reordered with cell-index remapping or removed when unused.
+**Status:** ACTIVE — world/chunk core, deterministic CPU meshing, stale-result validation, cooperative cancellation, bounded scheduling, seeded generation, v1 content-addressed persistence, and Editor project persistence wiring are implemented. Player loads voxel project folders, restores primitive entities, and imports saved GLB assets through the shared importer, including node transforms, mesh primitives, PBR factors and embedded texture channels. Player integrates bounded voxel collision geometry with the public PhysicsWorld API through `createVoxelChunkColliderInputs` and `StaticMeshColliderSet`, including source/neighbor revision tokens, configured chunk origins, pre-allocation mesh budgets, replacement and page-disposal cleanup. Editor now provides a voxel editor that supports selecting chunks, painting/erasing cells by local XYZ coordinates, selecting built-in Grass/Dirt/Stone materials, and revisioned palette updates alongside conventional entities. Cross-app E2E verifies painted multi-material chunk persistence and Player mesh reconstruction; exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) passed on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`. Viewport ray-based brush painting and hover preview are implemented. Cross-package scheduler/voxel lifecycle integration coverage is now present; browser-level streaming acceptance, migration fixtures, asset-backed material authoring and voxel benchmarks remain open. Palette entries can now be reordered with cell-index remapping or removed when unused.
 **Branch:** `feat/m7-world-voxels-main`  
 **Base:** `main` (M6 integrated at `54def10255ca8fad661e0077b15c3332d6a390f3`).  
-**Updated:** 2026-11-21
+**Updated:** 2026-11-22
 
 ## Goal
 
@@ -44,7 +44,7 @@ Deliver a bounded world/chunk layer, validated voxel representation, determinist
 - [x] Add a deterministic seeded generator context/PRNG hook and deterministic test generator.
 - [ ] Keep main-thread execution as the correctness baseline; add workers only after contract parity tests.
 - [x] Add repeated load/evict/dispose lifecycle stress coverage and scheduler diagnostics.
-- [ ] Add end-to-end load/edit/mesh/evict/dispose coverage across the full voxel pipeline.
+- [x] Add cross-package load/edit/mesh/evict/dispose integration coverage joining `WorldChunkScheduler`, immutable voxel snapshots, revisioned cell edits, and async CPU meshing. The test verifies mesh output, resident publication, idempotent eviction, release callbacks, disposal cleanup, and rejection after disposal. Browser-level streaming orchestration remains a separate future acceptance item.
 
 ## Phase 4 — serialization and runtime integration
 
@@ -62,7 +62,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Add coordinate-based Editor voxel cell paint/erase with built-in material selection, automatic palette extension, immutable revisioned edits and chunk removal.
 - [x] Add palette reordering with cell-index remapping and safe removal of unused palette entries.
 - [ ] Pass exact-head Chromium E2E for palette reorder/removal, usage protection and cell-index remapping; coverage added, CI #631 pending.
-- [x] Pass exact-head Chromium E2E for painted multi-material chunk save/reopen, verifying revision, palette and Player mesh parts; passed in [CI #615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`.
+- [x] Pass exact-head Chromium E2E for painted multi-material chunk save/reopen, verifying revision, palette and Player voxel mesh output; passed in [CI #615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`.
 
 ## Phase 5 — verification and closeout
 
@@ -88,5 +88,11 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - `@engine/voxel` exposes a stable v1 little-endian chunk payload codec (8192 bytes per 16³ chunk).
 - `@engine/project-storage` owns `com.choreon.voxel-world` extension persistence. The extension records schema version, world voxel settings, signed chunk coordinates, revisions, palettes, and payload references with codec version, exact byte length, and SHA-256.
 - Chunk blobs are immutable and content-addressed; duplicate byte-identical chunks share one blob. Save verifies every blob before writing the manifest last. Load rejects missing/corrupt blobs, unsupported versions, malformed metadata, and duplicate coordinates before returning decoded snapshots.
-- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and Player folder loading/rendering are wired; GLB asset resolution and static collision are integrated in Player. Editor now supports coordinate-based cell paint/erase and built-in material palette extension. The cross-app E2E persists a painted multi-material chunk and verifies two voxel mesh parts in Player; exact-head Chromium CI #615 passed.
+- Focused tests cover round-trip, invalid settings, duplicate-coordinate rejection, corruption detection, missing blobs, unsupported extension/codec versions, content deduplication, and manifest-last ordering. Editor persistence and Player folder loading/rendering are wired; GLB asset resolution and static collision are integrated in Player. Editor now supports coordinate-based cell paint/erase and built-in material palette extension. The cross-app E2E persists a painted multi-material chunk and verifies voxel mesh output in Player; exact-head Chromium CI #615 passed.
 - Exact-head GitHub Actions run [#44556875444](https://github.com/Startat6am/3d-engine/actions/runs/44556875444) passed for code head `8da13169472965bfb613943a7e91d94084d3edc0`.
+
+## Lifecycle integration update — 2026-11-22
+
+- Added `packages/engine-voxel/src/world-lifecycle.integration.test.ts` to exercise the generic world scheduler with actual voxel snapshots, revisioned edits, and asynchronous meshing. The test covers resident publication, explicit idempotent eviction, release callback ownership, scheduler disposal, and post-disposal rejection.
+- Exact-head GitHub Actions for the preceding E2E expectation corrections is running on `1ed5204678a554efd0ece3893f9e3ddba06dd6da`; do not treat it as passed until the run completes.
+- Remaining closeout work includes migration fixtures, voxel-specific correctness/streaming/performance benchmark evidence, asset-backed custom material/texture authoring, and owner acceptance.
