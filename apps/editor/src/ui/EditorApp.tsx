@@ -354,7 +354,7 @@ export function EditorApp() {
   });
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
-  const [cameraTool, setCameraTool] = useState<'orbit' | 'pan' | 'rotate'>('orbit');
+  const [cameraTool, setCameraTool] = useState<'select' | 'pan' | 'rotate'>('select');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -1704,6 +1704,7 @@ export function EditorApp() {
     const dy = event.clientY - drag.y;
     drag.x = event.clientX;
     drag.y = event.clientY;
+    if (cameraTool === 'select') return;
     if (cameraTool === 'pan') {
       setCamera((current) => {
         const [x, y, z] = current.position;
@@ -1962,7 +1963,7 @@ export function EditorApp() {
               aria-label="Move camera"
               aria-pressed={cameraTool === 'pan'}
               title="Move camera: drag left/right to strafe, up/down to move forward/back"
-              onClick={() => setCameraTool((current) => (current === 'pan' ? 'orbit' : 'pan'))}
+              onClick={() => setCameraTool((current) => (current === 'pan' ? 'select' : 'pan'))}
             >
               <span aria-hidden="true">✥</span>
               <small>Move</small>
@@ -1973,7 +1974,7 @@ export function EditorApp() {
               aria-pressed={cameraTool === 'rotate'}
               title="Rotate camera by dragging on the scene"
               onClick={() =>
-                setCameraTool((current) => (current === 'rotate' ? 'orbit' : 'rotate'))
+                setCameraTool((current) => (current === 'rotate' ? 'select' : 'rotate'))
               }
             >
               <span aria-hidden="true">⟳</span>
@@ -1988,7 +1989,7 @@ export function EditorApp() {
               aria-pressed={voxelBrushMode === 'paint'}
               onClick={() => {
                 setVoxelBrushMode('paint');
-                setCameraTool('orbit');
+                setCameraTool('select');
               }}
             >
               <span aria-hidden="true">▦</span>
@@ -2000,7 +2001,7 @@ export function EditorApp() {
               aria-pressed={voxelBrushMode === 'erase'}
               onClick={() => {
                 setVoxelBrushMode('erase');
-                setCameraTool('orbit');
+                setCameraTool('select');
               }}
             >
               <span aria-hidden="true">⌫</span>
@@ -2111,7 +2112,7 @@ export function EditorApp() {
               pinchDistanceRef.current = null;
               if (activePointersRef.current.size === 0) multiTouchRef.current = false;
               if (wasMultiTouch || !drag || drag.pointerId !== event.pointerId) return;
-              if (cameraTool !== 'orbit') return;
+              if (cameraTool !== 'select') return;
               const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
               if (moved > 4) return;
               const canvas = event.currentTarget;
