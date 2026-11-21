@@ -354,6 +354,7 @@ export function EditorApp() {
   });
   const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
   const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
+  const [cameraTool, setCameraTool] = useState<'orbit' | 'pan' | 'rotate'>('orbit');
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -1703,6 +1704,21 @@ export function EditorApp() {
     const dy = event.clientY - drag.y;
     drag.x = event.clientX;
     drag.y = event.clientY;
+    if (cameraTool === 'pan') {
+      setCamera((current) => {
+        const [x, y, z] = current.position;
+        const forward: Vec3 = [-Math.sin(Math.atan2(x, z)), 0, -Math.cos(Math.atan2(x, z))];
+        const right: Vec3 = [forward[2], 0, -forward[0]];
+        const speed = Math.max(0.004, Math.hypot(x, y, z) * 0.0018);
+        const position: Vec3 = [
+          x - right[0] * dx * speed + forward[0] * dy * speed,
+          y,
+          z - right[2] * dx * speed + forward[2] * dy * speed,
+        ];
+        return { ...current, position };
+      });
+      return;
+    }
     setCamera((current) => {
       const [x, y, z] = current.position;
       const radius = Math.max(1.5, Math.hypot(x, y, z));
@@ -1937,6 +1953,61 @@ export function EditorApp() {
             <span>{voxelChunks.length} VOXEL CHUNKS</span>
           </div>
         </aside>
+        <aside className="scene-tools" aria-label="Scene tools">
+          <div className="scene-tools-heading">TOOLS</div>
+          <div className="scene-tool-group" aria-label="Camera controls">
+            <span className="scene-tool-label">CAMERA</span>
+            <button
+              className={cameraTool === 'pan' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Move camera"
+              aria-pressed={cameraTool === 'pan'}
+              title="Move camera: drag left/right to strafe, up/down to move forward/back"
+              onClick={() => setCameraTool((current) => (current === 'pan' ? 'orbit' : 'pan'))}
+            >
+              <span aria-hidden="true">✥</span>
+              <small>Move</small>
+            </button>
+            <button
+              className={cameraTool === 'rotate' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Rotate camera"
+              aria-pressed={cameraTool === 'rotate'}
+              title="Rotate camera by dragging on the scene"
+              onClick={() =>
+                setCameraTool((current) => (current === 'rotate' ? 'orbit' : 'rotate'))
+              }
+            >
+              <span aria-hidden="true">⟳</span>
+              <small>Rotate</small>
+            </button>
+          </div>
+          <div className="scene-tool-group" aria-label="Voxel tools">
+            <span className="scene-tool-label">VOXELS</span>
+            <button
+              className={voxelBrushMode === 'paint' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Paint voxels"
+              aria-pressed={voxelBrushMode === 'paint'}
+              onClick={() => {
+                setVoxelBrushMode('paint');
+                setCameraTool('orbit');
+              }}
+            >
+              <span aria-hidden="true">▦</span>
+              <small>Paint</small>
+            </button>
+            <button
+              className={voxelBrushMode === 'erase' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Erase voxels"
+              aria-pressed={voxelBrushMode === 'erase'}
+              onClick={() => {
+                setVoxelBrushMode('erase');
+                setCameraTool('orbit');
+              }}
+            >
+              <span aria-hidden="true">⌫</span>
+              <small>Erase</small>
+            </button>
+          </div>
+        </aside>
         <section className="viewport">
           <div className="viewport-label">
             SCENE VIEW{' '}
@@ -2022,6 +2093,14 @@ export function EditorApp() {
             ref={canvasRef}
             aria-label="3D scene viewport"
             data-camera-radius={Math.hypot(...camera.position).toFixed(3)}
+            data-camera-tool={cameraTool}
+            className={
+              cameraTool === 'pan'
+                ? 'camera-pan-active'
+                : cameraTool === 'rotate'
+                  ? 'camera-rotate-active'
+                  : ''
+            }
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={(event) => {
@@ -2032,6 +2111,7 @@ export function EditorApp() {
               pinchDistanceRef.current = null;
               if (activePointersRef.current.size === 0) multiTouchRef.current = false;
               if (wasMultiTouch || !drag || drag.pointerId !== event.pointerId) return;
+              if (cameraTool !== 'orbit') return;
               const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
               if (moved > 4) return;
               const canvas = event.currentTarget;
@@ -2179,22 +2259,9 @@ export function EditorApp() {
               >
                 Move chunk
               </button>
-              <label>VIEWPORT BRUSH</label>
-              <div className="voxel-edit-actions">
-                <button
-                  aria-pressed={voxelBrushMode === 'paint'}
-                  onClick={() => setVoxelBrushMode('paint')}
-                >
-                  Paint tool
-                </button>
-                <button
-                  aria-pressed={voxelBrushMode === 'erase'}
-                  onClick={() => setVoxelBrushMode('erase')}
-                >
-                  Erase tool
-                </button>
-              </div>
-              <small>Click a visible voxel face in the viewport to edit it</small>
+              <small>
+                Choose Paint or Erase in the Scene Tools panel, then click a visible voxel face
+              </small>
               <label>PAINT MATERIAL</label>
               <select
                 aria-label="Voxel material"

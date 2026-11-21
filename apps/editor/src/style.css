@@ -61,7 +61,7 @@ body {
 }
 .workspace {
   display: grid;
-  grid-template-columns: 230px minmax(300px, 1fr) 260px;
+  grid-template-columns: 230px 62px minmax(300px, 1fr) 260px;
   flex: 1;
   min-height: 0;
 }
@@ -75,6 +75,77 @@ body {
 }
 .inspector {
   border-left: 1px solid #29313e;
+}
+.scene-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 6px;
+  background: #141a23;
+  border-right: 1px solid #29313e;
+  overflow-y: auto;
+}
+.scene-tools-heading,
+.scene-tool-label {
+  color: #78879a;
+  text-align: center;
+  font:
+    8px 'DM Mono',
+    monospace;
+  letter-spacing: 0.08em;
+}
+.scene-tool-group {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+}
+.scene-tool-label {
+  padding: 4px 0;
+}
+.scene-tool {
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: #aab7c8;
+  cursor: pointer;
+}
+.scene-tool > span {
+  font-size: 19px;
+  line-height: 1;
+}
+.scene-tool small {
+  font:
+    9px 'DM Mono',
+    monospace;
+}
+.scene-tool:hover {
+  background: #202b39;
+}
+.scene-tool.active {
+  color: #a9ccff;
+  background: #26364b;
+  border-color: #45688f;
+}
+.scene-tools button:focus-visible {
+  outline: 2px solid #83b6ff;
+  outline-offset: 1px;
+}
+.viewport canvas.camera-pan-active {
+  cursor: grab;
+}
+.viewport canvas.camera-pan-active:active {
+  cursor: grabbing;
+}
+.viewport canvas.camera-rotate-active {
+  cursor: crosshair;
 }
 .panel-heading {
   height: 43px;
@@ -234,7 +305,7 @@ body {
 }
 @media (max-width: 900px) {
   .workspace {
-    grid-template-columns: 180px minmax(280px, 1fr) 210px;
+    grid-template-columns: 180px 56px minmax(280px, 1fr) 210px;
   }
 }
 .entity-row {
@@ -507,6 +578,33 @@ input:focus-visible {
     right: 12px;
   }
 
+  .scene-tools {
+    order: 1;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    gap: 18px;
+    padding: 8px 10px;
+    border-right: 0;
+    border-top: 1px solid #29313e;
+  }
+
+  .scene-tools-heading {
+    display: none;
+  }
+  .scene-tool-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+  }
+  .scene-tool-label {
+    padding: 0 4px;
+  }
+  .scene-tool {
+    min-width: 58px;
+    min-height: 46px;
+  }
+
   .hierarchy,
   .inspector {
     position: relative;
@@ -517,13 +615,13 @@ input:focus-visible {
   }
 
   .hierarchy {
-    order: 1;
+    order: 2;
     min-height: 130px;
     padding-bottom: 36px;
   }
 
   .inspector {
-    order: 2;
+    order: 3;
     min-height: 220px;
     padding-bottom: 36px;
   }
