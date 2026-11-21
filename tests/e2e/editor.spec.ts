@@ -197,26 +197,37 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await expect(page.getByLabel('Voxel chunk editor')).toBeVisible();
   await expect(page.getByText('Revision 0 · 1 materials')).toBeVisible();
 
-  await page.getByLabel('Voxel cell X').fill('2');
+  const cellX = page.getByLabel('Voxel cell X');
+  await cellX.fill('');
+  await cellX.pressSequentially('5');
+  await page.getByLabel('Voxel material').focus();
+  await expect(cellX).toHaveValue('5');
+  await cellX.fill('2');
   await page.getByLabel('Voxel cell Y').fill('2');
   await page.getByLabel('Voxel cell Z').fill('3');
+
+  await page.getByLabel('Chunk X').fill('2');
+  await page.getByRole('button', { name: 'Move chunk' }).click();
+  await expect(page.getByText('Chunk (2, 0, 0)')).toBeVisible();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+
   await page.getByLabel('Voxel material').selectOption('builtin:stone');
   await page.getByRole('button', { name: 'Paint cell' }).click();
-  await expect(page.getByText('Revision 1 · 2 materials')).toBeVisible();
+  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette')).toContainText('grass');
   await expect(page.locator('.voxel-palette')).toContainText('stone');
 
   await page.getByRole('button', { name: 'Move stone up' }).click();
-  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
+  await expect(page.getByText('Revision 3 · 2 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette-entry').nth(0)).toContainText('stone');
   await expect(page.locator('.voxel-palette-entry').nth(1)).toContainText('grass');
   await expect(page.getByRole('button', { name: 'Move grass up' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Move stone down' })).toBeEnabled();
 
   await page.getByRole('button', { name: 'Erase cell' }).click();
-  await expect(page.getByText('Revision 3 · 2 materials')).toBeVisible();
+  await expect(page.getByText('Revision 4 · 2 materials')).toBeVisible();
   await page.getByRole('button', { name: 'Remove stone' }).click();
-  await expect(page.getByText('Revision 4 · 1 materials')).toBeVisible();
+  await expect(page.getByText('Revision 5 · 1 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette')).toContainText('grass');
   await expect(page.locator('.voxel-palette')).not.toContainText('stone');
   await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
