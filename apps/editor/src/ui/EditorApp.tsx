@@ -721,9 +721,10 @@ export function EditorApp() {
     });
   };
 
-  const moveSelectedVoxelChunk = () => {
+  const moveSelectedVoxelChunk = (target = voxelChunkTarget) => {
     if (!selectedVoxelChunk) return;
-    const { x, y, z } = voxelChunkTarget;
+    const { x, y, z } = target;
+    setVoxelChunkTarget({ x, y, z });
     if (![x, y, z].every(Number.isSafeInteger)) return;
     const nextKey = x + ',' + y + ',' + z;
     const currentKey =
@@ -815,6 +816,15 @@ export function EditorApp() {
   };
 
   const nudgeSelected = (direction: -1 | 1) => {
+    if (!selected && selectedVoxelChunk) {
+      if (transformMode !== 'position') return;
+      const axis = (['x', 'y', 'z'] as const)[transformAxis]!;
+      moveSelectedVoxelChunk({
+        ...selectedVoxelChunk.coordinate,
+        [axis]: selectedVoxelChunk.coordinate[axis] + direction,
+      });
+      return;
+    }
     if (!selected) return;
     const current =
       transformMode === 'rotation'
@@ -1915,7 +1925,7 @@ export function EditorApp() {
                       aria-label={`${label} mode`}
                       aria-pressed={transformMode === mode}
                       className={transformMode === mode ? 'active' : ''}
-                      disabled={!selected}
+                      disabled={!selected && (!selectedVoxelChunk || mode !== 'position')}
                       onClick={() => setTransformMode(mode)}
                     >
                       {label}
@@ -1936,7 +1946,7 @@ export function EditorApp() {
                       aria-label={`${axis} axis`}
                       aria-pressed={transformAxis === index}
                       className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
-                      disabled={!selected}
+                      disabled={!selected && !selectedVoxelChunk}
                       onClick={() => setTransformAxis(index)}
                     >
                       {axis}
@@ -1945,14 +1955,14 @@ export function EditorApp() {
                   <span className="transform-pad-spacer" />
                   <button
                     aria-label={`Decrease ${'XYZ'[transformAxis]}`}
-                    disabled={!selected}
+                    disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(-1)}
                   >
                     −
                   </button>
                   <button
                     aria-label={`Increase ${'XYZ'[transformAxis]}`}
-                    disabled={!selected}
+                    disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(1)}
                   >
                     ＋
