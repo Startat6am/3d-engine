@@ -1,6 +1,6 @@
 # World and Voxel Subsystem Specification
 
-**Status:** M7 implementation in progress; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, deterministic seeded generation, content-addressed persistence, Player static collision integration and Editor coordinate-based voxel cell editing are implemented. The initial mixed voxel+GLB Editor→Player round-trip passed exact-head Chromium CI #612. Painted multi-material Editor→Player round-trip passed exact-head Chromium CI #615. Viewport ray-based brush interaction, asset-backed palette workflows, migration fixtures, end-to-end streaming lifecycle acceptance and broader validation remain open.
+**Status:** M7 implementation in progress; coordinate/settings, immutable chunk storage/palette validation, deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, bounded chunk scheduling, deterministic seeded generation, content-addressed persistence, Player static collision integration and Editor coordinate-based voxel cell editing and empty-chunk creation with a shared built-in material library are implemented. The initial mixed voxel+GLB Editor→Player round-trip passed exact-head Chromium CI #612. Painted multi-material Editor→Player round-trip passed exact-head Chromium CI #615. Viewport ray-based brush interaction, asset-backed palette workflows, migration fixtures, end-to-end streaming lifecycle acceptance and broader validation remain open.
 **Milestone:** 7 — World & Voxels.
 
 ## Purpose and boundaries
@@ -12,7 +12,7 @@ The voxel subsystem is a geometry provider. It must not introduce voxel-specific
 ## Package boundaries
 
 - world package: chunk coordinates, lifecycle, residency, streaming orchestration, bounded asynchronous jobs, and generator interfaces.
-- voxel package: palette/material references, cell buffers, validation, and CPU mesh generation.
+- voxel package: palette/material references, the shared built-in material catalog, cell buffers, validation, and CPU mesh generation.
 - geometry package: shared CPU MeshData contract. Voxel meshing emits validated geometry and has no Three.js/WebGL dependency.
 - renderer: consumes ordinary geometry/material descriptors and remains unaware of voxel storage.
 - physics: consumes explicit collider descriptors; it does not inspect voxel buffers or own generation.
@@ -21,13 +21,22 @@ The voxel subsystem is a geometry provider. It must not introduce voxel-specific
 
 ## Current implementation snapshot
 
-- `@engine/world`: signed safe-integer chunk coordinates, canonical keys, floor-based world-to-chunk mapping, finite positive voxel-size validation, and fixed 16³ schema-v1 chunk dimensions.
+- `@engine/world`: signed safe-integer chunk coordinates, canonical keys, floor-based world-to-chunk mapping, finite positive voxel-size validation, and fixed 16³ schema-v1 chunk dimensions. A newly created Editor chunk is empty air (not a prefilled grass slab); users construct terrain by painting cells and placing adjacent chunks. World voxel edge length is editable independently of the fixed cell dimensions.
 - `@engine/voxel`: immutable snapshots backed by owned Uint16 cell buffers (4,096 cells); zero is air and non-zero values are one-based palette indexes. Palette references are stable asset IDs or built-in material keys. Batch edits increment one revision and report inclusive changed bounds.
 - CPU meshing: deterministic exposed-face culling, one `MeshData` part per palette index, outward normals/consistent winding, UVs, voxel-size scaling, intra-chunk and six-neighbor culling, neighbor revision tokens, and provisional boundary faces when a neighbor is unavailable.
 - Meshing cancellation: `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal`, and rejects with `MESHING_ABORTED` before returning any result; partial geometry remains private.
 - World streaming: `WorldChunkScheduler<T>` bounds concurrency, queue depth, resident count and per-chunk payload bytes; it deduplicates coordinate/revision requests, orders by priority, propagates cancellation, rejects stale completions, and exposes explicit eviction/disposal.
 - Procedural hook: `createChunkGenerationContext` combines a validated seed, signed chunk coordinate, AbortSignal and deterministic coordinate-scoped PRNG.
 - Implemented: repeated scheduler load/evict/dispose stress coverage, versioned content-addressed chunk blobs, Player static collider lifecycle integration, and Editor coordinate-based voxel cell painting/erasing with built-in material palette extension. Remaining: viewport ray-based brush interaction, asset-backed palette workflows, end-to-end streaming lifecycle coverage and migration fixtures.
+
+## Editor authoring model
+
+- Creating a voxel chunk creates an **empty 16 × 16 × 16 storage region**. It does not create a solid cube or a terrain surface. Air is represented by cell value 0; an untouched chunk therefore has no render mesh.
+- Chunk dimensions remain fixed at 16³ for persisted schema v1. This is an intentional bounded storage/meshing unit, not a limit on the size of a world or the amount of terrain a user can build. Adjacent signed-coordinate chunks compose larger continuous spaces. Changing chunk dimensions requires a new payload codec/schema migration; do not reinterpret existing v1 buffers.
+- voxelSize is an independent world setting that controls the world-space edge length of each cell. The Editor exposes it on the selected chunk inspector because it affects the whole voxel world, not just one chunk.
+- Built-in voxel materials live in a shared engine catalog with stable keys, display labels and preview colors. A new chunk starts with an empty palette; a material reference is added only when the first cell of that material is painted. Cells store compact one-based palette indexes. Adding another chunk does not duplicate material definitions.
+- The current built-in catalog is Grass, Dirt, Stone, Sand, Wood, Snow and Water. Asset-backed material references are part of the storage contract, but full authorable material assets, custom texture assignment/sampling and a project-wide material browser remain follow-up work; do not present those as implemented.
+- A logical voxel object larger than one chunk is represented by a set of chunks in world coordinates. A dedicated hierarchy/grouping and transform wrapper for voxel assemblies is not part of the current Editor slice.
 
 ## Coordinate and identity model
 

@@ -176,3 +176,21 @@ describe('voxel chunk payload codec', () => {
     );
   });
 });
+
+describe('built-in voxel material library', () => {
+  it('exposes stable named material keys for the editor palette', async () => {
+    const { BUILTIN_VOXEL_MATERIALS, getBuiltinVoxelMaterial } = await import('./materials.js');
+    expect(BUILTIN_VOXEL_MATERIALS.map((material) => material.key)).toEqual([
+      'grass',
+      'dirt',
+      'stone',
+      'sand',
+      'wood',
+      'snow',
+      'water',
+    ]);
+    expect(getBuiltinVoxelMaterial('sand')).toMatchObject({ label: 'Sand', color: 0xd8c18a });
+    expect(getBuiltinVoxelMaterial('missing')).toBeUndefined();
+    expect(Object.isFrozen(BUILTIN_VOXEL_MATERIALS)).toBe(true);
+  });
+});

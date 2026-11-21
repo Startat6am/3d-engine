@@ -39,7 +39,13 @@ import {
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
 import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
-import { createVoxelChunkSnapshot, editVoxelChunk, meshVoxelChunk } from '@engine/voxel';
+import {
+  BUILTIN_VOXEL_MATERIALS,
+  createVoxelChunkSnapshot,
+  editVoxelChunk,
+  getBuiltinVoxelMaterial,
+  meshVoxelChunk,
+} from '@engine/voxel';
 import { createChunkCoordinate } from '@engine/world';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
 import {
@@ -441,13 +447,16 @@ export function EditorApp() {
       return mesh.parts.map((part, index) => ({
         id: 'voxel:' + x + ',' + y + ',' + z + ':' + index,
         geometry: part.geometry,
-        material: createDefaultMaterial(
-          part.material.kind === 'builtin' && part.material.key === 'grass'
-            ? 0x70ad62
-            : part.material.kind === 'builtin' && part.material.key === 'dirt'
-              ? 0x9b7048
-              : 0x8995a5,
-        ),
+        material: (() => {
+          const builtin =
+            part.material.kind === 'builtin'
+              ? getBuiltinVoxelMaterial(part.material.key)
+              : undefined;
+          return {
+            ...createDefaultMaterial(builtin?.color ?? 0x8995a5),
+            ...(builtin ? { roughness: builtin.roughness } : {}),
+          };
+        })(),
         position,
         rotation: [0, 0, 0, 1] as const,
         scale: [1, 1, 1] as const,
@@ -614,15 +623,12 @@ export function EditorApp() {
     );
     let x = 0;
     while (occupied.has(x + ',0,0')) x += 1;
+    // A chunk is an empty storage region, not a prebuilt terrain slab.
+    // Built-in materials are shared library entries; cells start as air.
     const cells = new Uint16Array(16 * 16 * 16);
-    for (let z = 0; z < 16; z += 1) {
-      for (let cellX = 0; cellX < 16; cellX += 1) {
-        cells[cellX + 16 * (z * 16)] = 1;
-      }
-    }
     const chunk = createVoxelChunkSnapshot({
       coordinate: createChunkCoordinate({ x, y: 0, z: 0 }),
-      palette: [{ material: { kind: 'builtin', key: 'grass' } }],
+      palette: [],
       cells,
     });
     setVoxelChunks([...voxelChunks, chunk]);
@@ -1977,8 +1983,8 @@ export function EditorApp() {
                 </button>
               ))}
               <button onClick={addVoxelChunk}>
-                <span>Voxel chunk</span>
-                <small>16×16 grass surface</small>
+                <span>Empty voxel chunk</span>
+                <small>16×16×16 editable grid</small>
               </button>
             </div>
           ) : null}
@@ -2297,6 +2303,20 @@ export function EditorApp() {
                   ))}
                 </div>
               </div>
+              <label>WORLD VOXEL SIZE</label>
+              <TransformNumberInput
+                label="Voxel size in world units"
+                value={voxelWorldSettings.voxelSize}
+                onCommit={(raw) => {
+                  const next = Number(raw);
+                  if (!Number.isFinite(next) || next <= 0 || next > 1000) return;
+                  setVoxelWorldSettings((current) => ({ ...current, voxelSize: next }));
+                  setIsDirty(true);
+                }}
+              />
+              <small>
+                Each cell is this many world units. Chunk storage remains 16×16×16 cells.
+              </small>
               <label>CHUNK COORDINATES</label>
               <div className="vector-field">
                 <span>XYZ</span>
@@ -2338,9 +2358,11 @@ export function EditorApp() {
                 value={voxelMaterial}
                 onChange={(event) => setVoxelMaterial(event.target.value)}
               >
-                <option value="builtin:grass">Grass</option>
-                <option value="builtin:dirt">Dirt</option>
-                <option value="builtin:stone">Stone</option>
+                {BUILTIN_VOXEL_MATERIALS.map((material) => (
+                  <option key={material.key} value={'builtin:' + material.key}>
+                    {material.label}
+                  </option>
+                ))}
               </select>
               <div className="voxel-edit-actions">
                 <button
@@ -2376,7 +2398,11 @@ export function EditorApp() {
                       className="voxel-palette-entry"
                     >
                       <span>{index + 1}</span>
-                      <strong>{materialName}</strong>
+                      <strong>
+                        {entry.material.kind === 'builtin'
+                          ? (getBuiltinVoxelMaterial(entry.material.key)?.label ?? materialName)
+                          : materialName}
+                      </strong>
                       <small>{usage} cells</small>
                       <button
                         aria-label={'Move ' + materialName + ' up'}

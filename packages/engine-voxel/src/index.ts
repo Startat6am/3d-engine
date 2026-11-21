@@ -279,3 +279,9 @@ export {
   type VoxelCollisionMeshLimits,
   type VoxelCollisionGeometry,
 } from './collision.js';
+
+export {
+  BUILTIN_VOXEL_MATERIALS,
+  getBuiltinVoxelMaterial,
+  type BuiltinVoxelMaterial,
+} from './materials.js';
