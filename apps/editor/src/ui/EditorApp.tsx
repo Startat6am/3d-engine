@@ -1982,9 +1982,9 @@ export function EditorApp() {
                   <small>3D primitive</small>
                 </button>
               ))}
-              <button onClick={addVoxelChunk}>
-                <span>Empty voxel chunk</span>
-                <small>16×16×16 editable grid</small>
+              <button onClick={addVoxelChunk} aria-label="Add Voxel chunk">
+                <span>Voxel chunk</span>
+                <small>Empty · 16×16×16 editable grid</small>
               </button>
             </div>
           ) : null}
