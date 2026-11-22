@@ -13,7 +13,16 @@ import {
 import type { Matrix4 as Matrix4Type } from 'three';
 import type { GlbAsset } from '@engine/gltf-importer';
 import type { WorldAssetPayload } from '@engine/serialization';
+import {
+  loadVoxelWorldProject,
+  loadDirectoryProject as loadStoredDirectoryProject,
+  saveVoxelWorldProject,
+  VOXEL_WORLD_EXTENSION_KEY,
+  type VoxelWorldSettings,
+  type VoxelChunkSnapshot,
+} from '@engine/project-storage';
 import { EditorHistory } from './EditorHistory.js';
+import { resolveVoxelBrushCell } from './voxelBrush.js';
 import { readPbrMaterialState } from './materialValidation.js';
 import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
 import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
@@ -31,11 +40,19 @@ import {
   lookAtQuaternion,
 } from '@engine/renderer/contracts';
 import type { RenderObject, TextureSource, Vec3 } from '@engine/renderer/contracts';
+import {
+  BUILTIN_VOXEL_MATERIALS,
+  createVoxelChunkSnapshot,
+  editVoxelChunk,
+  getBuiltinVoxelMaterial,
+  meshVoxelChunk,
+} from '@engine/voxel';
+import { createChunkCoordinate } from '@engine/world';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
+import { EditorRecoveryStore } from '../project/EditorRecoveryStore.js';
 import {
   BrowserProjectFileStore,
   loadDirectoryProject,
-  saveDirectoryProject,
   type DirectoryHandleLike,
 } from '../project/ProjectAssetStore.js';
 
@@ -110,16 +127,7 @@ const geometryFor: Record<Primitive, () => MeshData> = {
   Plane: () => createPlaneGeometry(4, 4, 1, 1),
   Cylinder: () => createCylinderGeometry(),
 };
-const initialEntity = (): SceneEntity => ({
-  id: 'entity-1',
-  name: 'Box',
-  primitive: 'Box',
-  geometry: createBoxGeometry(),
-  material: createDefaultMaterial(),
-  position: [0, 0, 0],
-  rotation: [0, 0, 0, 1],
-  scale: [1, 1, 1],
-});
+const MAX_VOXEL_TEXTURE_BYTES = 16 * 1024 * 1024;
 
 const ASSET_KINDS: readonly AssetKind[] = [
   'model',
@@ -251,16 +259,28 @@ export function EditorApp() {
   const fpsRef = useRef<HTMLOutputElement>(null);
   const renderedFrameCountRef = useRef(0);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
-  const [entities, setEntities] = useState<SceneEntity[]>([initialEntity()]);
+  const [entities, setEntities] = useState<SceneEntity[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const entitiesRef = useRef(entities);
-  const history = useRef(new EditorHistory<SceneEntity[]>(100));
+  const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
+  const voxelChunksRef = useRef<readonly VoxelChunkSnapshot[]>(voxelChunks);
+  const history = useRef(
+    new EditorHistory<{ entities: SceneEntity[]; voxelChunks: readonly VoxelChunkSnapshot[] }>(100),
+  );
   const [historyVersion, setHistoryVersion] = useState(0);
   void historyVersion;
 
+  const commitVoxelChunks = (next: readonly VoxelChunkSnapshot[]) => {
+    history.current.commit({ entities: entitiesRef.current, voxelChunks: voxelChunksRef.current });
+    voxelChunksRef.current = next;
+    setVoxelChunks(next);
+    setIsDirty(true);
+    setHistoryVersion((version) => version + 1);
+  };
+
   const commitEntities = (next: SceneEntity[]) => {
-    history.current.commit(entitiesRef.current);
+    history.current.commit({ entities: entitiesRef.current, voxelChunks: voxelChunksRef.current });
     entitiesRef.current = next;
     setEntities(next);
     setIsDirty(true);
@@ -268,27 +288,63 @@ export function EditorApp() {
   };
 
   const undo = useCallback(() => {
-    const previous = history.current.undo(entitiesRef.current);
+    const previous = history.current.undo({
+      entities: entitiesRef.current,
+      voxelChunks: voxelChunksRef.current,
+    });
     if (!previous) return;
-    entitiesRef.current = previous;
-    setEntities(previous);
+    entitiesRef.current = previous.entities;
+    voxelChunksRef.current = previous.voxelChunks;
+    setEntities(previous.entities);
+    setVoxelChunks(previous.voxelChunks);
     setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
-      previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''),
+      previous.entities.some((entity) => entity.id === current)
+        ? current
+        : (previous.entities[0]?.id ?? ''),
     );
+    setSelectedVoxelChunkKey((current) => {
+      const exists = previous.voxelChunks.some(
+        (chunk) => `${chunk.coordinate.x},${chunk.coordinate.y},${chunk.coordinate.z}` === current,
+      );
+      const first = previous.voxelChunks[0];
+      return exists
+        ? current
+        : first
+          ? `${first.coordinate.x},${first.coordinate.y},${first.coordinate.z}`
+          : null;
+    });
   }, []);
 
   const redo = useCallback(() => {
-    const next = history.current.redo(entitiesRef.current);
+    const next = history.current.redo({
+      entities: entitiesRef.current,
+      voxelChunks: voxelChunksRef.current,
+    });
     if (!next) return;
-    entitiesRef.current = next;
-    setEntities(next);
+    entitiesRef.current = next.entities;
+    voxelChunksRef.current = next.voxelChunks;
+    setEntities(next.entities);
+    setVoxelChunks(next.voxelChunks);
     setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
-      next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''),
+      next.entities.some((entity) => entity.id === current)
+        ? current
+        : (next.entities[0]?.id ?? ''),
     );
+    setSelectedVoxelChunkKey((current) => {
+      const exists = next.voxelChunks.some(
+        (chunk) => `${chunk.coordinate.x},${chunk.coordinate.y},${chunk.coordinate.z}` === current,
+      );
+      const first = next.voxelChunks[0];
+      return exists
+        ? current
+        : first
+          ? `${first.coordinate.x},${first.coordinate.y},${first.coordinate.z}`
+          : null;
+    });
   }, []);
 
   useEffect(() => {
@@ -313,7 +369,7 @@ export function EditorApp() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [redo, undo]);
-  const [selectedId, setSelectedId] = useState('entity-1');
+  const [selectedId, setSelectedId] = useState('');
   const [rendererError, setRendererError] = useState('');
   const [rendererStatus, setRendererStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);
@@ -321,12 +377,54 @@ export function EditorApp() {
   const pushDiagnostic = useCallback((entry: Omit<DiagnosticEntry, 'id' | 'time'>) => {
     setDiagnostics((current) =>
       [
-        { ...entry, id: Date.now() + Math.random(), time: new Date().toLocaleTimeString() },
+        {
+          ...entry,
+          id: Date.now() + Math.random(),
+          time: new Date().toLocaleTimeString(),
+        },
         ...current,
       ].slice(0, 200),
     );
   }, []);
   const [worldName, setWorldName] = useState('Untitled World');
+  const [voxelWorldSettings, setVoxelWorldSettings] = useState<VoxelWorldSettings>({
+    voxelSize: 1,
+    chunkDimensions: { x: 16, y: 16, z: 16 },
+  });
+  const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<string | null>(null);
+  const [voxelCell, setVoxelCell] = useState({ x: 0, y: 1, z: 0 });
+  const [voxelChunkTarget, setVoxelChunkTarget] = useState({
+    x: 0,
+    y: 0,
+    z: 0,
+  });
+  const [voxelMaterial, setVoxelMaterial] = useState('builtin:grass');
+  const [voxelAssetMaterials, setVoxelAssetMaterials] = useState<
+    readonly {
+      assetId: string;
+      name: string;
+      color: number;
+      roughness: number;
+      textureAssetId?: string;
+    }[]
+  >([]);
+  const [newVoxelMaterialName, setNewVoxelMaterialName] = useState('Custom Material');
+  const [newVoxelMaterialColor, setNewVoxelMaterialColor] = useState('#a87952');
+  const [newVoxelMaterialRoughness, setNewVoxelMaterialRoughness] = useState('0.9');
+  const [newVoxelMaterialTexture, setNewVoxelMaterialTexture] = useState<File | null>(null);
+  const [isVoxelMaterialDialogOpen, setIsVoxelMaterialDialogOpen] = useState(false);
+  const [recoveryReady, setRecoveryReady] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+  );
+  const recoveryStoreRef = useRef<EditorRecoveryStore | null>(null);
+  const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
+  const [cameraTool, setCameraTool] = useState<'select' | 'pan' | 'rotate'>('select');
+  const [brushPreview, setBrushPreview] = useState<{
+    chunkKey: string;
+    cell: { x: number; y: number; z: number };
+    mode: 'paint' | 'erase';
+  } | null>(null);
   const [isAddMenuOpen, setIsAddMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
@@ -361,17 +459,136 @@ export function EditorApp() {
   const pinchDistanceRef = useRef<number | null>(null);
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
+  const selectedVoxelChunk =
+    voxelChunks.find(
+      (chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z ===
+        selectedVoxelChunkKey,
+    ) ?? null;
+  useEffect(() => {
+    if (selectedVoxelChunk) setVoxelChunkTarget({ ...selectedVoxelChunk.coordinate });
+  }, [selectedVoxelChunk]);
+
+  const voxelPaletteUsage = useMemo(() => {
+    if (!selectedVoxelChunk) return [];
+    const counts = new Array<number>(selectedVoxelChunk.palette.length).fill(0);
+    for (const value of selectedVoxelChunk.copyCells()) {
+      if (value > 0) counts[value - 1] = (counts[value - 1] ?? 0) + 1;
+    }
+    return counts;
+  }, [selectedVoxelChunk]);
+
+  const voxelRenderObjects = useMemo<RenderObject[]>(() => {
+    const byCoordinate = new Map(
+      voxelChunks.map((chunk) => [
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
+        chunk,
+      ]),
+    );
+    return voxelChunks.flatMap((chunk) => {
+      const { x, y, z } = chunk.coordinate;
+      const neighbor = (dx: number, dy: number, dz: number) =>
+        byCoordinate.get(x + dx + ',' + (y + dy) + ',' + (z + dz));
+      const neighbors = {
+        ...(neighbor(1, 0, 0) ? { positiveX: neighbor(1, 0, 0)! } : {}),
+        ...(neighbor(-1, 0, 0) ? { negativeX: neighbor(-1, 0, 0)! } : {}),
+        ...(neighbor(0, 1, 0) ? { positiveY: neighbor(0, 1, 0)! } : {}),
+        ...(neighbor(0, -1, 0) ? { negativeY: neighbor(0, -1, 0)! } : {}),
+        ...(neighbor(0, 0, 1) ? { positiveZ: neighbor(0, 0, 1)! } : {}),
+        ...(neighbor(0, 0, -1) ? { negativeZ: neighbor(0, 0, -1)! } : {}),
+      };
+      const mesh = meshVoxelChunk(chunk, neighbors, voxelWorldSettings.voxelSize);
+      const position: Vec3 = [
+        x * voxelWorldSettings.chunkDimensions.x * voxelWorldSettings.voxelSize,
+        y * voxelWorldSettings.chunkDimensions.y * voxelWorldSettings.voxelSize,
+        z * voxelWorldSettings.chunkDimensions.z * voxelWorldSettings.voxelSize,
+      ];
+      return mesh.parts.map((part, index) => ({
+        id: 'voxel:' + x + ',' + y + ',' + z + ':' + index,
+        geometry: part.geometry,
+        material: (() => {
+          const builtin =
+            part.material.kind === 'builtin'
+              ? getBuiltinVoxelMaterial(part.material.key)
+              : undefined;
+          const assetMaterial =
+            part.material.kind === 'asset'
+              ? assetRegistryRef.current.get(part.material.assetId as AssetId)
+              : undefined;
+          const assetColor = assetMaterial?.metadata.color;
+          const assetRoughness = assetMaterial?.metadata.roughness;
+          const textureAssetId = assetMaterial?.metadata.baseColorTextureAssetId;
+          const textureRecord =
+            typeof textureAssetId === 'string'
+              ? assetRegistryRef.current.get(textureAssetId as AssetId)
+              : undefined;
+          const texturePayload =
+            typeof textureAssetId === 'string'
+              ? assetPayloadsRef.current.get(textureAssetId as AssetId)
+              : undefined;
+          const baseColorTexture =
+            textureRecord?.kind === 'texture' &&
+            texturePayload &&
+            (texturePayload.mimeType === 'image/png' ||
+              texturePayload.mimeType === 'image/jpeg' ||
+              texturePayload.mimeType === 'image/webp')
+              ? {
+                  assetId: textureRecord.id,
+                  cacheKey: textureRecord.contentHash,
+                  mimeType: texturePayload.mimeType as 'image/png' | 'image/jpeg' | 'image/webp',
+                  data: new Uint8Array(decodeBase64(texturePayload.data)),
+                }
+              : undefined;
+          return {
+            ...createDefaultMaterial(
+              builtin?.color ?? (typeof assetColor === 'number' ? assetColor : 0x8995a5),
+            ),
+            ...(builtin ? { roughness: builtin.roughness } : {}),
+            ...(typeof assetRoughness === 'number' ? { roughness: assetRoughness } : {}),
+            ...(baseColorTexture ? { baseColorTexture } : {}),
+          };
+        })(),
+        position,
+        rotation: [0, 0, 0, 1] as const,
+        scale: [1, 1, 1] as const,
+      }));
+    });
+  }, [voxelChunks, voxelWorldSettings, voxelAssetMaterials]);
+  const brushPreviewObject = useMemo<RenderObject | null>(() => {
+    if (!brushPreview || cameraTool !== 'select') return null;
+    const chunk = voxelChunks.find(
+      (candidate) =>
+        [candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z].join(',') ===
+        brushPreview.chunkKey,
+    );
+    if (!chunk) return null;
+    const size = voxelWorldSettings.voxelSize;
+    const color = brushPreview.mode === 'paint' ? 0x66d9a8 : 0xff766f;
+    return {
+      id: '__voxel-brush-preview__',
+      geometry: createBoxGeometry(size * 0.94, size * 0.94, size * 0.94),
+      material: {
+        ...createDefaultMaterial(color),
+        opacity: 0.38,
+        transparent: true,
+        emissiveColor: color,
+      },
+      position: [
+        (chunk.coordinate.x * voxelWorldSettings.chunkDimensions.x + brushPreview.cell.x + 0.5) *
+          size,
+        (chunk.coordinate.y * voxelWorldSettings.chunkDimensions.y + brushPreview.cell.y + 0.5) *
+          size,
+        (chunk.coordinate.z * voxelWorldSettings.chunkDimensions.z + brushPreview.cell.z + 0.5) *
+          size,
+      ],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+    };
+  }, [brushPreview, cameraTool, voxelChunks, voxelWorldSettings]);
 
   const renderObjects = useMemo(
-    () =>
-      entities.map((entity) => ({
-        ...entity,
-        material:
-          entity.id === selectedId
-            ? { ...entity.material, color: entity.material.color }
-            : entity.material,
-      })),
-    [entities, selectedId],
+    () => [...entities, ...voxelRenderObjects, ...(brushPreviewObject ? [brushPreviewObject] : [])],
+    [entities, selectedId, voxelRenderObjects, brushPreviewObject],
   );
   const renderScene = useMemo(
     () => ({ camera, background: 0x151a23, objects: renderObjects }),
@@ -479,6 +696,357 @@ export function EditorApp() {
     [entities],
   );
 
+  const addVoxelChunk = () => {
+    const occupied = new Set(
+      voxelChunks.map(
+        (chunk) => chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z,
+      ),
+    );
+    let x = 0;
+    while (occupied.has(x + ',0,0')) x += 1;
+    // A chunk is an empty storage region, not a prebuilt terrain slab.
+    // Built-in materials are shared library entries; cells start as air.
+    const cells = new Uint16Array(16 * 16 * 16);
+    const chunk = createVoxelChunkSnapshot({
+      coordinate: createChunkCoordinate({ x, y: 0, z: 0 }),
+      palette: [],
+      cells,
+    });
+    commitVoxelChunks([...voxelChunksRef.current, chunk]);
+    setSelectedVoxelChunkKey(x + ',0,0');
+    setSelectedId('');
+    setIsDirty(true);
+    setIsAddMenuOpen(false);
+  };
+
+  const commitVoxelPalette = (
+    palette: VoxelChunkSnapshot['palette'],
+    remap: (value: number) => number,
+  ) => {
+    if (!selectedVoxelChunk || selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
+    const cells = selectedVoxelChunk.copyCells();
+    for (let index = 0; index < cells.length; index += 1) {
+      cells[index] = remap(cells[index]!);
+    }
+    const snapshot = createVoxelChunkSnapshot({
+      coordinate: selectedVoxelChunk.coordinate,
+      revision: selectedVoxelChunk.revision + 1,
+      palette,
+      cells,
+    });
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    commitVoxelChunks(
+      voxelChunksRef.current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
+          ? snapshot
+          : chunk,
+      ),
+    );
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel material palette updated',
+      details: 'Chunk ' + chunkKey + ', revision ' + snapshot.revision + '.',
+    });
+  };
+
+  const moveVoxelPaletteEntry = (from: number, to: number) => {
+    if (
+      !selectedVoxelChunk ||
+      from < 0 ||
+      to < 0 ||
+      from >= selectedVoxelChunk.palette.length ||
+      to >= selectedVoxelChunk.palette.length ||
+      from === to
+    )
+      return;
+    const palette = [...selectedVoxelChunk.palette];
+    const [entry] = palette.splice(from, 1);
+    if (!entry) return;
+    palette.splice(to, 0, entry);
+    commitVoxelPalette(palette, (value) => {
+      if (value === 0) return 0;
+      const oldIndex = value - 1;
+      const newIndex = palette.findIndex((item) => item === entry);
+      if (oldIndex === from) return newIndex + 1;
+      if (from < to && oldIndex > from && oldIndex <= to) return oldIndex;
+      if (from > to && oldIndex >= to && oldIndex < from) return oldIndex + 2;
+      return value;
+    });
+  };
+
+  const removeVoxelPaletteEntry = (paletteIndex: number) => {
+    if (
+      !selectedVoxelChunk ||
+      paletteIndex < 0 ||
+      paletteIndex >= selectedVoxelChunk.palette.length
+    ) {
+      return;
+    }
+    const cells = selectedVoxelChunk.copyCells();
+    const storedIndex = paletteIndex + 1;
+    if (cells.some((value) => value === storedIndex)) return;
+    const palette = selectedVoxelChunk.palette.filter((_, index) => index !== paletteIndex);
+    commitVoxelPalette(palette, (value) => (value > storedIndex ? value - 1 : value));
+  };
+
+  const createVoxelMaterialAsset = async () => {
+    const name = newVoxelMaterialName.trim();
+    const roughness = Number(newVoxelMaterialRoughness);
+    if (
+      !name ||
+      !/^#[0-9a-fA-F]{6}$/.test(newVoxelMaterialColor) ||
+      !Number.isFinite(roughness) ||
+      roughness < 0 ||
+      roughness > 1
+    ) {
+      return;
+    }
+    const color = Number.parseInt(newVoxelMaterialColor.slice(1), 16);
+    let textureAssetId: AssetId | undefined;
+    if (newVoxelMaterialTexture) {
+      const mimeType = newVoxelMaterialTexture.type;
+      if (
+        newVoxelMaterialTexture.size === 0 ||
+        newVoxelMaterialTexture.size > MAX_VOXEL_TEXTURE_BYTES
+      ) {
+        pushDiagnostic({
+          level: 'error',
+          source: 'Voxel materials',
+          message: 'Voxel texture size is outside the supported range',
+          details: 'Choose a non-empty image no larger than 16 MiB.',
+        });
+        return;
+      }
+      if (mimeType !== 'image/png' && mimeType !== 'image/jpeg' && mimeType !== 'image/webp') {
+        pushDiagnostic({
+          level: 'error',
+          source: 'Voxel materials',
+          message: 'Unsupported voxel texture format',
+          details: 'Choose a PNG, JPEG or WebP image.',
+        });
+        return;
+      }
+      const textureBuffer = await newVoxelMaterialTexture.arrayBuffer();
+      const textureId = ('asset:voxel-texture-' + crypto.randomUUID()) as AssetId;
+      const textureRecord = assetRegistryRef.current.register({
+        id: textureId,
+        name: name + ' Texture',
+        kind: 'texture',
+        uri: 'textures/voxel/' + textureId.slice('asset:'.length),
+        contentHash: await sha256(textureBuffer),
+        importer: { id: 'choreon.voxel-texture', version: '1', settings: {} },
+        metadata: { role: 'voxel-texture', mimeType },
+      });
+      assetPayloadsRef.current.set(textureRecord.id, {
+        assetId: textureRecord.id,
+        mimeType,
+        encoding: 'base64',
+        data: encodeBase64(textureBuffer),
+      });
+      textureAssetId = textureRecord.id;
+    }
+
+    const assetId = ('asset:voxel-material-' + crypto.randomUUID()) as AssetId;
+    const source = new TextEncoder().encode(
+      JSON.stringify({
+        schemaVersion: 1,
+        name,
+        color,
+        roughness,
+        ...(textureAssetId ? { baseColorTextureAssetId: textureAssetId } : {}),
+      }),
+    );
+    const sourceBuffer = source.buffer.slice(
+      source.byteOffset,
+      source.byteOffset + source.byteLength,
+    ) as ArrayBuffer;
+    const contentHash = await sha256(sourceBuffer);
+    const record = assetRegistryRef.current.register({
+      id: assetId,
+      name,
+      kind: 'material',
+      uri: 'materials/voxel/' + assetId.slice('asset:'.length) + '.json',
+      contentHash,
+      importer: { id: 'choreon.voxel-material', version: '1', settings: {} },
+      dependencies: textureAssetId ? [textureAssetId] : [],
+      metadata: {
+        role: 'voxel-material',
+        color,
+        roughness,
+        mimeType: 'application/vnd.choreon.voxel-material+json',
+        ...(textureAssetId ? { baseColorTextureAssetId: textureAssetId } : {}),
+      },
+    });
+    assetPayloadsRef.current.set(assetId, {
+      assetId,
+      mimeType: 'application/vnd.choreon.voxel-material+json',
+      encoding: 'base64',
+      data: encodeBase64(sourceBuffer),
+    });
+    setVoxelAssetMaterials((current) => [
+      ...current,
+      {
+        assetId: record.id,
+        name: record.name,
+        color,
+        roughness,
+        ...(textureAssetId ? { textureAssetId } : {}),
+      },
+    ]);
+    setVoxelMaterial('asset:' + assetId);
+    setNewVoxelMaterialTexture(null);
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel materials',
+      message: 'Custom voxel material created',
+      details:
+        name +
+        (textureAssetId
+          ? ' is stored with a project texture asset and can be shared by chunks.'
+          : ' is stored as a project asset and can be shared by chunks.'),
+    });
+  };
+
+  const updateVoxelCell = (value: number, cell = voxelCell) => {
+    if (!selectedVoxelChunk) return;
+    const material = voxelMaterial.startsWith('asset:')
+      ? { kind: 'asset' as const, assetId: voxelMaterial.slice('asset:'.length) }
+      : {
+          kind: 'builtin' as const,
+          key: voxelMaterial.startsWith('builtin:')
+            ? voxelMaterial.slice('builtin:'.length)
+            : 'grass',
+        };
+    const existingIndex = selectedVoxelChunk.palette.findIndex(
+      (entry) =>
+        entry.material.kind === material.kind &&
+        (entry.material.kind === 'asset'
+          ? entry.material.assetId === (material.kind === 'asset' ? material.assetId : '')
+          : entry.material.key === (material.kind === 'builtin' ? material.key : '')),
+    );
+    let base = selectedVoxelChunk;
+    let paletteIndex = existingIndex + 1;
+    if (value > 0 && existingIndex < 0) {
+      const palette = [...selectedVoxelChunk.palette, { material }];
+      base = createVoxelChunkSnapshot({
+        coordinate: selectedVoxelChunk.coordinate,
+        revision: selectedVoxelChunk.revision,
+        palette,
+        cells: selectedVoxelChunk.copyCells(),
+      });
+      paletteIndex = palette.length;
+    }
+    const result = editVoxelChunk(base, [{ ...cell, value: value === 0 ? 0 : paletteIndex }]);
+    if (result.snapshot === selectedVoxelChunk) return;
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    commitVoxelChunks(
+      voxelChunksRef.current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
+          ? result.snapshot
+          : chunk,
+      ),
+    );
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: value === 0 ? 'Voxel cell cleared' : 'Voxel cell painted',
+      details:
+        'Chunk ' +
+        chunkKey +
+        ', cell (' +
+        cell.x +
+        ', ' +
+        cell.y +
+        ', ' +
+        cell.z +
+        '), revision ' +
+        result.snapshot.revision +
+        '.',
+    });
+  };
+
+  const moveSelectedVoxelChunk = (target = voxelChunkTarget) => {
+    if (!selectedVoxelChunk) return;
+    const { x, y, z } = target;
+    setVoxelChunkTarget({ x, y, z });
+    if (![x, y, z].every(Number.isSafeInteger)) return;
+    const nextKey = x + ',' + y + ',' + z;
+    const currentKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    if (nextKey === currentKey) return;
+    if (
+      voxelChunks.some(
+        (chunk) =>
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === nextKey,
+      )
+    ) {
+      pushDiagnostic({
+        level: 'warning',
+        source: 'Voxel editor',
+        message: 'Cannot move chunk to an occupied coordinate',
+        details: 'Chunk ' + nextKey + ' already exists.',
+      });
+      return;
+    }
+    if (selectedVoxelChunk.revision === Number.MAX_SAFE_INTEGER) return;
+    const snapshot = createVoxelChunkSnapshot({
+      coordinate: createChunkCoordinate({ x, y, z }),
+      revision: selectedVoxelChunk.revision + 1,
+      palette: selectedVoxelChunk.palette,
+      cells: selectedVoxelChunk.copyCells(),
+    });
+    commitVoxelChunks(
+      voxelChunksRef.current.map((chunk) =>
+        chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === currentKey
+          ? snapshot
+          : chunk,
+      ),
+    );
+    setSelectedVoxelChunkKey(nextKey);
+    setIsDirty(true);
+    pushDiagnostic({
+      level: 'info',
+      source: 'Voxel editor',
+      message: 'Voxel chunk moved',
+      details: currentKey + ' → ' + nextKey + ', revision ' + snapshot.revision + '.',
+    });
+  };
+
+  const removeSelectedVoxelChunk = () => {
+    if (!selectedVoxelChunk) return;
+    const chunkKey =
+      selectedVoxelChunk.coordinate.x +
+      ',' +
+      selectedVoxelChunk.coordinate.y +
+      ',' +
+      selectedVoxelChunk.coordinate.z;
+    commitVoxelChunks(
+      voxelChunksRef.current.filter(
+        (chunk) =>
+          chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z !== chunkKey,
+      ),
+    );
+    setSelectedVoxelChunkKey(null);
+    setIsDirty(true);
+  };
+
   const updateVector = (key: 'position' | 'rotation' | 'scale', axis: number, value: string) => {
     const number = Number(value);
     if (!Number.isFinite(number) || !selected) return;
@@ -507,6 +1075,15 @@ export function EditorApp() {
   };
 
   const nudgeSelected = (direction: -1 | 1) => {
+    if (!selected && selectedVoxelChunk) {
+      if (transformMode !== 'position') return;
+      const axis = (['x', 'y', 'z'] as const)[transformAxis]!;
+      moveSelectedVoxelChunk({
+        ...selectedVoxelChunk.coordinate,
+        [axis]: selectedVoxelChunk.coordinate[axis] + direction,
+      });
+      return;
+    }
     if (!selected) return;
     const current =
       transformMode === 'rotation'
@@ -579,10 +1156,14 @@ export function EditorApp() {
                         metallicRoughnessTextureAssetId: material.metallicRoughnessTexture.assetId,
                         metallicRoughnessTextureSettings: {
                           ...(material.metallicRoughnessTexture.sampler
-                            ? { sampler: material.metallicRoughnessTexture.sampler }
+                            ? {
+                                sampler: material.metallicRoughnessTexture.sampler,
+                              }
                             : {}),
                           ...(material.metallicRoughnessTexture.transform
-                            ? { transform: material.metallicRoughnessTexture.transform }
+                            ? {
+                                transform: material.metallicRoughnessTexture.transform,
+                              }
                             : {}),
                         },
                       }
@@ -651,8 +1232,19 @@ export function EditorApp() {
   };
 
   const saveWorld = () => {
+    if (voxelChunks.length > 0) {
+      pushDiagnostic({
+        level: 'warning',
+        source: 'Voxel',
+        message: 'Save the project folder to preserve voxel chunks',
+        details: 'A standalone .world file does not contain content-addressed voxel chunk blobs.',
+      });
+      return;
+    }
     const worldDocument = createWorldDocument();
-    const blob = new Blob([serializeWorld(worldDocument)], { type: 'application/json' });
+    const blob = new Blob([serializeWorld(worldDocument)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
     const anchor = window.document.createElement('a');
     anchor.href = url;
@@ -665,12 +1257,23 @@ export function EditorApp() {
 
   const loadWorld = async (
     source?: File | WorldDocument,
-    options: { readonly replaceAssets?: boolean } = {},
+    options: {
+      readonly replaceAssets?: boolean;
+      readonly voxelWorld?: {
+        readonly settings: VoxelWorldSettings;
+        readonly chunks: readonly VoxelChunkSnapshot[];
+      };
+    } = {},
   ): Promise<boolean> => {
     if (!source) return false;
     const sourceName = source instanceof File ? source.name : 'main.world';
     try {
       const root = source instanceof File ? parseWorld(await source.text()) : source;
+      if (root.extensions[VOXEL_WORLD_EXTENSION_KEY] && !options.voxelWorld) {
+        throw new Error(
+          'This world contains external voxel chunk blobs. Open the project folder instead.',
+        );
+      }
       const restoredAssetRegistry = mergeAssetRegistry(
         options.replaceAssets ? new AssetRegistry() : assetRegistryRef.current,
         root.assets,
@@ -700,7 +1303,11 @@ export function EditorApp() {
           id?: string;
           name?: string;
           components?: {
-            Transform?: { position?: number[]; rotation?: number[]; scale?: number[] };
+            Transform?: {
+              position?: number[];
+              rotation?: number[];
+              scale?: number[];
+            };
             MeshRenderer?: {
               primitive?: Primitive | 'GLB';
               assetId?: string;
@@ -851,6 +1458,21 @@ export function EditorApp() {
         throw new Error('World contains duplicate entity IDs');
       assetRegistryRef.current = restoredAssetRegistry;
       assetPayloadsRef.current = restoredAssetPayloads;
+      setVoxelAssetMaterials(
+        restoredAssetRegistry
+          .list('material')
+          .filter((record) => record.metadata.role === 'voxel-material')
+          .map((record) => ({
+            assetId: record.id,
+            name: record.name,
+            color: typeof record.metadata.color === 'number' ? record.metadata.color : 0x8995a5,
+            roughness:
+              typeof record.metadata.roughness === 'number' ? record.metadata.roughness : 0.9,
+            ...(typeof record.metadata.baseColorTextureAssetId === 'string'
+              ? { textureAssetId: record.metadata.baseColorTextureAssetId }
+              : {}),
+          })),
+      );
       commitEntities(parsed);
       if (options.replaceAssets) {
         for (const lease of assetResourceLeasesRef.current) lease.release();
@@ -858,6 +1480,23 @@ export function EditorApp() {
       }
       setSelectedId(parsed[0]?.id ?? '');
       setWorldName(root.world.name || sourceName.replace(/\.world$/i, ''));
+      setVoxelWorldSettings(
+        options.voxelWorld?.settings ?? {
+          voxelSize: 1,
+          chunkDimensions: { x: 16, y: 16, z: 16 },
+        },
+      );
+      const restoredVoxelChunks = options.voxelWorld?.chunks ?? [];
+      voxelChunksRef.current = restoredVoxelChunks;
+      setVoxelChunks(restoredVoxelChunks);
+      history.current.clear();
+      setHistoryVersion((version) => version + 1);
+      const firstRestoredChunk = restoredVoxelChunks[0];
+      setSelectedVoxelChunkKey(
+        firstRestoredChunk
+          ? `${firstRestoredChunk.coordinate.x},${firstRestoredChunk.coordinate.y},${firstRestoredChunk.coordinate.z}`
+          : null,
+      );
       projectDirectoryRef.current = null;
       setIsDirty(false);
       setHasSaved(true);
@@ -886,14 +1525,19 @@ export function EditorApp() {
       }
       const directory = projectDirectoryRef.current ?? (await picker!({ mode: 'readwrite' }));
       projectDirectoryRef.current = directory;
-      await saveDirectoryProject(new BrowserProjectFileStore(directory), createWorldDocument());
+      await saveVoxelWorldProject(
+        new BrowserProjectFileStore(directory),
+        createWorldDocument(),
+        voxelWorldSettings,
+        voxelChunks,
+      );
       setIsDirty(false);
       setHasSaved(true);
       pushDiagnostic({
         level: 'info',
         source: 'Project',
         message: 'Project folder saved',
-        details: 'Binary assets were written and hash-verified before worlds/main.world.',
+        details: `Binary assets and ${voxelChunks.length} voxel chunks were hash-verified before worlds/main.world.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -914,14 +1558,31 @@ export function EditorApp() {
           'Directory projects are not supported in this browser. Use Open World instead.',
         );
       const directory = await picker({ mode: 'readwrite' });
-      const document = await loadDirectoryProject(new BrowserProjectFileStore(directory));
-      if (!(await loadWorld(document, { replaceAssets: true }))) return;
+      const store = new BrowserProjectFileStore(directory);
+      const document = await loadDirectoryProject(store);
+      const voxelWorld = document.extensions[VOXEL_WORLD_EXTENSION_KEY]
+        ? await loadVoxelWorldProject(store)
+        : null;
+      if (
+        !(await loadWorld(document, {
+          replaceAssets: true,
+          ...(voxelWorld
+            ? {
+                voxelWorld: {
+                  settings: voxelWorld.settings,
+                  chunks: voxelWorld.chunks,
+                },
+              }
+            : {}),
+        }))
+      )
+        return;
       projectDirectoryRef.current = directory;
       pushDiagnostic({
         level: 'info',
         source: 'Project',
         message: 'Project folder opened',
-        details: 'All external asset files were hash-verified before the scene was committed.',
+        details: `External assets and ${voxelWorld?.chunks.length ?? 0} voxel chunks were hash-verified before the scene was committed.`,
       });
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -1117,9 +1778,17 @@ export function EditorApp() {
           kind: 'texture',
           uri: `${uri}.image-${imageIndex}.${extension}`,
           contentHash: imageHash,
-          importer: { id: 'engine.gltf.embedded-image', version: importer.version, settings: {} },
+          importer: {
+            id: 'engine.gltf.embedded-image',
+            version: importer.version,
+            settings: {},
+          },
           dependencies: [],
-          metadata: { sourceFormat: 'glb', imageIndex, mimeType: image.mimeType },
+          metadata: {
+            sourceFormat: 'glb',
+            imageIndex,
+            mimeType: image.mimeType,
+          },
         });
         textureRecords.push(textureRecord.id);
         stagedPayloads.set(textureRecord.id, {
@@ -1273,6 +1942,33 @@ export function EditorApp() {
     };
   };
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    if (cameraTool === 'select' && !event.buttons) {
+      const bounds = event.currentTarget.getBoundingClientRect();
+      const surface = rendererRef.current?.pickSurface(
+        event.clientX - bounds.left,
+        event.clientY - bounds.top,
+        bounds.width,
+        bounds.height,
+      );
+      const match = surface?.entityId.startsWith('voxel:')
+        ? /^voxel:(-?\d+),(-?\d+),(-?\d+):/.exec(surface.entityId)
+        : null;
+      const chunkKey = match ? [match[1], match[2], match[3]].join(',') : null;
+      const chunk = chunkKey
+        ? voxelChunks.find(
+            (candidate) =>
+              [candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z].join(',') ===
+              chunkKey,
+          )
+        : null;
+      const cell =
+        surface && chunk
+          ? resolveVoxelBrushCell(surface, chunk, voxelWorldSettings, voxelBrushMode)
+          : null;
+      setBrushPreview(cell && chunkKey ? { chunkKey, cell, mode: voxelBrushMode } : null);
+    } else if (cameraTool !== 'select') {
+      setBrushPreview(null);
+    }
     const pointers = activePointersRef.current;
     if (!pointers.has(event.pointerId)) return;
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -1290,7 +1986,11 @@ export function EditorApp() {
           const radius = Math.min(40, Math.max(1.5, currentRadius * factor));
           const scale = radius / currentRadius;
           const position: Vec3 = [x * scale, y * scale, z * scale];
-          return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+          return {
+            ...current,
+            position,
+            rotation: lookAtQuaternion(position, [0, 0, 0]),
+          };
         });
       }
       return;
@@ -1302,6 +2002,22 @@ export function EditorApp() {
     const dy = event.clientY - drag.y;
     drag.x = event.clientX;
     drag.y = event.clientY;
+    if (cameraTool === 'select') return;
+    if (cameraTool === 'pan') {
+      setCamera((current) => {
+        const [x, y, z] = current.position;
+        const forward: Vec3 = [-Math.sin(Math.atan2(x, z)), 0, -Math.cos(Math.atan2(x, z))];
+        const right: Vec3 = [forward[2], 0, -forward[0]];
+        const speed = Math.max(0.004, Math.hypot(x, y, z) * 0.0018);
+        const position: Vec3 = [
+          x + right[0] * dx * speed + forward[0] * dy * speed,
+          y,
+          z + right[2] * dx * speed + forward[2] * dy * speed,
+        ];
+        return { ...current, position };
+      });
+      return;
+    }
     setCamera((current) => {
       const [x, y, z] = current.position;
       const radius = Math.max(1.5, Math.hypot(x, y, z));
@@ -1313,7 +2029,11 @@ export function EditorApp() {
         radius * Math.cos(phi),
         radius * Math.sin(phi) * Math.cos(theta),
       ];
-      return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+      return {
+        ...current,
+        position,
+        rotation: lookAtQuaternion(position, [0, 0, 0]),
+      };
     });
   };
   const onWheel = (event: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1324,9 +2044,91 @@ export function EditorApp() {
       const radius = Math.min(40, Math.max(1.5, Math.hypot(x, y, z) * factor));
       const scale = radius / Math.hypot(x, y, z);
       const position: Vec3 = [x * scale, y * scale, z * scale];
-      return { ...current, position, rotation: lookAtQuaternion(position, [0, 0, 0]) };
+      return {
+        ...current,
+        position,
+        rotation: lookAtQuaternion(position, [0, 0, 0]),
+      };
     });
   };
+
+  useEffect(() => {
+    let active = true;
+    const store = new EditorRecoveryStore();
+    recoveryStoreRef.current = store;
+    void (async () => {
+      try {
+        const document = await loadStoredDirectoryProject(store);
+        const voxelWorld = document.extensions[VOXEL_WORLD_EXTENSION_KEY]
+          ? await loadVoxelWorldProject(store)
+          : null;
+        if (!active) return;
+        await loadWorld(document, {
+          replaceAssets: true,
+          ...(voxelWorld
+            ? { voxelWorld: { settings: voxelWorld.settings, chunks: voxelWorld.chunks } }
+            : {}),
+        });
+        if (active) {
+          setRecoveryStatus('saved');
+          pushDiagnostic({
+            level: 'info',
+            source: 'Recovery',
+            message: 'Recovered the latest local draft',
+            details: 'The draft was restored from this browser.',
+          });
+        }
+      } catch (error) {
+        if (
+          active &&
+          error instanceof Error &&
+          !error.message.startsWith('Recovery file not found:')
+        ) {
+          setRecoveryStatus('error');
+          pushDiagnostic({
+            level: 'warning',
+            source: 'Recovery',
+            message: 'Could not restore the local draft',
+            details: error.message,
+          });
+        }
+      } finally {
+        if (active) setRecoveryReady(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recoveryReady || !isDirty) return;
+    const store = recoveryStoreRef.current;
+    if (!store) return;
+    setRecoveryStatus('saving');
+    const timeout = window.setTimeout(() => {
+      void saveVoxelWorldProject(store, createWorldDocument(), voxelWorldSettings, voxelChunks)
+        .then(() => setRecoveryStatus('saved'))
+        .catch((error: unknown) => {
+          setRecoveryStatus('error');
+          pushDiagnostic({
+            level: 'warning',
+            source: 'Recovery',
+            message: 'Local autosave failed',
+            details: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }, 650);
+    return () => window.clearTimeout(timeout);
+  }, [
+    recoveryReady,
+    isDirty,
+    entities,
+    worldName,
+    voxelWorldSettings,
+    voxelChunks,
+    voxelAssetMaterials,
+  ]);
 
   return (
     <main className="editor-shell">
@@ -1402,6 +2204,15 @@ export function EditorApp() {
             setIsDirty(true);
           }}
         />
+        <span className="autosave-status" role="status" aria-live="polite">
+          {recoveryStatus === 'saving'
+            ? 'Saving…'
+            : recoveryStatus === 'saved'
+              ? 'Saved locally'
+              : recoveryStatus === 'error'
+                ? 'Autosave error'
+                : ' '}
+        </span>
         <button
           className="toolbar-button"
           onClick={undo}
@@ -1485,6 +2296,10 @@ export function EditorApp() {
                   <small>3D primitive</small>
                 </button>
               ))}
+              <button onClick={addVoxelChunk} aria-label="Add Voxel chunk">
+                <span>Voxel chunk</span>
+                <small>Empty · 16×16×16 editable grid</small>
+              </button>
             </div>
           ) : null}
           <div className="tree-row active">
@@ -1494,12 +2309,93 @@ export function EditorApp() {
             <button
               key={entity.id}
               className={`tree-row entity-row ${entity.id === selectedId ? 'selected' : ''}`}
-              onClick={() => setSelectedId(entity.id)}
+              onClick={() => {
+                setSelectedVoxelChunkKey(null);
+                setSelectedId(entity.id);
+              }}
             >
               ◈ <span>{entity.name}</span>
             </button>
           ))}
-          <div className="panel-foot">{entities.length} OBJECTS</div>
+          {voxelChunks.map((chunk) => {
+            const key = chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z;
+            return (
+              <button
+                key={key}
+                className={
+                  'tree-row entity-row ' + (key === selectedVoxelChunkKey ? 'selected' : '')
+                }
+                onClick={() => {
+                  setSelectedVoxelChunkKey(key);
+                  setSelectedId('');
+                }}
+              >
+                ▦ <span>Voxel chunk ({key})</span>
+              </button>
+            );
+          })}
+          <div className="panel-foot">
+            <span>{entities.length} OBJECTS</span>
+            <span>{voxelChunks.length} VOXEL CHUNKS</span>
+          </div>
+        </aside>
+        <aside className="scene-tools" aria-label="Scene tools">
+          <div className="scene-tools-heading">TOOLS</div>
+          <div className="scene-tool-group" aria-label="Camera controls">
+            <span className="scene-tool-label">CAMERA</span>
+            <button
+              className={cameraTool === 'pan' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Move camera"
+              aria-pressed={cameraTool === 'pan'}
+              title="Move camera: drag left/right to strafe, up/down to move forward/back"
+              onClick={() => {
+                setCameraTool((current) => (current === 'pan' ? 'select' : 'pan'));
+                setBrushPreview(null);
+              }}
+            >
+              <span aria-hidden="true">✥</span>
+              <small>Move</small>
+            </button>
+            <button
+              className={cameraTool === 'rotate' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Rotate camera"
+              aria-pressed={cameraTool === 'rotate'}
+              title="Rotate camera by dragging on the scene"
+              onClick={() =>
+                setCameraTool((current) => (current === 'rotate' ? 'select' : 'rotate'))
+              }
+            >
+              <span aria-hidden="true">⟳</span>
+              <small>Rotate</small>
+            </button>
+          </div>
+          <div className="scene-tool-group" aria-label="Voxel tools">
+            <span className="scene-tool-label">VOXELS</span>
+            <button
+              className={voxelBrushMode === 'paint' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Paint voxels"
+              aria-pressed={voxelBrushMode === 'paint'}
+              onClick={() => {
+                setVoxelBrushMode('paint');
+                setCameraTool('select');
+              }}
+            >
+              <span aria-hidden="true">▦</span>
+              <small>Paint</small>
+            </button>
+            <button
+              className={voxelBrushMode === 'erase' ? 'scene-tool active' : 'scene-tool'}
+              aria-label="Erase voxels"
+              aria-pressed={voxelBrushMode === 'erase'}
+              onClick={() => {
+                setVoxelBrushMode('erase');
+                setCameraTool('select');
+              }}
+            >
+              <span aria-hidden="true">⌫</span>
+              <small>Erase</small>
+            </button>
+          </div>
         </aside>
         <section className="viewport">
           <div className="viewport-label">
@@ -1536,7 +2432,7 @@ export function EditorApp() {
                       aria-label={`${label} mode`}
                       aria-pressed={transformMode === mode}
                       className={transformMode === mode ? 'active' : ''}
-                      disabled={!selected}
+                      disabled={!selected && (!selectedVoxelChunk || mode !== 'position')}
                       onClick={() => setTransformMode(mode)}
                     >
                       {label}
@@ -1557,7 +2453,7 @@ export function EditorApp() {
                       aria-label={`${axis} axis`}
                       aria-pressed={transformAxis === index}
                       className={`axis-choice axis-${axis.toLowerCase()} ${transformAxis === index ? 'active' : ''}`}
-                      disabled={!selected}
+                      disabled={!selected && !selectedVoxelChunk}
                       onClick={() => setTransformAxis(index)}
                     >
                       {axis}
@@ -1566,14 +2462,14 @@ export function EditorApp() {
                   <span className="transform-pad-spacer" />
                   <button
                     aria-label={`Decrease ${'XYZ'[transformAxis]}`}
-                    disabled={!selected}
+                    disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(-1)}
                   >
                     −
                   </button>
                   <button
                     aria-label={`Increase ${'XYZ'[transformAxis]}`}
-                    disabled={!selected}
+                    disabled={!selected && !selectedVoxelChunk}
                     onClick={() => nudgeSelected(1)}
                   >
                     ＋
@@ -1586,8 +2482,17 @@ export function EditorApp() {
             ref={canvasRef}
             aria-label="3D scene viewport"
             data-camera-radius={Math.hypot(...camera.position).toFixed(3)}
+            data-camera-tool={cameraTool}
+            className={
+              cameraTool === 'pan'
+                ? 'camera-pan-active'
+                : cameraTool === 'rotate'
+                  ? 'camera-rotate-active'
+                  : ''
+            }
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
+            onPointerLeave={() => setBrushPreview(null)}
             onPointerUp={(event) => {
               const wasMultiTouch = multiTouchRef.current;
               activePointersRef.current.delete(event.pointerId);
@@ -1596,17 +2501,48 @@ export function EditorApp() {
               pinchDistanceRef.current = null;
               if (activePointersRef.current.size === 0) multiTouchRef.current = false;
               if (wasMultiTouch || !drag || drag.pointerId !== event.pointerId) return;
+              if (cameraTool !== 'select') return;
               const moved = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
               if (moved > 4) return;
               const canvas = event.currentTarget;
               const bounds = canvas.getBoundingClientRect();
-              const hit = rendererRef.current?.pick(
-                event.clientX - bounds.left,
-                event.clientY - bounds.top,
-                bounds.width,
-                bounds.height,
-              );
-              if (hit) setSelectedId(hit);
+              const localX = event.clientX - bounds.left;
+              const localY = event.clientY - bounds.top;
+              const renderer = rendererRef.current;
+              const surface = renderer?.pickSurface(localX, localY, bounds.width, bounds.height);
+              if (surface?.entityId.startsWith('voxel:')) {
+                const match = /^voxel:(-?\d+),(-?\d+),(-?\d+):/.exec(surface.entityId);
+                if (!match) return;
+                const key = `${match[1]},${match[2]},${match[3]}`;
+                if (
+                  !selectedVoxelChunk ||
+                  key !==
+                    `${selectedVoxelChunk.coordinate.x},${selectedVoxelChunk.coordinate.y},${selectedVoxelChunk.coordinate.z}`
+                ) {
+                  setSelectedVoxelChunkKey(key);
+                  setSelectedId('');
+                  return;
+                }
+                const cell = resolveVoxelBrushCell(
+                  surface,
+                  selectedVoxelChunk,
+                  voxelWorldSettings,
+                  voxelBrushMode,
+                );
+                if (cell) {
+                  setVoxelCell(cell);
+                  updateVoxelCell(voxelBrushMode === 'paint' ? 1 : 0, cell);
+                } else {
+                  pushDiagnostic({
+                    level: 'warning',
+                    source: 'Voxel editor',
+                    message: 'Brush target is outside the selected chunk',
+                  });
+                }
+              } else if (surface) {
+                setSelectedVoxelChunkKey(null);
+                setSelectedId(surface.entityId);
+              }
             }}
             onPointerCancel={(event) => {
               activePointersRef.current.delete(event.pointerId);
@@ -1619,7 +2555,7 @@ export function EditorApp() {
           <output ref={fpsRef} className="viewport-fps" aria-label="Frames per second">
             FPS --
           </output>
-          {entities.length === 0 ? (
+          {entities.length === 0 && voxelChunks.length === 0 ? (
             <div className="viewport-empty-state">
               <strong>Empty scene</strong>
               <span>Use + in Hierarchy to add a primitive, or File → Import GLB.</span>
@@ -1637,14 +2573,245 @@ export function EditorApp() {
           <div className="panel-heading">
             INSPECTOR{' '}
             <button
-              aria-label="Delete selected object"
-              disabled={!selected}
-              onClick={removeSelected}
+              aria-label={
+                selectedVoxelChunk ? 'Delete selected voxel chunk' : 'Delete selected object'
+              }
+              disabled={!selected && !selectedVoxelChunk}
+              onClick={selectedVoxelChunk ? removeSelectedVoxelChunk : removeSelected}
             >
               ⌫
             </button>
           </div>
-          {selected ? (
+          {selectedVoxelChunk ? (
+            <section className="voxel-inspector" aria-label="Voxel chunk editor">
+              <div className="inspector-title">
+                ▦ <strong>Voxel chunk</strong>
+              </div>
+              <div className="object-source">
+                <span>
+                  Chunk ({selectedVoxelChunk.coordinate.x}, {selectedVoxelChunk.coordinate.y},{' '}
+                  {selectedVoxelChunk.coordinate.z})
+                </span>
+                <small>
+                  Revision {selectedVoxelChunk.revision} · {selectedVoxelChunk.palette.length}{' '}
+                  materials
+                </small>
+              </div>
+              <label>CELL COORDINATES</label>
+              <div className="vector-field">
+                <span>XYZ</span>
+                <div>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <TransformNumberInput
+                      key={axis}
+                      label={'Voxel cell ' + axis.toUpperCase()}
+                      value={voxelCell[axis]}
+                      onCommit={(nextValue) => {
+                        const next = Number(nextValue);
+                        if (Number.isInteger(next) && next >= 0 && next < 16) {
+                          setVoxelCell((current) => ({
+                            ...current,
+                            [axis]: next,
+                          }));
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <label>WORLD VOXEL SIZE</label>
+              <TransformNumberInput
+                label="Voxel size in world units"
+                value={voxelWorldSettings.voxelSize}
+                onCommit={(raw) => {
+                  const next = Number(raw);
+                  if (!Number.isFinite(next) || next <= 0 || next > 1000) return;
+                  setVoxelWorldSettings((current) => ({ ...current, voxelSize: next }));
+                  setIsDirty(true);
+                }}
+              />
+              <small>
+                Each cell is this many world units. Chunk storage remains 16×16×16 cells.
+              </small>
+              <label>CHUNK COORDINATES</label>
+              <div className="vector-field">
+                <span>XYZ</span>
+                <div>
+                  {(['x', 'y', 'z'] as const).map((axis) => (
+                    <TransformNumberInput
+                      key={axis}
+                      label={'Chunk ' + axis.toUpperCase()}
+                      value={voxelChunkTarget[axis]}
+                      onCommit={(nextValue) => {
+                        const next = Number(nextValue);
+                        if (Number.isSafeInteger(next)) {
+                          setVoxelChunkTarget((current) => ({
+                            ...current,
+                            [axis]: next,
+                          }));
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => moveSelectedVoxelChunk()}
+                disabled={
+                  voxelChunkTarget.x === selectedVoxelChunk.coordinate.x &&
+                  voxelChunkTarget.y === selectedVoxelChunk.coordinate.y &&
+                  voxelChunkTarget.z === selectedVoxelChunk.coordinate.z
+                }
+              >
+                Move chunk
+              </button>
+              <small>
+                Choose Paint or Erase in the Scene Tools panel, then click a visible voxel face
+              </small>
+              <label>WORLD MATERIAL LIBRARY</label>
+              <div
+                className="voxel-material-library"
+                role="group"
+                aria-label="World voxel materials"
+              >
+                {BUILTIN_VOXEL_MATERIALS.map((material) => {
+                  const materialRef = 'builtin:' + material.key;
+                  const selected = voxelMaterial === materialRef;
+                  return (
+                    <button
+                      key={material.key}
+                      type="button"
+                      className={
+                        selected ? 'voxel-material-swatch selected' : 'voxel-material-swatch'
+                      }
+                      aria-pressed={selected}
+                      aria-label={'Select ' + material.label + ' voxel material'}
+                      title={material.label}
+                      onClick={() => setVoxelMaterial(materialRef)}
+                    >
+                      <span
+                        className="voxel-material-color"
+                        style={{
+                          backgroundColor: '#' + material.color.toString(16).padStart(6, '0'),
+                        }}
+                      />
+                      <span>{material.label}</span>
+                    </button>
+                  );
+                })}
+                {voxelAssetMaterials.map((material) => {
+                  const materialRef = 'asset:' + material.assetId;
+                  const selected = voxelMaterial === materialRef;
+                  return (
+                    <button
+                      key={material.assetId}
+                      type="button"
+                      className={
+                        selected ? 'voxel-material-swatch selected' : 'voxel-material-swatch'
+                      }
+                      aria-pressed={selected}
+                      aria-label={'Select ' + material.name + ' voxel material'}
+                      title={material.name}
+                      onClick={() => setVoxelMaterial(materialRef)}
+                    >
+                      <span
+                        className="voxel-material-color"
+                        style={{
+                          backgroundColor: '#' + material.color.toString(16).padStart(6, '0'),
+                        }}
+                      />
+                      <span>{material.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                className="voxel-material-add"
+                onClick={() => setIsVoxelMaterialDialogOpen(true)}
+              >
+                + Add material
+              </button>
+              <small>
+                Built-ins and custom project materials share the world library. Optional PNG, JPEG
+                or WebP textures are stored as dependent project assets and sampled on voxel faces.
+              </small>
+              <small>
+                Choose a shared world material. A chunk adds its reference only after you paint with
+                it.
+              </small>
+              <div className="voxel-edit-actions">
+                <button
+                  onClick={() => updateVoxelCell(1)}
+                  disabled={
+                    ![voxelCell.x, voxelCell.y, voxelCell.z].every(
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
+                    )
+                  }
+                >
+                  Paint cell
+                </button>
+                <button
+                  onClick={() => updateVoxelCell(0)}
+                  disabled={
+                    ![voxelCell.x, voxelCell.y, voxelCell.z].every(
+                      (value) => Number.isInteger(value) && value >= 0 && value < 16,
+                    )
+                  }
+                >
+                  Erase cell
+                </button>
+              </div>
+              <label>PALETTE</label>
+              <ul className="voxel-palette">
+                {selectedVoxelChunk.palette.map((entry, index) => {
+                  const isBuiltinMaterial = entry.material.kind === 'builtin';
+                  const materialName = isBuiltinMaterial
+                    ? entry.material.key
+                    : entry.material.assetId;
+                  const materialLabel = isBuiltinMaterial
+                    ? (getBuiltinVoxelMaterial(entry.material.key)?.label ?? materialName)
+                    : (voxelAssetMaterials.find((material) => material.assetId === materialName)
+                        ?.name ?? materialName);
+                  const usage = voxelPaletteUsage[index] ?? 0;
+                  return (
+                    <li
+                      key={entry.material.kind + ':' + materialName}
+                      className="voxel-palette-entry"
+                    >
+                      <span>{index + 1}</span>
+                      <strong>{materialLabel}</strong>
+                      <small>{usage} cells</small>
+                      <button
+                        aria-label={'Move ' + materialName + ' up'}
+                        disabled={index === 0}
+                        onClick={() => moveVoxelPaletteEntry(index, index - 1)}
+                      >
+                        ↑
+                      </button>
+                      <button
+                        aria-label={'Move ' + materialName + ' down'}
+                        disabled={index === selectedVoxelChunk.palette.length - 1}
+                        onClick={() => moveVoxelPaletteEntry(index, index + 1)}
+                      >
+                        ↓
+                      </button>
+                      <button
+                        aria-label={'Remove ' + materialName}
+                        disabled={usage > 0}
+                        onClick={() => removeVoxelPaletteEntry(index)}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+              <button className="voxel-delete" onClick={removeSelectedVoxelChunk}>
+                Delete voxel chunk
+              </button>
+            </section>
+          ) : selected ? (
             <>
               <div className="inspector-title">
                 ◈{' '}
@@ -1689,7 +2856,7 @@ export function EditorApp() {
             </>
           ) : (
             <div className="empty-inspector">
-              Select an object in the Hierarchy or add a primitive to begin.
+              Select an object or voxel chunk in the Hierarchy, or add content to begin.
             </div>
           )}
         </aside>
@@ -1743,10 +2910,98 @@ export function EditorApp() {
         </span>
         <span className="spacer" />
         <span className={isDirty ? 'save-state is-dirty' : 'save-state'}>
-          {isDirty ? 'UNSAVED CHANGES' : hasSaved ? 'SAVED' : 'NEW SCENE'}
+          {isDirty
+            ? recoveryStatus === 'saved'
+              ? 'SAVED LOCALLY'
+              : 'UNSAVED CHANGES'
+            : hasSaved
+              ? 'SAVED'
+              : 'NEW SCENE'}
         </span>
         <span>{entities.length} objects</span>
       </footer>
+      {isVoxelMaterialDialogOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsVoxelMaterialDialogOpen(false);
+          }}
+        >
+          <section
+            className="voxel-material-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="voxel-material-modal-title"
+          >
+            <div className="modal-heading">
+              <h2 id="voxel-material-modal-title">Add world material</h2>
+              <button
+                type="button"
+                aria-label="Close dialog"
+                onClick={() => setIsVoxelMaterialDialogOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="voxel-material-authoring">
+              <label>
+                Material name
+                <input
+                  aria-label="New voxel material name"
+                  value={newVoxelMaterialName}
+                  onChange={(event) => setNewVoxelMaterialName(event.target.value)}
+                  placeholder="Material name"
+                />
+              </label>
+              <label>
+                Base color
+                <input
+                  aria-label="New voxel material color"
+                  type="color"
+                  value={newVoxelMaterialColor}
+                  onChange={(event) => setNewVoxelMaterialColor(event.target.value)}
+                />
+              </label>
+              <label>
+                Roughness
+                <input
+                  aria-label="New voxel material roughness"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={newVoxelMaterialRoughness}
+                  onChange={(event) => setNewVoxelMaterialRoughness(event.target.value)}
+                />
+              </label>
+              <label>
+                Optional texture
+                <input
+                  aria-label="New voxel material texture"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => setNewVoxelMaterialTexture(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setIsVoxelMaterialDialogOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void createVoxelMaterialAsset().then(() => setIsVoxelMaterialDialogOpen(false))
+                  }
+                  disabled={!newVoxelMaterialName.trim()}
+                >
+                  Create material
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

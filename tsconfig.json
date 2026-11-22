@@ -21,6 +21,15 @@
     },
     {
       "path": "apps/player"
+    },
+    {
+      "path": "packages/engine-world"
+    },
+    {
+      "path": "packages/engine-voxel"
+    },
+    {
+      "path": "packages/engine-project-storage"
     }
   ]
 }

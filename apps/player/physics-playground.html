@@ -39,7 +39,7 @@
               id="camera-mode"
               class="touch-camera"
               type="button"
-              aria-label="Toggle camera orbit mode"
+              aria-label="Hold to rotate camera"
               aria-pressed="false"
               data-active="false"
             >
@@ -51,9 +51,12 @@
           </div>
         </section>
         <section class="help-panel">
-          <strong>Move the sphere</strong>
-          <span>W A S D or the joystick · Space or left mouse button to jump</span>
-          <span>Pause the simulation or advance one fixed step.</span>
+          <strong>Move the capsule</strong>
+          <span>W A S D or the joystick · Space or JUMP to jump</span>
+          <span>Climb the four-step block course; autostep height is 0.34 m.</span>
+          <output id="character-state" data-state="airborne" aria-live="polite"
+            >CHARACTER INITIALIZING</output
+          >
           <output id="raycast-result" aria-live="polite">Raycast not run</output>
         </section>
       </main>

@@ -9,6 +9,8 @@ importers:
         specifier: 12.18.0
         version: 12.18.0
 
+  packages/engine-world: {}
+
 packages:
   '@pnpm/exe.android-arm64@12.18.0':
     resolution:
@@ -261,12 +263,21 @@ importers:
       '@engine/gltf-importer':
         specifier: workspace:*
         version: link:../../packages/engine-gltf-importer
+      '@engine/project-storage':
+        specifier: workspace:*
+        version: link:../../packages/engine-project-storage
       '@engine/renderer':
         specifier: workspace:*
         version: link:../../packages/engine-renderer
       '@engine/serialization':
         specifier: workspace:*
         version: link:../../packages/engine-serialization
+      '@engine/voxel':
+        specifier: workspace:*
+        version: link:../../packages/engine-voxel
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../../packages/engine-world
       '@vitejs/plugin-react':
         specifier: 5.1.4
         version: 5.1.4(vite@7.3.8(lightningcss@1.33.0))
@@ -292,21 +303,39 @@ importers:
 
   apps/player:
     dependencies:
+      '@engine/assets':
+        specifier: workspace:*
+        version: link:../../packages/engine-assets
       '@engine/core':
         specifier: workspace:*
         version: link:../../packages/engine-core
       '@engine/geometry':
         specifier: workspace:*
         version: link:../../packages/engine-geometry
+      '@engine/gltf-importer':
+        specifier: workspace:*
+        version: link:../../packages/engine-gltf-importer
       '@engine/input':
         specifier: workspace:*
         version: link:../../packages/engine-input
       '@engine/physics':
         specifier: workspace:*
         version: link:../../packages/engine-physics
+      '@engine/project-storage':
+        specifier: workspace:*
+        version: link:../../packages/engine-project-storage
       '@engine/renderer':
         specifier: workspace:*
         version: link:../../packages/engine-renderer
+      '@engine/serialization':
+        specifier: workspace:*
+        version: link:../../packages/engine-serialization
+      '@engine/voxel':
+        specifier: workspace:*
+        version: link:../../packages/engine-voxel
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../../packages/engine-world
     devDependencies:
       vite:
         specifier: 7.3.8
@@ -349,6 +378,21 @@ importers:
         specifier: 0.21.0
         version: 0.21.0
 
+  packages/engine-project-storage:
+    dependencies:
+      '@engine/assets':
+        specifier: workspace:*
+        version: link:../engine-assets
+      '@engine/serialization':
+        specifier: workspace:*
+        version: link:../engine-serialization
+      '@engine/voxel':
+        specifier: workspace:*
+        version: link:../engine-voxel
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../engine-world
+
   packages/engine-renderer:
     dependencies:
       '@engine/assets':
@@ -366,6 +410,17 @@ importers:
       ajv:
         specifier: ^8.20.0
         version: 8.20.0
+
+  packages/engine-voxel:
+    dependencies:
+      '@engine/geometry':
+        specifier: workspace:*
+        version: link:../engine-geometry
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../engine-world
+
+  packages/engine-world: {}
 
 packages:
   '@babel/code-frame@7.29.7':

@@ -435,6 +435,21 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     Object.defineProperty(window, '__projectFiles', { value: files, configurable: true });
     Object.defineProperty(window, '__projectWrites', { value: writes, configurable: true });
   });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__glbImageBitmapUploads', {
+      configurable: true,
+      writable: true,
+      value: 0,
+    });
+    const original = WebGL2RenderingContext.prototype.texSubImage2D;
+    WebGL2RenderingContext.prototype.texSubImage2D = function (...args) {
+      if (args.at(-1) instanceof ImageBitmap) {
+        const scope = window as Window & { __glbImageBitmapUploads: number };
+        scope.__glbImageBitmapUploads += 1;
+      }
+      return original.apply(this, args);
+    };
+  });
   await page.goto('/');
   await page.locator('input[accept=".glb,model/gltf-binary"]').setInputFiles({
     name: 'project.glb',
@@ -442,6 +457,36 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     buffer: makeTriangleGlb(),
   });
   await expect(page.getByText('TriangleNode')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
+  await expect(page.getByText(/VOXEL CHUNKS/)).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('2');
+  await page.getByLabel('Voxel cell Y').fill('2');
+  await page.getByLabel('Voxel cell Z').fill('3');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('3');
+  await page.getByRole('button', { name: 'Select Stone voxel material' }).click();
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('4');
+  await page.getByRole('button', { name: '+ Add material' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add world material' })).toBeVisible();
+  await page.getByLabel('New voxel material name').fill('Copper Alloy');
+  await page.getByLabel('New voxel material color').fill('#b87333');
+  await page.getByLabel('New voxel material roughness').fill('0.35');
+  await page.getByLabel('New voxel material texture').setInputFiles({
+    name: 'copper.png',
+    mimeType: 'image/png',
+    buffer: makeSolidPng(184, 115, 51),
+  });
+  await page.getByRole('button', { name: 'Create material' }).click();
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 3 · 3 materials')).toBeVisible();
 
   const menu = page.locator('.file-menu');
   if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
@@ -461,19 +506,74 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes)) as {
       assets: Array<{ id: string; kind: string; uri: string }>;
       assetPayloads?: unknown[];
+      extensions?: {
+        'com.choreon.voxel-world'?: {
+          chunks: Array<{
+            coordinate: { x: number; y: number; z: number };
+            revision: number;
+            palette: Array<{ material: { kind: string; key?: string } }>;
+            payload: {
+              assetId: string;
+              byteLength: number;
+              codecVersion: number;
+              contentHash: string;
+            };
+          }>;
+        };
+      };
     };
     return {
       paths: [...files.keys()].sort(),
       writes: [...scope.__projectWrites!],
+      fileData: [...files.entries()].map(([path, node]) => ({
+        path,
+        bytes: Array.from(node.bytes),
+      })),
       manifest,
     };
   });
   expect(saved.manifest.assetPayloads).toBeUndefined();
-  expect(saved.manifest.assets).toHaveLength(2);
+  expect(saved.manifest.assets).toHaveLength(4);
+  const savedVoxelMaterial = saved.manifest.assets.find((asset) => asset.kind === 'material');
+  expect(savedVoxelMaterial).toMatchObject({
+    metadata: { color: 0xb87333, roughness: 0.35 },
+  });
+  expect(saved.manifest.assets.some((asset) => asset.kind === 'texture')).toBe(true);
   expect(saved.manifest.assets.every((asset) => asset.uri.startsWith('assets/sha256/'))).toBe(true);
   expect(saved.paths).toContain('worlds/main.world');
-  expect(saved.paths).toHaveLength(3);
+  expect(saved.paths.some((path) => path.startsWith('voxel/chunks/sha256/'))).toBe(true);
+  expect(saved.paths).toHaveLength(6);
+  const savedVoxelChunk = saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks[0];
+  expect(saved.manifest.extensions?.['com.choreon.voxel-world']?.chunks).toHaveLength(1);
+  expect(savedVoxelChunk?.revision).toBe(3);
+  expect(savedVoxelChunk?.palette.map((entry) => entry.material.key)).toEqual([
+    'grass',
+    'stone',
+    undefined,
+  ]);
+  expect(savedVoxelChunk?.palette[2]?.material).toMatchObject({
+    kind: 'asset',
+    assetId: expect.stringMatching(/^asset:voxel-material-/),
+  });
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
+
+  // Add two distant descriptors that share the same immutable payload. Player
+  // should read the active chunk once, not issue reads for all 3 descriptors.
+  const streamingManifest = structuredClone(saved.manifest);
+  const streamingChunks = streamingManifest.extensions?.['com.choreon.voxel-world']?.chunks;
+  expect(streamingChunks).toHaveLength(1);
+  const sourceDescriptor = streamingChunks![0]!;
+  streamingChunks!.push(
+    { ...sourceDescriptor, coordinate: { x: -4, y: 0, z: 0 } },
+    { ...sourceDescriptor, coordinate: { x: 4, y: 0, z: 0 } },
+  );
+  const streamingFileData = saved.fileData.map(({ path, bytes }) => ({
+    path,
+    bytes:
+      path === 'worlds/main.world'
+        ? Array.from(new TextEncoder().encode(JSON.stringify(streamingManifest)))
+        : bytes,
+  }));
 
   // Change the active scene, then reopen the folder. The directory loader should
   // resolve the external blobs and restore the previously saved world.
@@ -524,6 +624,202 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect.poll(() => openProjectError.count()).toBeGreaterThan(previousOpenErrorCount);
   await expect(page.getByText(/Project file not found:/)).toBeVisible();
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
+
+  // The exact saved Editor folder must also load in Player as a mixed voxel/mesh
+  // scene, including GLB geometry, project assets, streamed voxel colliders,
+  // and camera-windowed voxel mesh residency.
+  await page.goto('http://127.0.0.1:5174');
+  await page.evaluate((entries) => {
+    const state = window as Window & {
+      __glbImageBitmapUploads: number;
+      __playerDeletedBuffers: number;
+      __playerDeletedTextures: number;
+      __playerCreatedBuffers: number;
+      __playerDrawCalls: number;
+    };
+    state.__glbImageBitmapUploads = 0;
+    state.__playerDeletedBuffers = 0;
+    state.__playerDeletedTextures = 0;
+    state.__playerCreatedBuffers = 0;
+    state.__playerDrawCalls = 0;
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (...args) {
+      state.__playerDrawCalls += 1;
+      return drawElements.apply(this, args);
+    };
+    const createBuffer = WebGL2RenderingContext.prototype.createBuffer;
+    WebGL2RenderingContext.prototype.createBuffer = function () {
+      state.__playerCreatedBuffers += 1;
+      return createBuffer.call(this);
+    };
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__playerDeletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
+    const deleteTexture = WebGL2RenderingContext.prototype.deleteTexture;
+    WebGL2RenderingContext.prototype.deleteTexture = function (texture) {
+      state.__playerDeletedTextures += 1;
+      return deleteTexture.call(this, texture);
+    };
+    const files = new Map(
+      entries.map(({ path, bytes }) => [path, { bytes: new Uint8Array(bytes) }]),
+    );
+    const reads: string[] = [];
+    Object.defineProperty(window, '__playerProjectReads', { value: reads, configurable: true });
+    const directories = new Set<string>(['']);
+    for (const { path } of entries) {
+      const segments = path.split('/');
+      for (let index = 1; index < segments.length; index += 1) {
+        directories.add(segments.slice(0, index).join('/'));
+      }
+    }
+    const makeDirectory = (prefix: string) => ({
+      async getDirectoryHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!directories.has(path)) {
+          if (!options?.create) throw new DOMException('Directory not found', 'NotFoundError');
+          directories.add(path);
+        }
+        return makeDirectory(path);
+      },
+      async getFileHandle(name: string, options?: { create?: boolean }) {
+        const path = prefix ? `${prefix}/${name}` : name;
+        if (!files.has(path)) {
+          if (!options?.create) throw new DOMException('File not found', 'NotFoundError');
+          files.set(path, { bytes: new Uint8Array() });
+        }
+        return {
+          async getFile() {
+            reads.push(path);
+            const node = files.get(path)!;
+            return new File([node.bytes.slice().buffer as ArrayBuffer], name);
+          },
+          async createWritable() {
+            let pending = new Uint8Array();
+            return {
+              async write(data: Uint8Array) {
+                pending = new Uint8Array(data);
+              },
+              async close() {
+                files.set(path, { bytes: pending });
+              },
+              async abort() {},
+            };
+          },
+        };
+      },
+    });
+    Object.defineProperty(window, 'showDirectoryPicker', {
+      configurable: true,
+      value: async () => makeDirectory(''),
+    });
+  }, streamingFileData);
+  await page.getByRole('button', { name: 'Open project folder' }).click();
+  const playerStatus = page.locator('#project-status');
+  await expect(playerStatus).toContainText('Loaded');
+  await expect(playerStatus).toContainText('non-voxel mesh parts');
+  await expect(playerStatus).toContainText('3 voxel chunks available for streaming');
+  await expect(playerStatus).toContainText('streamed voxel collision enabled');
+  await expect(playerStatus).not.toContainText('unsupported');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerProjectReads: string[] }).__playerProjectReads.filter(
+            (path) => path.startsWith('voxel/chunks/sha256/'),
+          ).length,
+      ),
+    )
+    .toBe(1);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
+    )
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
+    )
+    .toBeGreaterThan(0);
+  const beforeEviction = await page.evaluate(
+    () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
+  );
+  await page.keyboard.down('d');
+  await page.waitForTimeout(5200);
+  await page.keyboard.up('d');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeEviction);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerProjectReads: string[] }).__playerProjectReads.filter(
+            (path) => path.startsWith('voxel/chunks/sha256/'),
+          ).length,
+      ),
+    )
+    .toBe(2);
+  const beforeReload = await page.evaluate(
+    () => (window as Window & { __playerCreatedBuffers: number }).__playerCreatedBuffers,
+  );
+  await page.keyboard.down('a');
+  await page.waitForTimeout(5200);
+  await page.keyboard.up('a');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerCreatedBuffers: number }).__playerCreatedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeReload);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerProjectReads: string[] }).__playerProjectReads.filter(
+            (path) => path.startsWith('voxel/chunks/sha256/'),
+          ).length,
+      ),
+    )
+    .toBeGreaterThan(2);
+  const beforeDispose = await page.evaluate(() => {
+    const state = window as Window & {
+      __playerDeletedBuffers: number;
+      __playerDeletedTextures: number;
+    };
+    return { ...state };
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__playerDeletedBuffers);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerDeletedTextures: number }).__playerDeletedTextures,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__playerDeletedTextures);
+  await page.waitForTimeout(100);
+  const settledDrawCalls = await page.evaluate(
+    () => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls,
+  );
+  await page.waitForTimeout(100);
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
+    )
+    .toBe(settledDrawCalls);
 });
 
 test('failed GLB texture resolution rolls back staged assets and a later import succeeds', async ({
@@ -978,4 +1274,89 @@ test('renderer restores its WebGL context and reuploads scene textures after con
   await expect(page.getByText('TriangleNode')).toBeVisible();
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
+});
+
+test('Player preloads the built-in voxel streaming test scene on startup', async ({ page }) => {
+  await page.addInitScript(() => {
+    const state = window as Window & {
+      __sampleDrawCalls: number;
+      __sampleCreatedBuffers: number;
+      __sampleDeletedBuffers: number;
+    };
+    state.__sampleDrawCalls = 0;
+    state.__sampleCreatedBuffers = 0;
+    state.__sampleDeletedBuffers = 0;
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__sampleDeletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (...args) {
+      state.__sampleDrawCalls += 1;
+      return drawElements.apply(this, args);
+    };
+    const createBuffer = WebGL2RenderingContext.prototype.createBuffer;
+    WebGL2RenderingContext.prototype.createBuffer = function () {
+      state.__sampleCreatedBuffers += 1;
+      return createBuffer.call(this);
+    };
+  });
+
+  await page.goto('http://127.0.0.1:5174');
+  const status = page.locator('#project-status');
+  await expect(status).toContainText('Voxel test scene ready');
+  await expect(status).toContainText('63 chunks available');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __sampleDrawCalls: number }).__sampleDrawCalls),
+    )
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __sampleCreatedBuffers: number }).__sampleCreatedBuffers,
+      ),
+    )
+    .toBeGreaterThan(0);
+
+  const beforeTravel = await page.evaluate(() => {
+    const state = window as Window & {
+      __playerSampleChunkLoads: number;
+      __sampleCreatedBuffers: number;
+      __sampleDeletedBuffers: number;
+    };
+    return { ...state };
+  });
+  await page.keyboard.down('d');
+  await page.waitForTimeout(5200);
+  await page.keyboard.up('d');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerSampleChunkLoads: number }).__playerSampleChunkLoads,
+      ),
+    )
+    .toBeGreaterThan(beforeTravel.__playerSampleChunkLoads);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __sampleDeletedBuffers: number }).__sampleDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeTravel.__sampleDeletedBuffers);
+
+  const createdAfterForwardTravel = await page.evaluate(
+    () => (window as Window & { __sampleCreatedBuffers: number }).__sampleCreatedBuffers,
+  );
+  await page.keyboard.down('a');
+  await page.waitForTimeout(5200);
+  await page.keyboard.up('a');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __sampleCreatedBuffers: number }).__sampleCreatedBuffers,
+      ),
+    )
+    .toBeGreaterThan(createdAfterForwardTravel);
 });

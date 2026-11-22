@@ -7,6 +7,7 @@ import type {
   RendererOptions,
   RenderScene,
   RenderObject,
+  RendererPickHit,
   TextureSource,
 } from './contracts.js';
 import { RendererError } from './contracts.js';
@@ -131,11 +132,41 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     this.#scene.updateMatrixWorld(true);
     this.#raycaster.setFromCamera(pointer, camera);
     const intersections = this.#raycaster.intersectObjects(
-      [...this.#objects.values()].map((entry) => entry.mesh),
+      [...this.#objects.values()]
+        .filter((entry) => entry.mesh.userData['engineEntityId'] !== '__voxel-brush-preview__')
+        .map((entry) => entry.mesh),
       false,
     );
     const entityId = intersections[0]?.object.userData['engineEntityId'];
     return typeof entityId === 'string' ? entityId : null;
+  }
+
+  pickSurface(x: number, y: number, width: number, height: number): RendererPickHit | null {
+    this.#assertActive();
+    const camera = this.#activeCamera;
+    if (!camera || width <= 0 || height <= 0) return null;
+    const pointer = new THREE.Vector2((x / width) * 2 - 1, 1 - (y / height) * 2);
+    camera.updateMatrixWorld();
+    this.#scene.updateMatrixWorld(true);
+    this.#raycaster.setFromCamera(pointer, camera);
+    const hit = this.#raycaster.intersectObjects(
+      [...this.#objects.values()]
+        .filter((entry) => entry.mesh.userData['engineEntityId'] !== '__voxel-brush-preview__')
+        .map((entry) => entry.mesh),
+      false,
+    )[0];
+    if (!hit) return null;
+    const entityId = hit.object.userData['engineEntityId'];
+    if (typeof entityId !== 'string' || !hit.face) return null;
+    const normal = hit.face.normal
+      .clone()
+      .applyNormalMatrix(new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld))
+      .normalize();
+    return {
+      entityId,
+      point: [hit.point.x, hit.point.y, hit.point.z],
+      normal: [normal.x, normal.y, normal.z],
+    };
   }
 
   dispose(): void {

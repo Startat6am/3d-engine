@@ -6,7 +6,7 @@ import {
   ProjectAssetStoreError,
   loadDirectoryProject,
   saveDirectoryProject,
-} from './ProjectAssetStore.js';
+} from './index.js';
 
 const bytes = new Uint8Array([0, 1, 2, 3, 254, 255]);
 

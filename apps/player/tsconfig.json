@@ -15,6 +15,12 @@
       "path": "../../packages/engine-geometry"
     },
     {
+      "path": "../../packages/engine-assets"
+    },
+    {
+      "path": "../../packages/engine-gltf-importer"
+    },
+    {
       "path": "../../packages/engine-renderer"
     },
     {
@@ -22,6 +28,18 @@
     },
     {
       "path": "../../packages/engine-physics"
+    },
+    {
+      "path": "../../packages/engine-project-storage"
+    },
+    {
+      "path": "../../packages/engine-voxel"
+    },
+    {
+      "path": "../../packages/engine-world"
+    },
+    {
+      "path": "../../packages/engine-serialization"
     }
   ],
   "include": ["src"]

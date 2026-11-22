@@ -17,7 +17,7 @@ Vitest for unit/integration; Playwright for browser E2E; TypeScript strict mode;
 
 ## Benchmark scenarios
 
-Entity counts and component densities; mesh count/triangle count/draw calls; voxel volume/chunk count and remesh; cold/warm GLB load; physics body/collider counts; serialization size/entity count. Capture median and tail latency, CPU/GPU time where available, memory estimates, and hardware/browser/driver details.
+Entity counts and component densities; mesh count/triangle count/draw calls; voxel volume/chunk count and remesh; cold/warm GLB load; physics body/collider counts; serialization size/entity count. Capture median and tail latency, CPU/GPU time where available, memory estimates, and hardware/browser/driver details. `benchmarks/voxel-world-stress.mjs` reports empty/single/solid/checkerboard CPU meshing and repeated load/edit/async-mesh/evict cycles with fixture sizes, face counts, geometry bytes, latency percentiles, residency, and Node/host metadata. CI uploads the raw JSON as the `voxel-world-stress-results` artifact; measurements are diagnostic and are not treated as portable thresholds.
 
 ## Error and flake policy
 

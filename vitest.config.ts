@@ -8,6 +8,7 @@ export default defineConfig({
       'packages/**/src/**/*.test.ts',
       'packages/**/test/**/*.test.ts',
       'apps/editor/src/project/**/*.test.ts',
+      'apps/player/src/**/*.test.ts',
     ],
     environment: 'node',
     coverage: { reporter: ['text', 'html'] },
