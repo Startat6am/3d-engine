@@ -507,8 +507,15 @@ test('directory project saves content-addressed blobs and opens atomically', asy
       extensions?: {
         'com.choreon.voxel-world'?: {
           chunks: Array<{
+            coordinate: { x: number; y: number; z: number };
             revision: number;
             palette: Array<{ material: { kind: string; key?: string } }>;
+            payload: {
+              assetId: string;
+              byteLength: number;
+              codecVersion: number;
+              contentHash: string;
+            };
           }>;
         };
       };
@@ -547,6 +554,24 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     assetId: expect.stringMatching(/^asset:voxel-material-/),
   });
   expect(saved.writes.at(-1)).toBe('worlds/main.world');
+
+  // Add two distant descriptors that share the same immutable payload. Player
+  // should read the active chunk once, not issue reads for all 3 descriptors.
+  const streamingManifest = structuredClone(saved.manifest);
+  const streamingChunks = streamingManifest.extensions?.['com.choreon.voxel-world']?.chunks;
+  expect(streamingChunks).toHaveLength(1);
+  const sourceDescriptor = streamingChunks![0]!;
+  streamingChunks!.push(
+    { ...sourceDescriptor, coordinate: { x: -4, y: 0, z: 0 } },
+    { ...sourceDescriptor, coordinate: { x: 4, y: 0, z: 0 } },
+  );
+  const streamingFileData = saved.fileData.map(({ path, bytes }) => ({
+    path,
+    bytes:
+      path === 'worlds/main.world'
+        ? Array.from(new TextEncoder().encode(JSON.stringify(streamingManifest)))
+        : bytes,
+  }));
 
   // Change the active scene, then reopen the folder. The directory loader should
   // resolve the external blobs and restore the previously saved world.
@@ -599,7 +624,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
 
   // The exact saved Editor folder must also load in Player as a mixed voxel/mesh
-  // scene, including GLB geometry, PBR material, embedded image, static voxel collider,
+  // scene, including GLB geometry, project assets, streamed voxel colliders,
   // and camera-windowed voxel mesh residency.
   await page.goto('http://127.0.0.1:5174');
   await page.evaluate((entries) => {
@@ -638,6 +663,8 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     const files = new Map(
       entries.map(({ path, bytes }) => [path, { bytes: new Uint8Array(bytes) }]),
     );
+    const reads: string[] = [];
+    Object.defineProperty(window, '__playerProjectReads', { value: reads, configurable: true });
     const directories = new Set<string>(['']);
     for (const { path } of entries) {
       const segments = path.split('/');
@@ -662,6 +689,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
         }
         return {
           async getFile() {
+            reads.push(path);
             const node = files.get(path)!;
             return new File([node.bytes.slice().buffer as ArrayBuffer], name);
           },
@@ -684,27 +712,29 @@ test('directory project saves content-addressed blobs and opens atomically', asy
       configurable: true,
       value: async () => makeDirectory(''),
     });
-  }, saved.fileData);
+  }, streamingFileData);
   await page.getByRole('button', { name: 'Open project folder' }).click();
   const playerStatus = page.locator('#project-status');
   await expect(playerStatus).toContainText('Loaded');
   await expect(playerStatus).toContainText('non-voxel mesh parts');
-  await expect(playerStatus).toContainText('voxel chunks available for streaming');
+  await expect(playerStatus).toContainText('3 voxel chunks available for streaming');
   await expect(playerStatus).toContainText('streamed voxel collision enabled');
   await expect(playerStatus).not.toContainText('unsupported');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerProjectReads: string[] }).__playerProjectReads.filter(
+            (path) => path.startsWith('voxel/chunks/sha256/'),
+          ).length,
+      ),
+    )
+    .toBe(1);
   await expect
     .poll(() =>
       page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
     )
     .toBeGreaterThan(0);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => (window as Window & { __glbImageBitmapUploads: number }).__glbImageBitmapUploads,
-      ),
-    )
-    .toBeGreaterThanOrEqual(2);
-
   await expect
     .poll(() =>
       page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),

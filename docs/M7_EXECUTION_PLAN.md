@@ -74,7 +74,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Integrate camera-windowed voxel mesh scheduling in Player with bounded concurrency/residency, nearest-first CPU meshing, stale/cancelled job protection and render-entity release on eviction; source chunk payloads are fetched on demand through the project store and kept in a bounded cache.
 - [x] Split voxel project opening into manifest/descriptor inspection and per-coordinate payload loading; verify SHA-256 and byte length when each chunk is requested. Keep the eager compatibility loader for callers that explicitly require all chunks.
 - [x] Stream static voxel colliders with the camera window, using loaded neighbor snapshots for shared-face culling and rebuilding neighbor revision tokens as chunks arrive.
-- [x] Add storage tests proving project open does not read chunk blobs and a single requested coordinate reads only its own content-addressed payload.
+- [x] Add storage tests proving project open does not read chunk blobs and a single requested coordinate reads only its own content-addressed payload; add Chromium coverage with three distant chunk descriptors proving Player reads only the active camera-window payload.
 - [x] Pass local Chromium E2E for initial streamed rendering, WASD-driven GPU buffer eviction/re-entry, and pagehide cleanup; exact-head CI for this implementation remains pending.
 
 ## Phase 5 — verification and closeout
