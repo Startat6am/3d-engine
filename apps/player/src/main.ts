@@ -644,16 +644,22 @@ function createVoxelStream(
               }
               return getSourceChunk(coordinate);
             };
-            const [positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ] =
-              await Promise.all([
-                neighbor(1, 0, 0),
-                neighbor(-1, 0, 0),
-                neighbor(0, 1, 0),
-                neighbor(0, -1, 0),
-                neighbor(0, 0, 1),
-                neighbor(0, 0, -1),
-              ]);
+            // A corrupt or unavailable adjacent payload must not prevent this
+            // valid chunk from meshing. If the failed neighbor is itself in the
+            // active window, its own scheduled job will report that failure.
+            const neighborResults = await Promise.allSettled([
+              neighbor(1, 0, 0),
+              neighbor(-1, 0, 0),
+              neighbor(0, 1, 0),
+              neighbor(0, -1, 0),
+              neighbor(0, 0, 1),
+              neighbor(0, 0, -1),
+            ]);
             if (signal.aborted) throw new Error('WORLD_JOB_CANCELLED');
+            const [positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ] =
+              neighborResults.map((result) =>
+                result.status === 'fulfilled' ? result.value : undefined,
+              );
             const neighbors = {
               ...(positiveX ? { positiveX } : {}),
               ...(negativeX ? { negativeX } : {}),
