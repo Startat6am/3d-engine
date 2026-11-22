@@ -194,6 +194,8 @@ test('editor creates project-backed voxel material assets and paints with them',
     .locator('#hierarchy-add-menu')
     .getByRole('button', { name: /Voxel chunk/ })
     .click();
+  await page.getByRole('button', { name: '+ Add material' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add world material' })).toBeVisible();
   await page.getByLabel('New voxel material name').fill('Copper Alloy');
   await page.getByLabel('New voxel material color').fill('#b87333');
   await page.getByRole('button', { name: 'Create material' }).click();
@@ -206,7 +208,27 @@ test('editor creates project-backed voxel material assets and paints with them',
   await page.getByRole('button', { name: 'Paint cell' }).click();
   await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
   await expect(page.locator('.voxel-palette')).toContainText('Copper Alloy');
-  await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
+  await expect(page.getByText(/SAVED LOCALLY|UNSAVED CHANGES/)).toBeVisible();
+});
+
+test('editor autosaves voxel edits locally and restores them after reload', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
+  await page.getByLabel('Voxel cell X').fill('2');
+  await page.getByLabel('Voxel cell Y').fill('3');
+  await page.getByLabel('Voxel cell Z').fill('4');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await expect(page.getByText('Saved locally', { exact: true })).toBeVisible({ timeout: 5000 });
+
+  await page.reload();
+  await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible({ timeout: 5000 });
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await expect(page.getByText('Saved locally', { exact: true })).toBeVisible();
 });
 
 test('editor can author and render a voxel chunk beside conventional mesh entities', async ({

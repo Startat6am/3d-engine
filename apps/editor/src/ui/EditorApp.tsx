@@ -15,6 +15,7 @@ import type { GlbAsset } from '@engine/gltf-importer';
 import type { WorldAssetPayload } from '@engine/serialization';
 import {
   loadVoxelWorldProject,
+  loadDirectoryProject as loadStoredDirectoryProject,
   saveVoxelWorldProject,
   VOXEL_WORLD_EXTENSION_KEY,
   type VoxelWorldSettings,
@@ -48,6 +49,7 @@ import {
 } from '@engine/voxel';
 import { createChunkCoordinate } from '@engine/world';
 import type { ThreeWebGLRendererAdapter } from '@engine/renderer';
+import { EditorRecoveryStore } from '../project/EditorRecoveryStore.js';
 import {
   BrowserProjectFileStore,
   loadDirectoryProject,
@@ -363,6 +365,12 @@ export function EditorApp() {
   const [newVoxelMaterialColor, setNewVoxelMaterialColor] = useState('#a87952');
   const [newVoxelMaterialRoughness, setNewVoxelMaterialRoughness] = useState('0.9');
   const [newVoxelMaterialTexture, setNewVoxelMaterialTexture] = useState<File | null>(null);
+  const [isVoxelMaterialDialogOpen, setIsVoxelMaterialDialogOpen] = useState(false);
+  const [recoveryReady, setRecoveryReady] = useState(false);
+  const [recoveryStatus, setRecoveryStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
+    'idle',
+  );
+  const recoveryStoreRef = useRef<EditorRecoveryStore | null>(null);
   const [voxelBrushMode, setVoxelBrushMode] = useState<'paint' | 'erase'>('paint');
   const [cameraTool, setCameraTool] = useState<'select' | 'pan' | 'rotate'>('select');
   const [brushPreview, setBrushPreview] = useState<{
@@ -1432,7 +1440,14 @@ export function EditorApp() {
           chunkDimensions: { x: 16, y: 16, z: 16 },
         },
       );
-      setVoxelChunks(options.voxelWorld?.chunks ?? []);
+      const restoredVoxelChunks = options.voxelWorld?.chunks ?? [];
+      setVoxelChunks(restoredVoxelChunks);
+      const firstRestoredChunk = restoredVoxelChunks[0];
+      setSelectedVoxelChunkKey(
+        firstRestoredChunk
+          ? `${firstRestoredChunk.coordinate.x},${firstRestoredChunk.coordinate.y},${firstRestoredChunk.coordinate.z}`
+          : null,
+      );
       projectDirectoryRef.current = null;
       setIsDirty(false);
       setHasSaved(true);
@@ -1988,6 +2003,84 @@ export function EditorApp() {
     });
   };
 
+  useEffect(() => {
+    let active = true;
+    const store = new EditorRecoveryStore();
+    recoveryStoreRef.current = store;
+    void (async () => {
+      try {
+        const document = await loadStoredDirectoryProject(store);
+        const voxelWorld = document.extensions[VOXEL_WORLD_EXTENSION_KEY]
+          ? await loadVoxelWorldProject(store)
+          : null;
+        if (!active) return;
+        await loadWorld(document, {
+          replaceAssets: true,
+          ...(voxelWorld
+            ? { voxelWorld: { settings: voxelWorld.settings, chunks: voxelWorld.chunks } }
+            : {}),
+        });
+        if (active) {
+          setRecoveryStatus('saved');
+          pushDiagnostic({
+            level: 'info',
+            source: 'Recovery',
+            message: 'Recovered the latest local draft',
+            details: 'The draft was restored from this browser.',
+          });
+        }
+      } catch (error) {
+        if (
+          active &&
+          error instanceof Error &&
+          !error.message.startsWith('Recovery file not found:')
+        ) {
+          setRecoveryStatus('error');
+          pushDiagnostic({
+            level: 'warning',
+            source: 'Recovery',
+            message: 'Could not restore the local draft',
+            details: error.message,
+          });
+        }
+      } finally {
+        if (active) setRecoveryReady(true);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!recoveryReady || !isDirty) return;
+    const store = recoveryStoreRef.current;
+    if (!store) return;
+    setRecoveryStatus('saving');
+    const timeout = window.setTimeout(() => {
+      void saveVoxelWorldProject(store, createWorldDocument(), voxelWorldSettings, voxelChunks)
+        .then(() => setRecoveryStatus('saved'))
+        .catch((error: unknown) => {
+          setRecoveryStatus('error');
+          pushDiagnostic({
+            level: 'warning',
+            source: 'Recovery',
+            message: 'Local autosave failed',
+            details: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }, 650);
+    return () => window.clearTimeout(timeout);
+  }, [
+    recoveryReady,
+    isDirty,
+    entities,
+    worldName,
+    voxelWorldSettings,
+    voxelChunks,
+    voxelAssetMaterials,
+  ]);
+
   return (
     <main className="editor-shell">
       <header className="topbar">
@@ -2062,6 +2155,15 @@ export function EditorApp() {
             setIsDirty(true);
           }}
         />
+        <span className="autosave-status" role="status" aria-live="polite">
+          {recoveryStatus === 'saving'
+            ? 'Saving…'
+            : recoveryStatus === 'saved'
+              ? 'Saved locally'
+              : recoveryStatus === 'error'
+                ? 'Autosave error'
+                : ' '}
+        </span>
         <button
           className="toolbar-button"
           onClick={undo}
@@ -2572,42 +2674,13 @@ export function EditorApp() {
                   );
                 })}
               </div>
-              <div className="voxel-material-authoring">
-                <input
-                  aria-label="New voxel material name"
-                  value={newVoxelMaterialName}
-                  onChange={(event) => setNewVoxelMaterialName(event.target.value)}
-                  placeholder="Material name"
-                />
-                <input
-                  aria-label="New voxel material color"
-                  type="color"
-                  value={newVoxelMaterialColor}
-                  onChange={(event) => setNewVoxelMaterialColor(event.target.value)}
-                />
-                <input
-                  aria-label="New voxel material roughness"
-                  type="number"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={newVoxelMaterialRoughness}
-                  onChange={(event) => setNewVoxelMaterialRoughness(event.target.value)}
-                />
-                <input
-                  aria-label="New voxel material texture"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  onChange={(event) => setNewVoxelMaterialTexture(event.target.files?.[0] ?? null)}
-                />
-                <button
-                  type="button"
-                  onClick={() => void createVoxelMaterialAsset()}
-                  disabled={!newVoxelMaterialName.trim()}
-                >
-                  Create material
-                </button>
-              </div>
+              <button
+                type="button"
+                className="voxel-material-add"
+                onClick={() => setIsVoxelMaterialDialogOpen(true)}
+              >
+                + Add material
+              </button>
               <small>
                 Built-ins and custom project materials share the world library. Optional PNG, JPEG
                 or WebP textures are stored as dependent project assets and sampled on voxel faces.
@@ -2786,10 +2859,98 @@ export function EditorApp() {
         </span>
         <span className="spacer" />
         <span className={isDirty ? 'save-state is-dirty' : 'save-state'}>
-          {isDirty ? 'UNSAVED CHANGES' : hasSaved ? 'SAVED' : 'NEW SCENE'}
+          {isDirty
+            ? recoveryStatus === 'saved'
+              ? 'SAVED LOCALLY'
+              : 'UNSAVED CHANGES'
+            : hasSaved
+              ? 'SAVED'
+              : 'NEW SCENE'}
         </span>
         <span>{entities.length} objects</span>
       </footer>
+      {isVoxelMaterialDialogOpen ? (
+        <div
+          className="modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setIsVoxelMaterialDialogOpen(false);
+          }}
+        >
+          <section
+            className="voxel-material-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="voxel-material-modal-title"
+          >
+            <div className="modal-heading">
+              <h2 id="voxel-material-modal-title">Add world material</h2>
+              <button
+                type="button"
+                aria-label="Close dialog"
+                onClick={() => setIsVoxelMaterialDialogOpen(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="voxel-material-authoring">
+              <label>
+                Material name
+                <input
+                  aria-label="New voxel material name"
+                  value={newVoxelMaterialName}
+                  onChange={(event) => setNewVoxelMaterialName(event.target.value)}
+                  placeholder="Material name"
+                />
+              </label>
+              <label>
+                Base color
+                <input
+                  aria-label="New voxel material color"
+                  type="color"
+                  value={newVoxelMaterialColor}
+                  onChange={(event) => setNewVoxelMaterialColor(event.target.value)}
+                />
+              </label>
+              <label>
+                Roughness
+                <input
+                  aria-label="New voxel material roughness"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={newVoxelMaterialRoughness}
+                  onChange={(event) => setNewVoxelMaterialRoughness(event.target.value)}
+                />
+              </label>
+              <label>
+                Optional texture
+                <input
+                  aria-label="New voxel material texture"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => setNewVoxelMaterialTexture(event.target.files?.[0] ?? null)}
+                />
+              </label>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setIsVoxelMaterialDialogOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void createVoxelMaterialAsset().then(() => setIsVoxelMaterialDialogOpen(false))
+                  }
+                  disabled={!newVoxelMaterialName.trim()}
+                >
+                  Create material
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

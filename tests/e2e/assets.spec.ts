@@ -474,6 +474,8 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await page.getByRole('button', { name: 'Paint cell' }).click();
   await expect(page.getByText('Revision 2 · 2 materials')).toBeVisible();
   await page.getByLabel('Voxel cell X').fill('4');
+  await page.getByRole('button', { name: '+ Add material' }).click();
+  await expect(page.getByRole('dialog', { name: 'Add world material' })).toBeVisible();
   await page.getByLabel('New voxel material name').fill('Copper Alloy');
   await page.getByLabel('New voxel material color').fill('#b87333');
   await page.getByLabel('New voxel material roughness').fill('0.35');
