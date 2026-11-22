@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-test('player renders the primitive acceptance scene through WebGL2', async ({ page }) => {
+test('player renders the preloaded voxel test scene through WebGL2', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   await page.addInitScript(() => {
@@ -16,6 +16,7 @@ test('player renders the primitive acceptance scene through WebGL2', async ({ pa
   await page.goto('http://127.0.0.1:5174');
   const canvas = page.locator('#player');
   await expect(canvas).toBeVisible();
+  await expect(page.locator('#project-status')).toContainText('Voxel test scene ready');
   const fps = page.getByLabel('Frames per second');
   await expect.poll(() => fps.textContent()).toMatch(/^FPS \d+$/);
   await expect
@@ -74,6 +75,14 @@ test('player shutdown releases renderer GPU resources and stops its frame loop',
   });
 
   await page.goto('http://127.0.0.1:5174');
+  await expect(page.locator('#project-status')).toContainText('Voxel test scene ready');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __playerSampleChunkLoads: number }).__playerSampleChunkLoads,
+      ),
+    )
+    .toBeGreaterThan(20);
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __drawCalls: number }).__drawCalls))
     .toBeGreaterThanOrEqual(4);
