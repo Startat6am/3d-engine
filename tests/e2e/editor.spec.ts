@@ -185,6 +185,21 @@ test('editor opens with an empty scene and shows an actionable state', async ({ 
   await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
 });
 
+test('selected voxel chunks can be deleted from the inspector and restored with undo', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page.locator('#hierarchy-add-menu').getByRole('button', { name: /Voxel chunk/ }).click();
+  await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Delete selected voxel chunk' }).click();
+  await expect(page.getByText('0 VOXEL CHUNKS', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete selected object' })).toBeDisabled();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
+  await expect(page.getByText('Chunk (0, 0, 0)')).toBeVisible();
+});
+
 test('editor creates project-backed voxel material assets and paints with them', async ({
   page,
 }) => {
