@@ -185,10 +185,15 @@ test('editor opens with an empty scene and shows an actionable state', async ({ 
   await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
 });
 
-test('selected voxel chunks can be deleted from the inspector and restored with undo', async ({ page }) => {
+test('selected voxel chunks can be deleted from the inspector and restored with undo', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add object' }).click();
-  await page.locator('#hierarchy-add-menu').getByRole('button', { name: /Voxel chunk/ }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
   await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Delete selected voxel chunk' }).click();
