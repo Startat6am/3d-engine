@@ -1,36 +1,39 @@
 # Project Handoff — Choreon 3D Engine
 
-Updated: 2026-11-21
+Updated: 2026-11-22
 
 ## Current authoritative snapshot
 
 - Repository: `Startat6am/3d-engine`; default branch: `main`.
-- M6 is integrated in `main` through squash merge `54def10255ca8fad661e0077b15c3332d6a390f3` (PR
-  #87).
-- M6 functional implementation is closed. Exact-head GitHub Actions [run
-  #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
-- M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
-  on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
-- Player project-folder loading, GLB restoration, and bounded static voxel collider integration are present on the current M7 head. Exact-head CI remains the merge gate.
-- Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
-  automatically.
+- M6 is integrated in `main` through squash merge `54def10255ca8fad661e0077b15c3332d6a390f3` (PR #87).
+- M7 World & Voxels was explicitly accepted by the owner on 2026-11-22 after exact-head CI and Android smoke validation. PR [#90](https://github.com/Startat6am/3d-engine/pull/90) was squash-merged as `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
+- M8 Animation & Audio is active on branch `feat/m8-animation-audio`, based directly on the M7 merge commit above.
+- M8 normative contract: [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md). Sequencing/evidence: [M8 Execution Plan](M8_EXECUTION_PLAN.md). Architecture decision: [ADR 0013](ADR/0013-animation-audio-package-boundaries.md).
+- Latest M7 exact-head CI: [run #45022849198](https://github.com/Startat6am/3d-engine/actions/runs/45022849198), passed on `ae64a2b05a9c6fbf9e8f244e0be7850c8682438a`. Local verification: 283/283 Vitest tests, full Chromium Playwright suite, format, lint, typecheck and production builds.
+- Owner confirmed Player and Editor work on the target Android device. This is a smoke check, not detailed GPU/memory profiling.
 
 ## Milestone status
 
 - M2–M5: complete.
-- M6 Physics/Input: functionally closed by owner direction on 2026-11-19.
-- M7 World & Voxels: active; coordinates/settings, immutable chunk storage/palette validation,
-  deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and a
-  bounded chunk scheduler, deterministic seeded generation, repeated load/eviction lifecycle stress
-  coverage, content-addressed v1 `com.choreon.voxel-world` persistence, and Editor project persistence
-  wiring are implemented. Player opens project folders, verifies voxel blobs, renders voxel chunks,
-  restores primitive and GLB entities, and builds bounded static voxel colliders through PhysicsWorld.
-  Editor supports chunk selection, local XYZ cell painting/erasing, built-in Grass/Dirt/Stone
-  material selection and revisioned palette extension. Painted multi-material save/reopen E2E coverage
-  passed exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`. Viewport ray-based brush interaction, migration fixtures, lifecycle coverage and voxel benchmarks remain.
-  Palette entries can be reordered with index remapping or removed when unused.
-- M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
-  started. AI authoring remains M10; do not reorder the roadmap.
+- M6 Physics/Input: functional scope closed by owner direction on 2026-11-19; physical profiling remains deferred.
+- M7 World & Voxels: complete and merged; owner acceptance recorded 2026-11-22.
+- M8 Animation & Audio: implementation active on `feat/m8-animation-audio`; GLB import, renderer skinning, animated Player path and browser Web Audio backend are implemented with focused Chromium coverage. Full workspace CI, device validation and owner acceptance remain pending.
+- M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
+
+## M8 current implementation
+
+- `@engine/animation` now exports validated clip/track contracts, STEP/LINEAR/CUBICSPLINE samplers, shortest-path quaternion slerp and normalization, pose blending, playback controls, looping/seek, cross-fade state, and CPU skinning palette calculation with column-major matrix validation.
+- `@engine/audio` exports backend-neutral clip/voice/listener contracts, explicit user-gesture activation, deduplicated clip decoding, inverse-distance attenuation, bounded voice count (default 32), encoded clip size (64 MiB), decoded duration (600 seconds), and teardown that waits for pending decodes. `WebAudioBackend` now implements lazy AudioContext activation, clip decoding, voice lifecycle, panning and attenuation.
+- GLB importer imports skin joint lists, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences and supported TRS animation channels with bounded counts and strict validation. Player advances the first imported clip, computes node world transforms and skinning palettes, and sends skinned render data to the renderer.
+- Renderer creates Three.js `SkinnedMesh` / `Skeleton` resources behind the package boundary, normalizes uploaded weights, updates joint matrices and releases skeleton resources on object removal/disposal.
+- Player Chromium suite passed 5/5: static scene, shutdown/resource cleanup, palette-driven mesh deformation, animated GLB playback and user-gesture Web Audio startup. Workspace Vitest passed 314/314 after audio activation hardening; format, lint, typecheck and production builds passed locally. Player Chromium suite passed 5/5 including camera/listener synchronization. GitHub Actions run #699 passed on exact PR head `2aea6a4` (unit tests, full Chromium E2E, stress benchmarks, format, lint, typecheck and build); all four Vercel checks passed.
+- Known gaps: no physical-device GPU/audio validation, no performance profiling, no persisted audio scene component/source workflow, no animation selection/graph UI, and no morph targets. The Player audio listener now follows camera movement each frame. The Player audio control is a smoke-test harness.
+
+## M8 immediate next steps
+
+1. Run the remaining full Chromium E2E suites and address regressions.
+2. Implement the schema 1.1.0 / 1.0.0 migration and validated AudioSource asset reference contract described in ADR 0014; only then wire audio-only entity loading, Editor authoring and Player gesture-gated playback. Listener/camera synchronization is already covered in Player E2E.
+3. Record exact-head CI and benchmark/device evidence, then request owner review. M8 remains unaccepted and must not be merged without explicit approval.
 
 ## M6 implementation and accepted limitations
 
@@ -79,14 +82,7 @@ Explicitly deferred; do not describe as passed:
 - Player builds bounded chunk-local static voxel colliders through the public PhysicsWorld API, tracks source and neighbor revisions, synchronizes replacements/unloads through `StaticMeshColliderSet`, and disposes handles on page teardown. The Editor→Player E2E creates a voxel chunk beside an imported GLB, verifies binary chunk persistence, reopens the project in Player, and asserts rendered mesh parts plus static voxel colliders; exact-head Chromium acceptance passed in CI #612.
 - Exact-head GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) passed on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, GLB geometry and embedded-image benchmarks, and Chromium E2E. After that head, coordinate-based voxel paint/erase and multi-material round-trip assertions were added. Local `pnpm check` passes with 257/257 tests and both app builds; local Playwright cannot launch Chromium because this sandbox lacks `libglib-2.0.so.0`. Exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) passed on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`, including the painted multi-material save/reopen E2E.
 
-Next sequence:
-
-1. Add viewport ray-based painting and richer authoring controls.
-2. Add migration fixtures and full load/edit/mesh/evict/dispose pipeline coverage.
-3. Run voxel correctness/streaming/performance benchmarks and record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
-4. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
-
-Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
+M7 was accepted and merged. Deferred follow-ups are recorded rather than treated as blockers: future persisted-schema migration fixtures, additional long-run/browser/device profiling, and any unimplemented authoring/meshing enhancements. Do not add workers, greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
 
 ## Quality gates
 
@@ -102,7 +98,7 @@ pnpm build
 pnpm e2e
 ```
 
-Every implementation slice must update its owning spec, M7 execution plan and this handoff in the
+Every implementation slice must update its owning spec, owning subsystem specification, milestone execution plan, roadmap and this handoff in the
 same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test
 counts, hardware measurements, deployment state or acceptance.
 

@@ -5,16 +5,22 @@
       "path": "packages/engine-assets"
     },
     {
+      "path": "packages/engine-animation"
+    },
+    {
+      "path": "packages/engine-audio"
+    },
+    {
       "path": "packages/engine-core"
     },
     {
       "path": "packages/engine-geometry"
     },
     {
-      "path": "packages/engine-renderer"
+      "path": "packages/engine-gltf-importer"
     },
     {
-      "path": "packages/engine-gltf-importer"
+      "path": "packages/engine-renderer"
     },
     {
       "path": "apps/editor"

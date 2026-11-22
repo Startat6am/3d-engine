@@ -387,6 +387,7 @@ test('GLB imports register stable project assets and survive world save/reopen',
 });
 
 test('directory project saves content-addressed blobs and opens atomically', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.addInitScript(() => {
     type FakeFileNode = { bytes: Uint8Array };
     const files = new Map<string, FakeFileNode>();

@@ -13,6 +13,8 @@ The format is an architectural direction, not yet a finalized or implemented pub
 ## Foundation workspace
 
 - `packages/engine-core` — renderer-independent engine lifecycle and generation-safe entity handles.
+- `packages/engine-animation` — CPU animation sampling, pose blending and playback contracts (M8 in progress).
+- `packages/engine-audio` — backend-neutral audio source/listener lifecycle and spatial attenuation contracts (M8 in progress).
 - `packages/engine-geometry` — CPU-side mesh contracts and primitive geometry.
 - `packages/engine-renderer` — Three.js WebGL2 implementation behind an engine-owned adapter.
 - `apps/editor` — React authoring shell with hierarchy, inspector and live 3D viewport.
@@ -61,7 +63,7 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Status
 
-M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels is active: `@engine/world` coordinates/settings and `@engine/voxel` immutable chunk storage, palette validation, deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are implemented. The bounded chunk scheduler and deterministic seeded generator hooks are implemented; lifecycle stress tests, persistence, and runtime integration remain ahead. See the M7 execution plan, voxel/world specification, ADRs 0005–0011, and project handoff. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
+M2–M7 are complete. M7 World & Voxels was accepted by the owner and merged to `main` on 2026-11-22. M8 Animation & Audio is active on `feat/m8-animation-audio`; see the M8 execution plan and animation/audio specification. M6 physical-device profiling and controlled WASM/GPU measurements remain explicitly deferred. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
 
 ## Deployment
 

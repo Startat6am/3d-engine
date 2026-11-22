@@ -1,4 +1,5 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
+import { validateAnimationClip, type AnimationClip, type AnimationTrack } from '@engine/animation';
 import type { AssetImportContext, AssetImporter, ImportedAsset } from '@engine/assets';
 import { validateMeshData, type MeshData } from '@engine/geometry';
 
@@ -40,6 +41,8 @@ export interface GltfPrimitive {
   readonly mesh: MeshData;
   readonly material: number | null;
   readonly mode: 4;
+  readonly joints0?: Uint16Array;
+  readonly weights0?: Float32Array;
 }
 
 export interface GltfMesh {
@@ -50,6 +53,7 @@ export interface GltfMesh {
 export interface GltfNode {
   readonly name: string;
   readonly mesh: number | null;
+  readonly skin: number | null;
   readonly children: readonly number[];
   readonly translation: readonly [number, number, number];
   readonly rotation: readonly [number, number, number, number];
@@ -78,12 +82,22 @@ export interface GltfTextureInfo {
   readonly embedded: boolean;
 }
 
+export interface GltfSkin {
+  readonly name: string;
+  readonly joints: readonly number[];
+  readonly skeleton: number | null;
+  /** Column-major MAT4 inverse-bind matrices, one per joint. */
+  readonly inverseBindMatrices: Float32Array;
+}
+
 export interface GlbAsset {
   readonly version: 2;
   readonly generator: string;
   readonly meshes: readonly GltfMesh[];
   readonly materials: readonly GltfPbrMaterial[];
   readonly nodes: readonly GltfNode[];
+  readonly skins: readonly GltfSkin[];
+  readonly animations: readonly AnimationClip[];
   readonly images: readonly GltfImageAsset[];
   readonly samplers: readonly GltfSampler[];
   readonly textures: readonly GltfTextureInfo[];
@@ -180,10 +194,17 @@ interface GltfRoot {
     rotation?: number[];
     scale?: number[];
     matrix?: number[];
+    skin?: number;
   }[];
   textures?: { source?: number; sampler?: number }[];
   samplers?: { magFilter?: number; minFilter?: number; wrapS?: number; wrapT?: number }[];
   images?: { name?: string; mimeType?: string; bufferView?: number; uri?: string }[];
+  skins?: { name?: string; joints?: number[]; skeleton?: number; inverseBindMatrices?: number }[];
+  animations?: {
+    name?: string;
+    samplers?: { input?: number; output?: number; interpolation?: string }[];
+    channels?: { sampler?: number; target?: { node?: number; path?: string } }[];
+  }[];
   extensionsUsed?: string[];
   extensionsRequired?: string[];
 }
@@ -250,6 +271,8 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
     'textures',
     'samplers',
     'images',
+    'skins',
+    'animations',
     'extensionsUsed',
     'extensionsRequired',
   ];
@@ -267,6 +290,8 @@ function parseGlb(source: ArrayBuffer): { root: GltfRoot; binary: Uint8Array } {
     'textures',
     'samplers',
     'images',
+    'skins',
+    'animations',
   ] as const;
   for (const field of objectArrayFields) {
     const entries = root[field] as unknown[] | undefined;
@@ -437,7 +462,8 @@ function readAccessor(
   root: GltfRoot,
   binary: Uint8Array,
   index: number,
-  expectedType: 'VEC2' | 'VEC3' | 'SCALAR',
+  expectedType: 'VEC2' | 'VEC3' | 'VEC4' | 'MAT4' | 'SCALAR',
+  options: { allowFloatScalar?: boolean; allowUnsignedIntegerVectors?: boolean } = {},
 ): Float32Array | Uint32Array {
   const accessor = root.accessors?.[index];
   if (!accessor) fail(`Accessor ${index} does not exist`, 'INVALID_ACCESSOR');
@@ -459,16 +485,28 @@ function readAccessor(
         : 0;
   if (
     !bytes ||
-    (expectedType === 'SCALAR' && ![5121, 5123, 5125].includes(componentType!)) ||
+    (expectedType === 'SCALAR' &&
+      ![5121, 5123, 5125, ...(options.allowFloatScalar ? [5126] : [])].includes(componentType!)) ||
+    (expectedType === 'MAT4' && componentType !== 5126) ||
     (expectedType !== 'SCALAR' &&
+      expectedType !== 'MAT4' &&
       componentType !== 5126 &&
-      !([5120, 5121, 5122, 5123].includes(componentType!) && accessor.normalized))
+      !([5120, 5121, 5122, 5123].includes(componentType!) && accessor.normalized) &&
+      !(
+        options.allowUnsignedIntegerVectors &&
+        expectedType === 'VEC4' &&
+        [5121, 5123].includes(componentType!) &&
+        !accessor.normalized
+      ))
   ) {
     fail(`Accessor ${index} uses an unsupported component type`, 'UNSUPPORTED_FEATURE');
   }
   if (accessor.normalized !== undefined && typeof accessor.normalized !== 'boolean')
     fail(`Accessor ${index} normalized flag must be boolean`, 'INVALID_ACCESSOR');
-  if (accessor.normalized && (expectedType === 'SCALAR' || componentType === 5126))
+  if (
+    accessor.normalized &&
+    (expectedType === 'SCALAR' || expectedType === 'MAT4' || componentType === 5126)
+  )
     fail(
       `Accessor ${index} uses normalized values for an invalid component type`,
       'INVALID_ACCESSOR',
@@ -477,7 +515,16 @@ function readAccessor(
   const bufferView = root.bufferViews?.[viewIndex ?? -1];
   if (!bufferView || bufferView.buffer !== 0)
     fail(`Accessor ${index} references an invalid bufferView`, 'INVALID_ACCESSOR');
-  const components = expectedType === 'VEC3' ? 3 : expectedType === 'VEC2' ? 2 : 1;
+  const components =
+    expectedType === 'MAT4'
+      ? 16
+      : expectedType === 'VEC4'
+        ? 4
+        : expectedType === 'VEC3'
+          ? 3
+          : expectedType === 'VEC2'
+            ? 2
+            : 1;
   const elementBytes = components * bytes;
   const stride = bufferView.byteStride ?? elementBytes;
   const accessorOffset = accessor.byteOffset ?? 0;
@@ -511,7 +558,7 @@ function readAccessor(
   // Avoid boxed number[] allocations (8+ bytes per JS element plus array overhead).
   // Geometry accessors are materialized directly into their final renderer-ready buffers.
   const result =
-    expectedType === 'SCALAR'
+    expectedType === 'SCALAR' && componentType !== 5126
       ? new Uint32Array(accessor.count!)
       : new Float32Array(accessor.count! * components);
   for (let item = 0; item < accessor.count!; item++) {
@@ -721,7 +768,13 @@ function validateImportBudget(
   settings: AssetImportContext['settings'],
 ): GlbImportBudget {
   const accessors = root.accessors ?? [];
-  const componentCounts: Record<string, number> = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 };
+  const componentCounts: Record<string, number> = {
+    SCALAR: 1,
+    VEC2: 2,
+    VEC3: 3,
+    VEC4: 4,
+    MAT4: 16,
+  };
   let geometryBytes = 0;
   const accessorBytes = (index: number): number => {
     const accessor = accessors[index];
@@ -798,7 +851,12 @@ function now(): number {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
-function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal): GlbAsset {
+function importDocument(
+  root: GltfRoot,
+  binary: Uint8Array,
+  signal: AbortSignal,
+  settings: AssetImportContext['settings'],
+): GlbAsset {
   const textureCount = root.textures?.length ?? 0;
   const validateTextureRef = (textureIndex: number | undefined, materialIndex: number): void => {
     if (
@@ -918,6 +976,70 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
       ) {
         fail('Primitive indices must reference valid triangle vertices', 'INVALID_ACCESSOR');
       }
+      if (
+        primitive.attributes?.JOINTS_1 !== undefined ||
+        primitive.attributes?.WEIGHTS_1 !== undefined
+      )
+        fail('Only JOINTS_0 / WEIGHTS_0 skin influences are supported', 'UNSUPPORTED_FEATURE');
+      const jointsAccessor = primitive.attributes?.JOINTS_0;
+      const weightsAccessor = primitive.attributes?.WEIGHTS_0;
+      if ((jointsAccessor === undefined) !== (weightsAccessor === undefined))
+        fail('JOINTS_0 and WEIGHTS_0 must be provided together', 'INVALID_ACCESSOR');
+      let joints0: Uint16Array | undefined;
+      let weights0: Float32Array | undefined;
+      if (jointsAccessor !== undefined && weightsAccessor !== undefined) {
+        const jointsMeta = root.accessors?.[jointsAccessor];
+        const weightsMeta = root.accessors?.[weightsAccessor];
+        if (
+          !jointsMeta ||
+          jointsMeta.type !== 'VEC4' ||
+          ![5121, 5123].includes(jointsMeta.componentType ?? -1) ||
+          jointsMeta.normalized
+        )
+          fail(
+            'JOINTS_0 must be an unnormalized UNSIGNED_BYTE/UNSIGNED_SHORT VEC4 accessor',
+            'INVALID_ACCESSOR',
+          );
+        if (
+          !weightsMeta ||
+          weightsMeta.type !== 'VEC4' ||
+          !(
+            weightsMeta.componentType === 5126 ||
+            ([5121, 5123].includes(weightsMeta.componentType ?? -1) && weightsMeta.normalized)
+          )
+        )
+          fail(
+            'WEIGHTS_0 must be a FLOAT or normalized unsigned VEC4 accessor',
+            'INVALID_ACCESSOR',
+          );
+        const jointValues = readAccessor(root, binary, jointsAccessor, 'VEC4', {
+          allowUnsignedIntegerVectors: true,
+        }) as Float32Array;
+        weights0 = readAccessor(root, binary, weightsAccessor, 'VEC4') as Float32Array;
+        if (jointValues.length !== vertexCount * 4 || weights0.length !== vertexCount * 4)
+          fail('Skin vertex attribute counts must match POSITION', 'INVALID_ACCESSOR');
+        joints0 = new Uint16Array(jointValues.length);
+        for (let i = 0; i < jointValues.length; i++) {
+          const joint = jointValues[i]!;
+          const weight = weights0[i]!;
+          if (!Number.isInteger(joint) || joint < 0 || joint > 65535 || weight < 0)
+            fail(
+              'Skin vertex attributes contain invalid joint indices or weights',
+              'INVALID_ACCESSOR',
+            );
+          joints0[i] = joint;
+        }
+        for (let i = 0; i < weights0.length; i += 4) {
+          const total = weights0[i]! + weights0[i + 1]! + weights0[i + 2]! + weights0[i + 3]!;
+          if (total <= 1e-8)
+            fail(
+              'Each skinned vertex must have at least one positive joint weight',
+              'INVALID_ACCESSOR',
+            );
+          for (let influence = 0; influence < 4; influence++)
+            weights0[i + influence] = weights0[i + influence]! / total;
+        }
+      }
       const normals =
         primitive.attributes?.NORMAL === undefined
           ? makeNormals(positions, indices)
@@ -960,7 +1082,12 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
           'UNSUPPORTED_FEATURE',
         );
       }
-      return { mesh, material: primitive.material ?? null, mode: 4 };
+      return {
+        mesh,
+        material: primitive.material ?? null,
+        mode: 4,
+        ...(joints0 ? { joints0, weights0: weights0! } : {}),
+      };
     });
     return { name: sourceMesh.name ?? `Mesh ${meshIndex}`, primitives };
   });
@@ -981,6 +1108,11 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
         };
     if (node.mesh !== undefined && !meshes[node.mesh])
       fail(`Node ${index} references missing mesh ${node.mesh}`);
+    if (
+      node.skin !== undefined &&
+      (!Number.isInteger(node.skin) || node.skin < 0 || node.mesh === undefined)
+    )
+      fail(`Node ${index} has an invalid skin reference or no mesh`);
     const children = node.children ?? [];
     if (
       children.some(
@@ -991,10 +1123,179 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     return {
       name: node.name ?? `Node ${index}`,
       mesh: node.mesh ?? null,
+      skin: node.skin ?? null,
       children,
       ...transform,
       ...(node.matrix ? { matrix: node.matrix } : {}),
     };
+  });
+
+  const maxJoints = budgetLimit(settings, 'maxJoints', 256);
+  const skins: GltfSkin[] = (root.skins ?? []).map((skin, skinIndex) => {
+    const joints = skin.joints;
+    if (!Array.isArray(joints) || joints.length === 0 || joints.length > maxJoints)
+      fail(`Skin ${skinIndex} must contain 1..${maxJoints} joints`, 'RESOURCE_LIMIT');
+    const seen = new Set<number>();
+    for (const joint of joints) {
+      if (!Number.isSafeInteger(joint) || joint < 0 || joint >= nodes.length)
+        fail(`Skin ${skinIndex} references an invalid joint node`, 'INVALID_ACCESSOR');
+      if (seen.has(joint)) fail(`Skin ${skinIndex} contains a duplicate joint node`, 'INVALID_GLB');
+      seen.add(joint);
+    }
+    if (
+      skin.skeleton !== undefined &&
+      (!Number.isInteger(skin.skeleton) || skin.skeleton < 0 || skin.skeleton >= nodes.length)
+    )
+      fail(`Skin ${skinIndex} references an invalid skeleton root`, 'INVALID_GLB');
+    let inverseBindMatrices: Float32Array;
+    if (skin.inverseBindMatrices === undefined) {
+      inverseBindMatrices = new Float32Array(joints.length * 16);
+      for (let i = 0; i < joints.length; i++) {
+        inverseBindMatrices[i * 16] = 1;
+        inverseBindMatrices[i * 16 + 5] = 1;
+        inverseBindMatrices[i * 16 + 10] = 1;
+        inverseBindMatrices[i * 16 + 15] = 1;
+      }
+    } else {
+      const accessor = root.accessors?.[skin.inverseBindMatrices];
+      if (
+        !accessor ||
+        accessor.type !== 'MAT4' ||
+        accessor.componentType !== 5126 ||
+        accessor.count !== joints.length
+      )
+        fail(
+          `Skin ${skinIndex} inverseBindMatrices must be a FLOAT MAT4 accessor with one matrix per joint`,
+          'INVALID_ACCESSOR',
+        );
+      inverseBindMatrices = readAccessor(
+        root,
+        binary,
+        skin.inverseBindMatrices,
+        'MAT4',
+      ) as Float32Array;
+    }
+    return {
+      name: skin.name ?? `Skin ${skinIndex}`,
+      joints: [...joints],
+      skeleton: skin.skeleton ?? null,
+      inverseBindMatrices,
+    };
+  });
+
+  for (const [nodeIndex, node] of nodes.entries()) {
+    if (node.skin === null) continue;
+    const skin = skins[node.skin];
+    const mesh = node.mesh === null ? undefined : meshes[node.mesh];
+    if (!skin || !mesh)
+      fail(`Node ${nodeIndex} references an unavailable skin or mesh`, 'INVALID_GLB');
+    for (const [primitiveIndex, primitive] of mesh.primitives.entries()) {
+      if (!primitive.joints0 || !primitive.weights0)
+        fail(
+          `Skinned node ${nodeIndex} mesh primitive ${primitiveIndex} is missing JOINTS_0/WEIGHTS_0`,
+          'INVALID_ACCESSOR',
+        );
+      for (const joint of primitive.joints0) {
+        if (joint >= skin.joints.length)
+          fail(
+            `Skinned node ${nodeIndex} primitive ${primitiveIndex} references joint ${joint} outside skin ${node.skin}`,
+            'INVALID_ACCESSOR',
+          );
+      }
+    }
+  }
+
+  const maxAnimationTracks = budgetLimit(settings, 'maxAnimationTracks', 10_000);
+  const maxAnimationKeys = budgetLimit(settings, 'maxAnimationKeys', 1_000_000);
+  let totalAnimationTracks = 0;
+  let totalAnimationKeys = 0;
+  const animations: AnimationClip[] = (root.animations ?? []).map((animation, animationIndex) => {
+    if (!animation.channels?.length || !animation.samplers?.length)
+      fail(`Animation ${animationIndex} must contain samplers and channels`, 'INVALID_GLB');
+    if (
+      animation.channels.some(
+        (entry) => !entry || typeof entry !== 'object' || Array.isArray(entry),
+      ) ||
+      animation.samplers.some(
+        (entry) => !entry || typeof entry !== 'object' || Array.isArray(entry),
+      )
+    )
+      fail(`Animation ${animationIndex} contains a malformed channel or sampler`, 'INVALID_GLB');
+    const tracks: AnimationTrack[] = animation.channels.map((channel, channelIndex) => {
+      const samplerIndex = channel.sampler;
+      const sampler = samplerIndex === undefined ? undefined : animation.samplers?.[samplerIndex];
+      const targetNode = channel.target?.node;
+      const path = channel.target?.path;
+      if (!sampler || !Number.isInteger(samplerIndex) || samplerIndex! < 0)
+        fail(
+          `Animation ${animationIndex} channel ${channelIndex} references an invalid sampler`,
+          'INVALID_GLB',
+        );
+      if (!Number.isInteger(targetNode) || targetNode! < 0 || targetNode! >= nodes.length)
+        fail(
+          `Animation ${animationIndex} channel ${channelIndex} references an invalid target node`,
+          'INVALID_GLB',
+        );
+      if (path !== 'translation' && path !== 'rotation' && path !== 'scale')
+        fail(
+          `Animation ${animationIndex} channel ${channelIndex} targets unsupported path ${path ?? '(missing)'}`,
+          'UNSUPPORTED_FEATURE',
+        );
+      const interpolation = sampler.interpolation ?? 'LINEAR';
+      if (interpolation !== 'STEP' && interpolation !== 'LINEAR' && interpolation !== 'CUBICSPLINE')
+        fail(
+          `Animation ${animationIndex} sampler ${samplerIndex} uses unsupported interpolation ${interpolation}`,
+          'UNSUPPORTED_FEATURE',
+        );
+      if (!Number.isInteger(sampler.input) || !Number.isInteger(sampler.output))
+        fail(
+          `Animation ${animationIndex} sampler ${samplerIndex} is missing input/output accessors`,
+          'INVALID_ACCESSOR',
+        );
+      const times = readAccessor(root, binary, sampler.input!, 'SCALAR', {
+        allowFloatScalar: true,
+      }) as Float32Array;
+      const outputType = path === 'rotation' ? 'VEC4' : 'VEC3';
+      const values = readAccessor(root, binary, sampler.output!, outputType) as Float32Array;
+      const expectedKeyCount = interpolation === 'CUBICSPLINE' ? times.length * 3 : times.length;
+      if (root.accessors?.[sampler.output!]?.count !== expectedKeyCount)
+        fail(
+          `Animation ${animationIndex} sampler ${samplerIndex} output count does not match input keys`,
+          'INVALID_ACCESSOR',
+        );
+      totalAnimationKeys += times.length;
+      totalAnimationTracks++;
+      if (totalAnimationTracks > maxAnimationTracks || totalAnimationKeys > maxAnimationKeys)
+        fail(
+          `Animation data exceeds track/key limits (${maxAnimationTracks} tracks, ${maxAnimationKeys} keys)`,
+          'RESOURCE_LIMIT',
+        );
+      return {
+        targetNode: targetNode!,
+        path,
+        interpolation,
+        times,
+        values,
+      };
+    });
+    const duration = tracks.reduce(
+      (maximum, track) => Math.max(maximum, track.times[track.times.length - 1]!),
+      0,
+    );
+    const clip: AnimationClip = {
+      name: animation.name ?? `Animation ${animationIndex}`,
+      duration,
+      tracks,
+    };
+    try {
+      validateAnimationClip(clip);
+    } catch (error) {
+      fail(
+        `Animation ${animationIndex} is invalid: ${error instanceof Error ? error.message : String(error)}`,
+        'INVALID_ACCESSOR',
+      );
+    }
+    return clip;
   });
 
   const images: GltfImageAsset[] = (root.images ?? []).map((image, index) => {
@@ -1077,6 +1378,8 @@ function importDocument(root: GltfRoot, binary: Uint8Array, signal: AbortSignal)
     meshes,
     materials,
     nodes,
+    skins,
+    animations,
     images,
     samplers,
     textures,
@@ -1113,7 +1416,7 @@ export class GlbImporter implements AssetImporter<GlbAsset> {
     validateGlbBufferViews(root, binary);
     const decodedAt = now();
     abortIfNeeded(context.signal);
-    const data = importDocument(root, binary, context.signal);
+    const data = importDocument(root, binary, context.signal, context.settings);
     const builtAt = now();
     abortIfNeeded(context.signal);
     return {
@@ -1126,6 +1429,12 @@ export class GlbImporter implements AssetImporter<GlbAsset> {
         meshCount: data.meshes.length,
         primitiveCount: data.meshes.reduce((sum, mesh) => sum + mesh.primitives.length, 0),
         materialCount: data.materials.length,
+        skinCount: data.skins.length,
+        animationCount: data.animations.length,
+        animationTrackCount: data.animations.reduce(
+          (sum, animation) => sum + animation.tracks.length,
+          0,
+        ),
         textureCount: data.textures.length,
         sourceBytes: budget.sourceBytes,
         geometryBytes: budget.geometryBytes,
