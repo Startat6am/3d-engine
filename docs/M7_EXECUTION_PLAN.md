@@ -75,7 +75,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Split voxel project opening into manifest/descriptor inspection and per-coordinate payload loading; verify SHA-256 and byte length when each chunk is requested. Keep the eager compatibility loader for callers that explicitly require all chunks.
 - [x] Stream static voxel colliders with the camera window, using loaded neighbor snapshots for shared-face culling and rebuilding neighbor revision tokens as chunks arrive.
 - [x] Add storage tests proving project open does not read chunk blobs and a single requested coordinate reads only its own content-addressed payload; add Chromium coverage with three distant chunk descriptors proving Player reads only the active camera-window payload.
-- [x] Pass local Chromium E2E for initial streamed rendering, WASD-driven GPU buffer eviction/re-entry, and pagehide cleanup; exact-head CI for this implementation remains pending.
+- [x] Pass local Chromium E2E for initial streamed rendering, WASD-driven GPU buffer eviction/re-entry, and pagehide cleanup; exact-head CI for this implementation remains pending. Latest exact-head streaming/churn CI passed in [run #44997328596](https://github.com/Startat6am/3d-engine/actions/runs/44997328596) on `72f42e7d2d742ac3064c5ad4ab5b30d75374823c`.
 
 ## Phase 5 — verification and closeout
 
@@ -83,6 +83,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Local `pnpm check` passed after voxel cell editor changes: Prettier, ESLint, TypeScript, 257/257 Vitest tests and package/app builds. Local Playwright cannot launch Chromium because the sandbox lacks `libglib-2.0.so.0`; exact-head Chromium acceptance passed in CI #615.
 - [x] Exact-head quality gates and Chromium E2E for the painted multi-material round-trip passed in CI #615.
 - [x] Run the voxel-world stress benchmark on Node 22 in exact-head CI and archive the raw JSON measurements in `benchmarks/results/voxel-world-stress-422026f.json`; browser streaming acceptance and comparative before/after optimization studies remain open.
+- [x] Add source-cache LRU/capacity/pruning tests, including a 1,000-chunk traversal capped at 256 entries; isolate fulfilled neighbor payloads so a corrupt/unavailable adjacent chunk cannot block valid chunk meshing. Local validation: 282/282 Vitest tests, typecheck, lint, formatting and builds passed; local Chromium E2E reports passed. Exact-head CI for these latest cache/fault-tolerance tests is pending.
 - [ ] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
 - [x] Add viewport ray-based voxel brush interaction and hover preview; exact-head CI coverage remains part of the editor E2E suite.
 - [ ] Obtain owner acceptance of M7 scope and measured exit gates before closing M7.

@@ -24,6 +24,12 @@ import {
 import { meshVoxelChunkAsync } from '@engine/voxel';
 import { WorldChunkScheduler, type ChunkCoordinate3 } from '@engine/world';
 import { selectVoxelStreamingWindow } from './voxel-streaming.js';
+import {
+  fulfilledVoxelNeighbors,
+  pruneVoxelSourceCache,
+  readVoxelSourceCache,
+  writeVoxelSourceCache,
+} from './voxel-source-cache.js';
 import { resolveVoxelMaterialStyle } from './voxel-material.js';
 import { createPhysicsWorld, StaticMeshColliderSet, type PhysicsWorld } from '@engine/physics';
 import { createVoxelChunkColliderInputs } from './voxel-collision.js';
@@ -554,22 +560,12 @@ function createVoxelStream(
 
   const getSourceChunk = (coordinate: ChunkCoordinate3): Promise<PlayerVoxelChunkSnapshot> => {
     const key = chunkKey(coordinate.x, coordinate.y, coordinate.z);
-    const cached = sourceCache.get(key);
-    if (cached) {
-      // Refresh insertion order for a small, deterministic LRU cache.
-      sourceCache.delete(key);
-      sourceCache.set(key, cached);
-      return Promise.resolve(cached);
-    }
+    const cached = readVoxelSourceCache(sourceCache, key);
+    if (cached) return Promise.resolve(cached);
     const existing = sourcePending.get(key);
     if (existing) return existing;
     const request = loadChunk(coordinate).then((chunk) => {
-      if (!disposed && sourceKeepKeys.has(key)) sourceCache.set(key, chunk);
-      while (sourceCache.size > 256) {
-        const oldest = sourceCache.keys().next().value as string | undefined;
-        if (!oldest) break;
-        sourceCache.delete(oldest);
-      }
+      if (!disposed && sourceKeepKeys.has(key)) writeVoxelSourceCache(sourceCache, key, chunk);
       return chunk;
     });
     sourcePending.set(key, request);
@@ -578,9 +574,7 @@ function createVoxelStream(
   };
 
   const pruneSourceCache = (keepKeys: ReadonlySet<string>) => {
-    for (const key of sourceCache.keys()) {
-      if (!keepKeys.has(key)) sourceCache.delete(key);
-    }
+    pruneVoxelSourceCache(sourceCache, keepKeys);
   };
 
   const update = (position: readonly [number, number, number]) => {
@@ -657,9 +651,7 @@ function createVoxelStream(
             ]);
             if (signal.aborted) throw new Error('WORLD_JOB_CANCELLED');
             const [positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ] =
-              neighborResults.map((result) =>
-                result.status === 'fulfilled' ? result.value : undefined,
-              );
+              fulfilledVoxelNeighbors(neighborResults);
             const neighbors = {
               ...(positiveX ? { positiveX } : {}),
               ...(negativeX ? { negativeX } : {}),
