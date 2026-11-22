@@ -1,6 +1,6 @@
 # ADR-0013: Animation and audio package boundaries
 
-- **Status:** Proposed for M8 implementation
+- **Status:** Accepted by project owner for M8 implementation
 - **Date:** 2026-11-22
 - **Decision owners:** Project owner
 - **Related:** [Architecture](../ARCHITECTURE.md), [Subsystem Contracts](../SUBSYSTEM_CONTRACTS.md), [Animation & Audio Specification](../ANIMATION_AUDIO_SPEC.md)
