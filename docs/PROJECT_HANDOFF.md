@@ -18,7 +18,7 @@ Updated: 2026-11-22
 - M2–M5: complete.
 - M6 Physics/Input: functional scope closed; profiling limitations remain deferred.
 - M7 World & Voxels: complete and owner-accepted. See the M7 implementation notes below and exact merge/CI above.
-- M8 Animation & Audio: planning/contract baseline in progress on the current branch; no runtime implementation claimed.
+- M8 Animation & Audio: M8.0 contract baseline established; M8.1 animation data/sampling foundation in progress on `feat/m8-animation-audio-contracts`. `@engine/animation` exports validated track/clip/skin data and keyframe sampling; GLB skin/animation import and playback/renderer integration remain open.
 - M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
 ## M8 audit findings at the main baseline
@@ -26,9 +26,9 @@ Updated: 2026-11-22
 - `@engine/core` provides `EngineHost` ordered service lifecycle and ECS `SystemScheduler` phases including `fixed-update`, `variable-update` and `transform-propagation`.
 - `@engine/gltf-importer` currently exposes GLB meshes, materials, nodes, images, samplers and textures; it does not import skins, inverse-bind matrices or animation channels.
 - `@engine/renderer` render objects accept geometry/material and TRS or a world matrix; no skinning palette contract exists.
-- `@engine/animation` and `@engine/audio` packages do not exist.
+- `@engine/animation` has been added on the M8 branch with validated track/clip/skin data and sampling. `@engine/audio` does not exist yet.
 - Player/Editor do not yet restore animation/audio components from project documents.
-- Next implementation after M8.0 docs: M8.1 animation data model + GLB skin/animation import. Follow the ordered slices in `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
+- Next implementation: extend `@engine/gltf-importer` with bounded GLB skin and animation import, then deterministic playback/pose evaluation. Follow `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
 
 ## M6 implementation and accepted limitations
 
