@@ -532,17 +532,7 @@ export function EditorApp() {
   }, [brushPreview, cameraTool, voxelChunks, voxelWorldSettings]);
 
   const renderObjects = useMemo(
-    () => [
-      ...entities.map((entity) => ({
-        ...entity,
-        material:
-          entity.id === selectedId
-            ? { ...entity.material, color: entity.material.color }
-            : entity.material,
-      })),
-      ...voxelRenderObjects,
-      ...(brushPreviewObject ? [brushPreviewObject] : []),
-    ],
+    () => [...entities, ...voxelRenderObjects, ...(brushPreviewObject ? [brushPreviewObject] : [])],
     [entities, selectedId, voxelRenderObjects, brushPreviewObject],
   );
   const renderScene = useMemo(
