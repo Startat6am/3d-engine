@@ -51,17 +51,17 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [Physics](docs/PHYSICS_SPEC.md)                      | Physics integration contract                                    |
 | [Input](docs/INPUT_SPEC.md)                          | Device-independent input mapping and fixed-tick snapshots       |
 | [M6 acceptance](docs/acceptance/M6_PHYSICS_INPUT.md) | Physics, input, editor UX and CI exit gates                     |
-| [M7 execution plan](docs/M7_EXECUTION_PLAN.md)       | World and voxel milestone sequencing and acceptance             |
+| [M7 execution plan](docs/M7_EXECUTION_PLAN.md)       | World and voxel milestone sequencing and acceptance             |\n| [M8 execution plan](docs/M8_EXECUTION_PLAN.md)       | Animation and audio milestone sequencing and acceptance         |\n| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle        |
 | [World/voxel spec](docs/VOXEL_WORLD_SPEC.md)         | Chunk, voxel, meshing, streaming and generation contracts       |
 | [Editor](docs/EDITOR_SPEC.md)                        | Authoring application                                           |
 | [Runtime](docs/RUNTIME_SPEC.md)                      | Player lifecycle and frame scheduling                           |
 | [AI agent authoring](docs/AI_AGENT_SPEC.md)          | Prompt-to-object/world workflow, validation and approval        |
 | [Testing](docs/TESTING_SPEC.md)                      | Quality gates and benchmark methodology                         |
-| [ADRs](docs/ADR/)                                    | Accepted and proposed architecture decisions                    |
+| [ADRs](docs/ADR/)                                    | Accepted and proposed architecture decisions                    |\n\n## Current milestone status\n\nM2–M5 are complete, M6 functional scope is closed, and M7 World & Voxels was merged and owner-accepted on 2026-11-22 (PR #90; exact-head CI #45022849198). M8 Animation & Audio is next; see the M8 execution plan and subsystem specification. M9 Editor MVP and M10 AI Authoring remain in sequence.
 
 ## Status
 
-M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels is active: `@engine/world` coordinates/settings and `@engine/voxel` immutable chunk storage, palette validation, deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are implemented. The bounded chunk scheduler and deterministic seeded generator hooks are implemented; lifecycle stress tests, persistence, and runtime integration remain ahead. See the M7 execution plan, voxel/world specification, ADRs 0005–0011, and project handoff. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
+M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels is complete: `@engine/world` coordinates/settings and `@engine/voxel` immutable chunk storage, palette validation, deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are implemented. The bounded chunk scheduler and deterministic seeded generator hooks are implemented; lifecycle stress tests, persistence, and runtime integration remain ahead. See the M7 execution plan, voxel/world specification, ADRs 0005–0011, and project handoff. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
 
 ## Deployment
 
