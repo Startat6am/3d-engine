@@ -27,13 +27,13 @@ No React/editor dependency may enter animation, audio, importer, core, or Player
 
 ## 3. Skeletal animation data contract
 
-An imported skin contains an ordered joint-node index list and one inverse-bind matrix per joint. If inverse-bind matrices are absent, identity matrices are used per glTF. Joint count and accessor sizes are bounded by importer limits. Joint indices must reference existing nodes, skin joint lists must not contain duplicates, and a skinned mesh node must reference an existing skin.
+An imported skin contains an ordered joint-node index list and one inverse-bind matrix per joint. If inverse-bind matrices are absent, identity matrices are used per glTF. The GLB importer currently caps a skin at 256 joints by default (`maxJoints` import setting). Joint indices must reference existing nodes, skin joint lists must not contain duplicates, and a skinned mesh node must reference an existing skin. The first importer slice supports four influences (`JOINTS_0` / `WEIGHTS_0`) and normalizes each vertex weight tuple; `JOINTS_1` / `WEIGHTS_1` are explicitly unsupported.
 
-An animation clip contains a stable name, duration, and tracks. Each track targets one node and one path (`translation`, `rotation`, or `scale`), has strictly increasing finite key times, an interpolation mode (`STEP`, `LINEAR`, `CUBICSPLINE`), and typed values. CUBICSPLINE stores in-tangent, value, out-tangent triplets per key as required by glTF. Unsupported weights/morph-target animation is reported as a capability diagnostic until a later extension; it must not be silently treated as skeletal TRS animation.
+An animation clip contains a stable name, duration, and tracks. Each track targets one node and one path (`translation`, `rotation`, or `scale`), has strictly increasing finite key times, an interpolation mode (`STEP`, `LINEAR`, `CUBICSPLINE`), and typed values. The current GLB importer defaults to at most 10,000 tracks and 1,000,000 aggregate keyframes per asset (`maxAnimationTracks` / `maxAnimationKeys` import settings). CUBICSPLINE stores in-tangent, value, out-tangent triplets per key as required by glTF. Unsupported weights/morph-target animation is reported as a capability diagnostic until a later extension; it must not be silently treated as skeletal TRS animation.
 
 The runtime pose is a set of local TRS transforms keyed by imported node index. Clip blending uses normalized non-negative weights. A single base pose can be layered with weighted overrides; additive animation is explicitly out of the first M8 contract. Missing tracks preserve the bind/default local transform. Cross-fades advance both source and target clocks and interpolate their sampled poses over a caller-supplied duration.
 
-The skinning palette for a mesh node is computed from mesh-node world transform, joint world transforms, and inverse-bind matrices using the documented column-major convention. The exact matrix order is covered by fixtures before renderer integration. CPU palette output is backend-neutral; GPU texture/bone upload is renderer-owned.
+The skinning palette for a mesh node is computed as `inverse(meshWorld) * jointWorld * inverseBindMatrix` for each joint, using column-major matrices. `@engine/animation` now exposes `computeSkinningPalette` with singular-matrix, missing-joint and matrix-count validation. The CPU matrix order is fixture-tested; renderer integration and GPU upload remain pending. CPU palette output is backend-neutral; GPU texture/bone upload is renderer-owned.
 
 ## 4. Animation runtime lifecycle
 
@@ -57,7 +57,7 @@ Audio is presentation output: it does not advance the fixed simulation clock, af
 ## 6. Resource ownership and security
 
 - Imported clip data is immutable CPU data. Decoded audio buffers and GPU skinning resources are backend-owned and reference-counted where shared.
-- Every voice, decoded clip lease, listener binding, and backend is released on owner disposal. Repeated dispose/release is safe.
+- Every voice, decoded clip lease, listener binding, and backend is released on owner disposal. Runtime disposal waits for pending decode promises to settle, releases any late decoded handle, then disposes the backend. Repeated dispose/release is safe.
 - Audio decode is asynchronous and cancellable where the platform allows; no file/network I/O occurs in frame callbacks.
 - Enforce configurable limits for encoded bytes, decoded duration, active voices, joint count, key count, and simultaneous decode jobs. The initial audio runtime defaults are 64 MiB per encoded clip, 600 seconds per decoded clip, and 32 active voices. The browser adapter phase must add a bounded concurrent-decode queue and document decoded channel/sample-rate ceilings before production acceptance. Importer phase must publish joint/key ceilings before accepting untrusted animated assets.
 - Treat GLB accessors and audio files as untrusted. Validate ranges, finite values, counts, MIME/type and decoded sizes before allocation or backend submission.

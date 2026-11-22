@@ -27,7 +27,12 @@ export interface NodeTransform {
 export type AnimationPose = ReadonlyMap<number, NodeTransform>;
 
 export type AnimationErrorCode =
-  'INVALID_CLIP' | 'INVALID_TRACK' | 'INVALID_TIME' | 'INVALID_WEIGHT' | 'DISPOSED';
+  | 'INVALID_CLIP'
+  | 'INVALID_TRACK'
+  | 'INVALID_TIME'
+  | 'INVALID_WEIGHT'
+  | 'INVALID_SKIN'
+  | 'DISPOSED';
 
 export class AnimationError extends Error {
   constructor(
@@ -437,4 +442,116 @@ export class AnimationPlayer {
   #assertActive(): void {
     if (this.#disposed) throw new AnimationError('DISPOSED', 'Animation player has been disposed');
   }
+}
+
+export interface SkeletonDescriptor {
+  /** Imported glTF node indices, in skin-joint order. */
+  readonly jointNodeIndices: readonly number[];
+  /** Column-major inverse-bind matrices, one 4x4 matrix per joint. */
+  readonly inverseBindMatrices: Float32Array;
+}
+
+function validateMatrix4(matrix: ArrayLike<number>, label: string): void {
+  if (matrix.length !== 16)
+    throw new AnimationError('INVALID_SKIN', `${label} must contain exactly 16 matrix values`);
+  for (let i = 0; i < 16; i++) {
+    if (!Number.isFinite(matrix[i]))
+      throw new AnimationError('INVALID_SKIN', `${label} contains a non-finite matrix value`);
+  }
+}
+
+function multiplyMatrix4(a: ArrayLike<number>, b: ArrayLike<number>): Float64Array {
+  const result = new Float64Array(16);
+  for (let column = 0; column < 4; column++) {
+    for (let row = 0; row < 4; row++) {
+      result[column * 4 + row] =
+        a[row]! * b[column * 4]! +
+        a[4 + row]! * b[column * 4 + 1]! +
+        a[8 + row]! * b[column * 4 + 2]! +
+        a[12 + row]! * b[column * 4 + 3]!;
+    }
+  }
+  return result;
+}
+
+function invertMatrix4(matrix: ArrayLike<number>): Float64Array {
+  const rows = Array.from({ length: 4 }, (_, row) => [
+    matrix[row]!,
+    matrix[4 + row]!,
+    matrix[8 + row]!,
+    matrix[12 + row]!,
+    Number(row === 0),
+    Number(row === 1),
+    Number(row === 2),
+    Number(row === 3),
+  ]);
+  for (let column = 0; column < 4; column++) {
+    let pivot = column;
+    for (let row = column + 1; row < 4; row++) {
+      if (Math.abs(rows[row]![column]!) > Math.abs(rows[pivot]![column]!)) pivot = row;
+    }
+    const pivotValue = rows[pivot]![column]!;
+    if (Math.abs(pivotValue) < 1e-12)
+      throw new AnimationError(
+        'INVALID_SKIN',
+        'Mesh world matrix is singular and cannot be inverted',
+      );
+    if (pivot !== column) [rows[pivot], rows[column]] = [rows[column]!, rows[pivot]!];
+    const active = rows[column]!;
+    for (let entry = 0; entry < 8; entry++) active[entry] = active[entry]! / pivotValue;
+    for (let row = 0; row < 4; row++) {
+      if (row === column) continue;
+      const factor = rows[row]![column]!;
+      for (let entry = 0; entry < 8; entry++)
+        rows[row]![entry] = rows[row]![entry]! - factor * active[entry]!;
+    }
+  }
+  const result = new Float64Array(16);
+  for (let row = 0; row < 4; row++)
+    for (let column = 0; column < 4; column++) result[column * 4 + row] = rows[row]![4 + column]!;
+  return result;
+}
+
+/**
+ * Build glTF-compatible skinning matrices in column-major order:
+ * inverse(meshWorld) * jointWorld * inverseBindMatrix.
+ * Renderer adapters upload this CPU palette; GPU handles never enter this package.
+ */
+export function computeSkinningPalette(
+  skeleton: SkeletonDescriptor,
+  worldMatrices: ReadonlyMap<number, ArrayLike<number>>,
+  meshWorldMatrix: ArrayLike<number>,
+): Float32Array {
+  validateMatrix4(meshWorldMatrix, 'Mesh world matrix');
+  if (
+    skeleton.jointNodeIndices.length === 0 ||
+    skeleton.inverseBindMatrices.length !== skeleton.jointNodeIndices.length * 16 ||
+    !finiteArray(skeleton.inverseBindMatrices)
+  )
+    throw new AnimationError(
+      'INVALID_SKIN',
+      'Skeleton joints and inverse-bind matrix counts do not match',
+    );
+  const unique = new Set<number>();
+  for (const node of skeleton.jointNodeIndices) {
+    if (!Number.isSafeInteger(node) || node < 0 || unique.has(node))
+      throw new AnimationError(
+        'INVALID_SKIN',
+        'Skeleton joint node indices must be unique non-negative safe integers',
+      );
+    unique.add(node);
+  }
+  const inverseMesh = invertMatrix4(meshWorldMatrix);
+  const palette = new Float32Array(skeleton.jointNodeIndices.length * 16);
+  for (let index = 0; index < skeleton.jointNodeIndices.length; index++) {
+    const node = skeleton.jointNodeIndices[index]!;
+    const jointWorld = worldMatrices.get(node);
+    if (!jointWorld)
+      throw new AnimationError('INVALID_SKIN', `World matrix for joint node ${node} is missing`);
+    validateMatrix4(jointWorld, `Joint node ${node} world matrix`);
+    const inverseBind = skeleton.inverseBindMatrices.subarray(index * 16, index * 16 + 16);
+    const meshRelativeJoint = multiplyMatrix4(inverseMesh, jointWorld);
+    palette.set(multiplyMatrix4(meshRelativeJoint, inverseBind), index * 16);
+  }
+  return palette;
 }

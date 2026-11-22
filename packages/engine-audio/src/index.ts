@@ -320,10 +320,16 @@ export class AudioRuntime {
     for (const id of [...this.#voices.keys()]) this.releaseVoice(id);
     for (const clip of this.#clips.values()) this.#backend.disposeClip(clip);
     this.#clips.clear();
-    this.#loading.clear();
-    this.#backend.dispose();
     this.#active = false;
     this.#disposed = true;
+    const pendingLoads = [...this.#loading.values()];
+    if (pendingLoads.length === 0) {
+      this.#backend.dispose();
+    } else {
+      // Let pending decodes observe the disposed state and release their clip
+      // handles before the backend itself is torn down.
+      void Promise.allSettled(pendingLoads).then(() => this.#backend.dispose());
+    }
   }
 
   #requireVoice(id: string): void {

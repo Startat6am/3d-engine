@@ -3,6 +3,7 @@ import {
   AnimationError,
   AnimationPlayer,
   blendAnimationPoses,
+  computeSkinningPalette,
   sampleAnimationTrack,
   validateAnimationClip,
   type AnimationClip,
@@ -142,5 +143,50 @@ describe('AnimationPlayer', () => {
     player.dispose();
     player.dispose();
     expect(() => player.play(clip)).toThrowError(AnimationError);
+  });
+});
+
+describe('skinning palette', () => {
+  const identity = new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]);
+
+  it('computes mesh-relative joint matrices in column-major glTF order', () => {
+    const meshWorld = identity.slice();
+    meshWorld[12] = 2;
+    const jointWorld = identity.slice();
+    jointWorld[12] = 5;
+    const inverseBind = identity.slice();
+    inverseBind[12] = -1;
+    const palette = computeSkinningPalette(
+      { jointNodeIndices: [7], inverseBindMatrices: inverseBind },
+      new Map([[7, jointWorld]]),
+      meshWorld,
+    );
+    expect(palette[12]).toBeCloseTo(2);
+    expect([...palette.slice(0, 12)]).toEqual([...identity.slice(0, 12)]);
+  });
+
+  it('rejects singular mesh matrices, missing joints and mismatched bind data', () => {
+    const singular = new Float32Array(16);
+    expect(() =>
+      computeSkinningPalette(
+        { jointNodeIndices: [0], inverseBindMatrices: identity },
+        new Map([[0, identity]]),
+        singular,
+      ),
+    ).toThrowError(AnimationError);
+    expect(() =>
+      computeSkinningPalette(
+        { jointNodeIndices: [0], inverseBindMatrices: identity },
+        new Map(),
+        identity,
+      ),
+    ).toThrowError(AnimationError);
+    expect(() =>
+      computeSkinningPalette(
+        { jointNodeIndices: [0, 1], inverseBindMatrices: identity },
+        new Map(),
+        identity,
+      ),
+    ).toThrowError(AnimationError);
   });
 });

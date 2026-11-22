@@ -20,14 +20,14 @@ M8 delivers a complete first skeletal-animation path and a browser spatial-audio
 
 ## Sequencing
 
-| Phase                   | Work                                                                                 | Exit evidence                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| 0. Contracts            | This spec, plan, ADR 0013, package boundaries, error/limit policy                    | Docs reviewed, dependency direction checked, package API tests planned |
-| 1. CPU animation        | Track validation/sampling, quaternion interpolation, pose blend, playback/cross-fade | Deterministic unit tests and typed public API                          |
-| 2. GLB animation import | Skin joints, inverse bind matrices, animation sampler/channel data                   | Valid/malformed fixtures, accessor bounds and capability diagnostics   |
-| 3. Renderer skinning    | Palette calculation integration and backend upload                                   | Matrix fixtures, WebGL2 skinned-character E2E, GPU resource cleanup    |
-| 4. Spatial audio        | Audio contracts, Web Audio adapter, decode/voice lifecycle, attenuation              | Fake backend contract tests and browser audio lifecycle E2E            |
-| 5. Acceptance/closeout  | Player example, docs, performance/resource evidence, owner review                    | Exact-head CI, Chromium review, explicit owner acceptance              |
+| Phase                   | Work                                                                                 | Exit evidence                                                          | Status                                |
+| ----------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------- |
+| 0. Contracts            | This spec, plan, ADR 0013, package boundaries, error/limit policy                    | Docs reviewed, dependency direction checked, package API tests planned | Complete                              |
+| 1. CPU animation        | Track validation/sampling, quaternion interpolation, pose blend, playback/cross-fade | Deterministic unit tests and typed public API                          | Complete                              |
+| 2. GLB animation import | Skin joints, inverse bind matrices, animation sampler/channel data                   | Valid/malformed fixtures, accessor bounds and capability diagnostics   | Complete for M8 TRS + 4 influences    |
+| 3. Renderer skinning    | Palette calculation integration and backend upload                                   | Matrix fixtures, WebGL2 skinned-character E2E, GPU resource cleanup    | Not started                           |
+| 4. Spatial audio        | Audio contracts, Web Audio adapter, decode/voice lifecycle, attenuation              | Fake backend contract tests and browser audio lifecycle E2E            | Contracts complete; Web Audio pending |
+| 5. Acceptance/closeout  | Player example, docs, performance/resource evidence, owner review                    | Exact-head CI, Chromium review, explicit owner acceptance              | Not started                           |
 
 ## Architecture rules
 
@@ -78,5 +78,25 @@ Morph targets, retargeting, animation graph editor, root-motion physics, IK/ragd
 
 - Added `@engine/animation` with strict track/clip validation, STEP/LINEAR/CUBICSPLINE sampling, quaternion shortest-path slerp/normalization, pose blending, playback controls, looping/seek and cross-fade state.
 - Added `@engine/audio` with a backend-neutral audio backend contract, explicit user-gesture activation, clip decode deduplication, source/listener validation, inverse-distance attenuation, configurable 64 MiB encoded / 600-second decoded clip limits, 32-voice default bound and idempotent teardown. No Web Audio adapter or autoplay behavior is implemented yet.
-- Added 10 animation and 6 audio contract tests (16 total). Full workspace verification passed: format, lint, typecheck, 299/299 Vitest tests and production builds.
-- Current limitation: GLB importer still does not import skins/animation channels; renderer still draws static meshes; browser Web Audio backend and Player acceptance scene remain future phases.
+- Added 12 animation and 7 audio contract tests (19 total); the GLB importer suite now contains 37 tests. Full workspace verification passed: format, lint, typecheck, 307/307 Vitest tests and production builds.
+- Current limitation at this point in the history: GLB importer, renderer skinning, browser Web Audio backend and Player acceptance scene remained future phases; see the later GLB import progress entry below.
+
+### 2026-11-22 — GLB skin/animation import and CPU palette
+
+- Extended `GlbAsset` with normalized skins, joint node indices, column-major inverse-bind matrices, and animation clips/tracks. Missing inverse-bind accessors produce per-joint identity matrices.
+- Added `JOINTS_0` / `WEIGHTS_0` import (four influences), per-vertex weight normalization, skinned node/skin/mesh cross-validation, joint-index bounds, and explicit rejection of `JOINTS_1` / `WEIGHTS_1`.
+- Added glTF STEP/LINEAR/CUBICSPLINE channel import for translation, rotation and scale. Morph `weights` targets remain explicitly unsupported. Defaults: 256 joints/skin, 10,000 tracks and 1,000,000 aggregate animation keys; import settings can lower or raise these positive limits.
+- Added `computeSkinningPalette` to `@engine/animation` using `inverse(meshWorld) * jointWorld * inverseBindMatrix` in column-major order, with singular/missing matrix validation.
+- Added five GLB importer tests and two CPU skinning palette tests. Renderer GPU skinning, actual animated Player rendering and Web Audio remain open.
+
+- Full workspace verification after the importer/palette slice: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` (307/307) and `pnpm build` all passed locally. The full Chromium Playwright suite passed: 29/29. The existing directory-project streaming test now has a 60-second test budget (it needs about 18 seconds on this runner when the suite is uncontended).
+
+### 2026-11-22 — Browser regression verification
+
+- Full Chromium Playwright suite passed: 29/29 tests, including GLB import/save/reopen, directory project streaming, renderer resource cleanup, Editor mobile workflows, physics playground and Player shutdown.
+- The directory-project streaming test has an explicit 60-second budget to avoid false timeouts on slower WebGL test hosts; the clean full-suite run completed successfully.
+
+### 2026-11-22 — Audio teardown hardening
+
+- `AudioRuntime.dispose()` now waits for pending clip decodes to settle before disposing the backend. Late decoded handles are released and report `DISPOSED`, avoiding a decode-completion-after-backend-disposal leak.
+- Added an explicit in-flight decode teardown test. Audio package suite is now 7 tests; workspace total is 307.

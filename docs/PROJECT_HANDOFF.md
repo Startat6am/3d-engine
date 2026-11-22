@@ -22,18 +22,17 @@ Updated: 2026-11-22
 
 ## M8 current implementation
 
-- `@engine/animation` now exports validated clip/track contracts, STEP/LINEAR/CUBICSPLINE samplers, shortest-path quaternion slerp and normalization, pose blending, playback controls, looping/seek and cross-fade state.
-- `@engine/audio` now exports backend-neutral clip/voice/listener contracts, explicit user-gesture activation, deduplicated clip decoding, validated source/listener updates, inverse-distance attenuation, bounded voice count (default 32), encoded clip size (64 MiB) and decoded duration (600 seconds), and idempotent teardown. It does not yet contain a Web Audio implementation.
-- Focused tests: 10 animation + 6 audio; full workspace: format, lint, typecheck, 299/299 Vitest tests and production builds passed on the current local workspace.
-- GLB skin/animation import, renderer skinning, Web Audio backend and Player acceptance scene are not yet implemented.
+- `@engine/animation` now exports validated clip/track contracts, STEP/LINEAR/CUBICSPLINE samplers, shortest-path quaternion slerp and normalization, pose blending, playback controls, looping/seek, cross-fade state, and CPU skinning palette calculation with column-major matrix validation.
+- `@engine/audio` now exports backend-neutral clip/voice/listener contracts, explicit user-gesture activation, deduplicated clip decoding, validated source/listener updates, inverse-distance attenuation, bounded voice count (default 32), encoded clip size (64 MiB) and decoded duration (600 seconds), and idempotent teardown that waits for pending decodes before backend disposal. It does not yet contain a Web Audio implementation.
+- Focused tests: 12 animation + 7 audio focused tests; GLB importer now has 37 tests. Full workspace verification passed: format, lint, typecheck, 307/307 Vitest tests and production builds. Full Chromium Playwright suite passed: 29/29 tests, including GLB import/save/reopen, directory-project streaming, renderer resource cleanup, Editor mobile workflows, physics playground and Player shutdown. The directory-project streaming test now has a 60-second budget; the clean suite completed successfully.
+- GLB importer now imports skin joint lists, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences, and supported TRS animation channels with bounded counts and strict validation. Renderer/GPU skinning, Web Audio backend and Player acceptance scene are not yet implemented.
 
 ## M8 immediate next steps
 
-1. Extend GLB importer with skins, inverse-bind matrices and animation samplers/channels, including malformed fixture coverage.
-2. Implement CPU skinning palette calculation and validate matrix order.
-3. Add skinned render inputs and renderer-owned GPU skinning resources.
-4. Implement Web Audio decode/voice backend and Chromium lifecycle tests.
-5. Build Player animated-character/spatial-audio acceptance scene; keep roadmap, plan, spec and handoff synchronized.
+1. Add backend-neutral skinned render inputs and renderer-owned GPU skinning resources.
+2. Add the real Web Audio decode/voice backend with bounded decode concurrency and browser lifecycle tests.
+3. Build the Player animated-character/spatial-audio acceptance scene and verify visible movement, user-gesture audio activation, spatial response and teardown.
+4. Rerun full workspace/Chromium CI and update this handoff with exact-head evidence.
 
 ## M6 implementation and accepted limitations
 

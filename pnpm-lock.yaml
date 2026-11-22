@@ -341,7 +341,11 @@ importers:
         specifier: 7.3.8
         version: 7.3.8(lightningcss@1.33.0)
 
+  packages/engine-animation: {}
+
   packages/engine-assets: {}
+
+  packages/engine-audio: {}
 
   packages/engine-core: {}
 
@@ -349,6 +353,9 @@ importers:
 
   packages/engine-gltf-importer:
     dependencies:
+      '@engine/animation':
+        specifier: workspace:*
+        version: link:../engine-animation
       '@engine/assets':
         specifier: workspace:*
         version: link:../engine-assets

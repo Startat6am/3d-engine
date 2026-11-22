@@ -96,6 +96,27 @@ describe('spatial audio contracts', () => {
     runtime.dispose();
   });
 
+  it('waits for in-flight decode cleanup before disposing the backend', async () => {
+    const backend = createBackend();
+    let finish: ((clip: AudioClipHandle) => void) | undefined;
+    vi.mocked(backend.decodeClip).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const runtime = new AudioRuntime(backend);
+    await runtime.activateFromUserGesture();
+    const pending = runtime.loadClip(clipData);
+    runtime.dispose();
+    expect(backend.dispose).not.toHaveBeenCalled();
+    finish?.({ id: 'late-clip', durationSeconds: 1 });
+    await expect(pending).rejects.toMatchObject({ code: 'DISPOSED' });
+    await Promise.resolve();
+    expect(backend.disposeClip).toHaveBeenCalledWith({ id: 'late-clip', durationSeconds: 1 });
+    expect(backend.dispose).toHaveBeenCalledTimes(1);
+  });
+
   it('enforces encoded byte and decoded duration limits', async () => {
     const backend = createBackend();
     const runtime = new AudioRuntime(backend, { maxClipBytes: 2, maxClipDurationSeconds: 1 });
