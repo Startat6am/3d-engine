@@ -1,36 +1,34 @@
 # Project Handoff — Choreon 3D Engine
 
-Updated: 2026-11-21
+Updated: 2026-11-22
 
 ## Current authoritative snapshot
 
 - Repository: `Startat6am/3d-engine`; default branch: `main`.
-- M6 is integrated in `main` through squash merge `54def10255ca8fad661e0077b15c3332d6a390f3` (PR
-  #87).
-- M6 functional implementation is closed. Exact-head GitHub Actions [run
-  #506](https://github.com/Startat6am/3d-engine/actions/runs/44465087886) passed.
-- M7 is being developed in draft PR [#90](https://github.com/Startat6am/3d-engine/pull/90)
-  on `feat/m7-world-voxels-main`, based directly on the M6 merge commit above.
-- Player project-folder loading, GLB restoration, and bounded static voxel collider integration are present on the current M7 head. Exact-head CI remains the merge gate.
-- Keep PR #90 as Draft until the remaining M7 scope and owner review are complete; do not merge it
-  automatically.
+- M6 Physics/Input is functionally closed by owner direction (2026-11-19); physical-device profiling and controlled WASM/GPU measurements remain explicitly deferred.
+- M7 World & Voxels is complete and owner-accepted (2026-11-22), integrated by PR [#90](https://github.com/Startat6am/3d-engine/pull/90).
+- Current M7 merge commit: [`ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`](https://github.com/Startat6am/3d-engine/commit/ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2).
+- Exact-head GitHub Actions [run #45022849198](https://github.com/Startat6am/3d-engine/actions/runs/45022849198) passed.
+- The previous 2026-11-21 handoff incorrectly said PR #90 was Draft and M7 active. That snapshot is stale and superseded by the merge above.
+- Current M8 planning branch: `feat/m8-animation-audio-contracts`, based on `main` at the M7 merge commit.
+- M8 documents: [Execution Plan](M8_EXECUTION_PLAN.md), [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md), [ADR-0013](ADR/0013-animation-audio-package-boundaries.md).
 
 ## Milestone status
 
 - M2–M5: complete.
-- M6 Physics/Input: functionally closed by owner direction on 2026-11-19.
-- M7 World & Voxels: active; coordinates/settings, immutable chunk storage/palette validation,
-  deterministic CPU meshing, stale-result validation, cooperative AbortSignal cancellation, and a
-  bounded chunk scheduler, deterministic seeded generation, repeated load/eviction lifecycle stress
-  coverage, content-addressed v1 `com.choreon.voxel-world` persistence, and Editor project persistence
-  wiring are implemented. Player opens project folders, verifies voxel blobs, renders voxel chunks,
-  restores primitive and GLB entities, and builds bounded static voxel colliders through PhysicsWorld.
-  Editor supports chunk selection, local XYZ cell painting/erasing, built-in Grass/Dirt/Stone
-  material selection and revisioned palette extension. Painted multi-material save/reopen E2E coverage
-  passed exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`. Viewport ray-based brush interaction, migration fixtures, lifecycle coverage and voxel benchmarks remain.
-  Palette entries can be reordered with index remapping or removed when unused.
-- M8 Animation & Audio, M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not
-  started. AI authoring remains M10; do not reorder the roadmap.
+- M6 Physics/Input: functional scope closed; profiling limitations remain deferred.
+- M7 World & Voxels: complete and owner-accepted. See the M7 implementation notes below and exact merge/CI above.
+- M8 Animation & Audio: planning/contract baseline in progress on the current branch; no runtime implementation claimed.
+- M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
+
+## M8 audit findings at the main baseline
+
+- `@engine/core` provides `EngineHost` ordered service lifecycle and ECS `SystemScheduler` phases including `fixed-update`, `variable-update` and `transform-propagation`.
+- `@engine/gltf-importer` currently exposes GLB meshes, materials, nodes, images, samplers and textures; it does not import skins, inverse-bind matrices or animation channels.
+- `@engine/renderer` render objects accept geometry/material and TRS or a world matrix; no skinning palette contract exists.
+- `@engine/animation` and `@engine/audio` packages do not exist.
+- Player/Editor do not yet restore animation/audio components from project documents.
+- Next implementation after M8.0 docs: M8.1 animation data model + GLB skin/animation import. Follow the ordered slices in `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
 
 ## M6 implementation and accepted limitations
 
@@ -62,31 +60,15 @@ Explicitly deferred; do not describe as passed:
 - Firefox/WebKit and real mobile-browser compatibility. M6 browser acceptance is Chromium;
   mobile-sized Chromium touch checks are responsive/input coverage only.
 
-## M7 current implementation
+## M7 implementation snapshot (complete)
 
-- `@engine/world` provides signed safe-integer chunk coordinates, canonical keys, floor-based world-position mapping, validated world settings and a bounded `WorldChunkScheduler<T>`.
-- The scheduler bounds concurrent jobs, queued jobs, resident chunks and per-chunk payload bytes; it deduplicates coordinate/revision requests, orders by priority with FIFO ties, propagates AbortSignal, rejects stale completions, enforces explicit eviction and disposes idempotently.
-- `createChunkGenerationContext` supplies a deterministic PRNG scoped to a validated world seed and signed chunk coordinate, plus the request AbortSignal.
-- `@engine/voxel` provides immutable 4,096-cell Uint16 snapshots, zero-as-air and one-based palette indexes, stable material references, palette/index validation, revisioned batch edits and inclusive changed bounds.
-- CPU meshing emits deterministic exposed faces as `@engine/geometry` MeshData, split by palette material. It culls internal and loaded-neighbor faces, records six neighbor revision/availability tokens and marks missing-neighbor boundary faces provisional.
-- `meshVoxelChunkAsync` cooperatively yields between z-slices, observes `AbortSignal` and rejects with `MESHING_ABORTED`; partial geometry is never returned. The synchronous mesher remains the deterministic baseline.
-- Repeated load/evict/dispose lifecycle coverage is present in `packages/engine-world/src/streaming.test.ts`; the test keeps resident bounds enforced across repeated cycles.
-- `@engine/project-storage` owns the versioned `com.choreon.voxel-world` extension and content-addressed binary chunk blobs. Save verifies payload read-back and writes the manifest last; load validates extension/codec versions, exact payload length, SHA-256, coordinates, palette and cell indexes before returning snapshots.
-- Focused persistence tests cover round-trip, invalid settings, duplicate coordinates, unsupported versions, missing/corrupted blobs, content deduplication and manifest-last ordering.
-- Editor directory-project persistence carries voxel settings/chunk snapshots through project open/save and refuses standalone `.world` export when external voxel blobs would be lost. The Editor Hierarchy selects voxel chunks; the Inspector edits local cell coordinates, paints or erases cells, selects built-in Grass/Dirt/Stone materials, appends missing palette entries and displays the current revision/palette. Palette entries can be reordered with cell-index remapping or removed only when unused. Each edit creates a new immutable snapshot and marks the project dirty. Chunk deletion is supported. E2E for palette remapping/removal is added and awaiting exact-head CI #631.
-- Player now exposes an `Open project folder` action backed by `BrowserProjectFileStore` and `loadVoxelWorldProject`. It verifies project assets/chunk blobs before replacing the sample scene, renders voxel chunks through `meshVoxelChunk` with loaded-neighbor face culling, maps built-in palette keys to preview colors, restores Box/Sphere/Plane/Cylinder `MeshRenderer` entities, and frames the loaded content.
-- Player restores Box/Sphere/Plane/Cylinder entities and imported GLB node hierarchies, mesh primitives, PBR factors and embedded texture channels. External GLB image URIs, custom components and non-GLB external texture references remain unsupported. Folder selection requires the browser File System Access API (Chromium-based browser, secure context).
-- Player builds bounded chunk-local static voxel colliders through the public PhysicsWorld API, tracks source and neighbor revisions, synchronizes replacements/unloads through `StaticMeshColliderSet`, and disposes handles on page teardown. The Editor→Player E2E creates a voxel chunk beside an imported GLB, verifies binary chunk persistence, reopens the project in Player, and asserts rendered mesh parts plus static voxel colliders; exact-head Chromium acceptance passed in CI #612.
-- Exact-head GitHub Actions [run #612](https://github.com/Startat6am/3d-engine/actions/runs/44821444780) passed on `2cc93543379c2c8b1ea2cbf2f6dc12c465a6bc08`: format, lint, typecheck, 257 unit/contract tests, package/app builds, GLB geometry and embedded-image benchmarks, and Chromium E2E. After that head, coordinate-based voxel paint/erase and multi-material round-trip assertions were added. Local `pnpm check` passes with 257/257 tests and both app builds; local Playwright cannot launch Chromium because this sandbox lacks `libglib-2.0.so.0`. Exact-head Chromium CI [#615](https://github.com/Startat6am/3d-engine/actions/runs/44824221456) passed on `7e25e4135a3b8bd9a9084a2fa11d4d0b20ef3f9c`, including the painted multi-material save/reopen E2E.
-
-Next sequence:
-
-1. Add viewport ray-based painting and richer authoring controls.
-2. Add migration fixtures and full load/edit/mesh/evict/dispose pipeline coverage.
-3. Run voxel correctness/streaming/performance benchmarks and record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data.
-4. Obtain owner acceptance of the measured M7 exit gates before closing the milestone.
-
-Do not add workers before main-thread contracts are correct. Do not add greedy meshing, LOD, AO, GPU meshing, AI authoring, networking or dynamic voxel collision without a new decision and evidence.
+- `@engine/world`: signed safe-integer chunk coordinates, validated settings, deterministic seeded generation context, bounded scheduler with deduplication, priority/FIFO ordering, cancellation, stale-result rejection, eviction and idempotent disposal.
+- `@engine/voxel`: immutable 4,096-cell Uint16 snapshots, zero-as-air/one-based palette indexes, revisioned batch edits and deterministic CPU exposed-face meshing with neighbor revision tokens.
+- `@engine/project-storage`: versioned `com.choreon.voxel-world` extension, content-addressed chunk blobs, read-back hash verification and manifest-last save.
+- Editor: project persistence, chunk selection, local XYZ cell paint/erase, material palette extension/reorder/removal and dirty-state tracking.
+- Player: project-folder loading, primitive and GLB restoration, voxel chunk rendering, bounded chunk-local static voxel colliders and teardown.
+- Exact-head M7 acceptance is recorded in CI [#45022849198](https://github.com/Startat6am/3d-engine/actions/runs/45022849198) for merge commit `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
+- Do not reopen M7 or add deferred greedy meshing, LOD, AO, GPU meshing, networking or dynamic voxel collision without new evidence and an explicit decision.
 
 ## Quality gates
 
@@ -102,11 +84,11 @@ pnpm build
 pnpm e2e
 ```
 
-Every implementation slice must update its owning spec, M7 execution plan and this handoff in the
+Every implementation slice must update its owning spec, M8 execution plan (for M8 work) and this handoff in the
 same PR. Record exact branch/head, CI run, test totals, limitations and next task. Never invent test
 counts, hardware measurements, deployment state or acceptance.
 
-## Voxel persistence slice — 2026-11-19
+## Historical voxel persistence slice — 2026-11-19
 
 - Added `saveVoxelWorldProject` / `loadVoxelWorldProject` in `@engine/project-storage`. V1 extension key: `com.choreon.voxel-world`; extension metadata stores voxel settings and chunk descriptors with coordinate, revision, palette, asset ID, 8192-byte length, codec version 1, and SHA-256.
 - Binary chunk blobs are immutable and content-addressed under `voxel/chunks/sha256/`; identical payloads deduplicate. Save verifies blob read-back before writing `worlds/main.world` last. Load validates metadata, duplicate coordinates, codec version, byte length, hash, and voxel palette/cell indexes.
