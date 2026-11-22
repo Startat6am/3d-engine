@@ -76,6 +76,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Stream static voxel colliders with the camera window, using loaded neighbor snapshots for shared-face culling and rebuilding neighbor revision tokens as chunks arrive.
 - [x] Add storage tests proving project open does not read chunk blobs and a single requested coordinate reads only its own content-addressed payload; add Chromium coverage with three distant chunk descriptors proving Player reads only the active camera-window payload.
 - [x] Pass Chromium E2E for initial streamed rendering, on-demand voxel payload reads, WASD-driven GPU buffer eviction/re-entry, payload reload after camera return, and pagehide cleanup. The complete current PR head passed [CI run #44999666432](https://github.com/Startat6am/3d-engine/actions/runs/44999666432).
+- [x] Preload a built-in Player voxel streaming test scene at startup (63 in-memory 16³ chunks) so the camera-driven rendering/streaming path can be exercised without selecting a project folder. The sample is visual-only (colliders are disabled); real project loading retains physics colliders. Chromium E2E verifies initial rendering and additional source-chunk reads after camera travel; opening a real project still replaces the sample scene.
 
 ## Phase 5 — verification and closeout
 
