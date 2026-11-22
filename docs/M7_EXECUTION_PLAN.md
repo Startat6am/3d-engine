@@ -84,7 +84,7 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - [x] Exact-head quality gates and Chromium E2E for the painted multi-material round-trip passed in CI #615.
 - [x] Run the voxel-world stress benchmark on Node 22 in exact-head CI and archive raw JSON measurements. Latest report: `benchmarks/results/voxel-world-stress-552d6ba.json`; comparative before/after optimization studies remain open.
 - [x] Add source-cache LRU/capacity/pruning tests, including a 1,000-chunk traversal capped at 256 entries; isolate fulfilled neighbor payloads so a corrupt/unavailable adjacent chunk cannot block valid chunk meshing. Exact-head PR CI passed 282/282 Vitest tests and 25/25 Chromium E2E tests.
-- [x] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data below. Physical-device validation and comparative before/after optimization studies remain open.
+- [x] Record exact commit, CI run, Node/browser versions, chunk dimensions, voxel counts, job limits and measured resource data below. Physical-device validation remains open.
 - [x] Add viewport ray-based voxel brush interaction and hover preview; exact-head CI coverage remains part of the editor E2E suite.
 - [ ] Obtain owner acceptance of M7 scope and measured exit gates before closing M7.
 
@@ -129,3 +129,25 @@ The v1 persistence contract, focused storage tests, Editor directory-project per
 - Raw report is checked in at `benchmarks/results/voxel-world-stress-552d6ba.json` and uploaded as the [voxel-world-stress-results artifact](https://github.com/Startat6am/3d-engine/actions/runs/44999666432). Browser E2E validates on-demand reads, camera-driven buffer eviction/re-entry, and pagehide cleanup; this is hosted Chromium/WebGL validation, not physical-device GPU/memory acceptance.
 - Migration note: the v1 compatibility fixture is checked in. A future-version migration fixture is not applicable until a later schema/codec revision exists; do not fabricate a future format fixture.
 - Remaining closeout: broader physical-device/browser validation, comparative before/after performance study, and explicit owner acceptance. M7 remains ACTIVE; PR #90 remains Draft.
+
+
+## Comparative voxel performance study — 2026-11-22
+
+Two archived stress runs were produced on the same GitHub Actions runner class and runtime (Node 22.23.5, Linux x64, 4 reported vCPUs), with identical chunk fixtures and scheduler configuration. The baseline report is from source commit `422026ffbf844372a96b178df77ad8adf23f52ec`; the later report is from `552d6baddc8f4b995c72f56a6f5434a180b8df7f`. Both use 8 meshing repeats and 32 lifecycle cycles.
+
+| Fixture | Median before | Median after | Median change | p95 before | p95 after |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Empty chunk | 0.108 ms | 0.079 ms | -26.9% | 0.311 ms | 0.281 ms |
+| One occupied cell | 0.197 ms | 0.092 ms | -53.3% | 0.397 ms | 0.210 ms |
+| Solid 16³ chunk | 2.435 ms | 1.508 ms | -38.1% | 2.796 ms | 4.533 ms |
+| Checkerboard chunk | 12.674 ms | 11.765 ms | -7.2% | 14.207 ms | 12.496 ms |
+| Scheduler lifecycle (32 cycles) | 16.140 ms | 16.189 ms | +0.3% | 16.331 ms | 16.297 ms |
+
+Interpretation:
+- Median CPU meshing improved in all four fixtures (about 7–53% in these runs).
+- The solid fixture's p95 regressed in this small sample despite a better median; 8 repeats are insufficient to treat that tail result as a stable regression or improvement. Repeat with a larger sample before making tail-latency claims.
+- Scheduler lifecycle median was effectively unchanged (+0.3%); this benchmark does not show a measurable lifecycle speedup.
+- Output geometry sizes and exposed-face counts were unchanged, so the runs compare the same work.
+- These are diagnostic comparisons, not controlled microbenchmark guarantees. The benchmark excludes project disk reads, browser rendering, GPU upload, physics cooking, and mobile-device thermal/runtime behavior. It therefore does not quantify the end-to-end benefit of lazy payload streaming or prove Android performance.
+
+Raw inputs: `benchmarks/results/voxel-world-stress-422026f.json` and `benchmarks/results/voxel-world-stress-552d6ba.json`. The additional 50-repeat/100-cycle local sandbox run used Node 25.9.0 on Linux arm64 and is intentionally excluded from this comparison because its runtime and hardware differ from the Node 22 x64 CI baselines.
