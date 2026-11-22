@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** planning/contract baseline in progress; no runtime implementation claimed.
+**Status:** M8.0 contract baseline established; M8.1 animation data/sampling foundation in progress.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -25,10 +25,10 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Correct stale M7 status in roadmap and handoff.
 - Define public subsystem responsibilities, time/coordinate conventions, resource ownership, errors, limits, serialization rules and acceptance.
 - Record package-boundary decision and dependency direction.
-- Exit: docs are linked from README/roadmap; no implementation is implied.
+- Exit: docs are linked from README/roadmap; no runtime capability was implied by the docs-only slice. Contract baseline is now established.
 
 ### M8.1 — Animation data model and GLB import
-- Add readonly animation/skeleton data structures and validators to `@engine/animation`.
+- Add readonly animation/skeleton data structures and validators to `@engine/animation`. (First slice implemented: validated track/clip/skin data and allocation-conscious STEP/LINEAR/CUBICSPLINE sampling.)
 - Extend GLB importer with skins, inverse bind matrices, animation samplers/channels, supported interpolation and bounded accessor validation.
 - Preserve node/joint indices and source asset identity; reject unsupported/malformed data with typed errors.
 - Tests: GLB fixtures for STEP/LINEAR/CUBICSPLINE, translation/rotation/scale, malformed accessors, invalid joint references and limits.
