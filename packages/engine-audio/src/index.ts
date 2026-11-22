@@ -53,7 +53,12 @@ export class AudioError extends Error {
   }
 }
 
+export interface AudioBackendCapabilities {
+  readonly spatialization: 'HRTF' | 'equalpower' | 'none';
+}
+
 export interface AudioBackend {
+  getCapabilities(): AudioBackendCapabilities;
   /** Must be called explicitly from a user gesture handler in browser hosts. */
   activateFromUserGesture(): Promise<void>;
   decodeClip(data: AudioClipData): Promise<AudioClipHandle>;
@@ -158,27 +163,44 @@ export class AudioRuntime {
   readonly #maxVoices: number;
   readonly #maxClipBytes: number;
   readonly #maxClipDurationSeconds: number;
+  readonly #maxConcurrentDecodes: number;
+  readonly #maxQueuedDecodes: number;
   readonly #clips = new Map<string, AudioClipHandle>();
   readonly #loading = new Map<string, Promise<AudioClipHandle>>();
+  readonly #decodeQueue: Array<{ start: () => void; cancel: () => void }> = [];
+  #activeDecodes = 0;
   readonly #voices = new Map<string, { readonly handle: string; state: AudioSourceState }>();
   #active = false;
   #disposed = false;
   #nextVoiceId = 1;
+  #listener: AudioListenerState = { position: [0, 0, 0], orientation: [0, 0, 0, 1] };
 
   constructor(
     backend: AudioBackend,
-    options: { maxVoices?: number; maxClipBytes?: number; maxClipDurationSeconds?: number } = {},
+    options: {
+      maxVoices?: number;
+      maxClipBytes?: number;
+      maxClipDurationSeconds?: number;
+      maxConcurrentDecodes?: number;
+      maxQueuedDecodes?: number;
+    } = {},
   ) {
     this.#backend = backend;
     this.#maxVoices = options.maxVoices ?? 32;
     this.#maxClipBytes = options.maxClipBytes ?? 64 * 1024 * 1024;
     this.#maxClipDurationSeconds = options.maxClipDurationSeconds ?? 600;
+    this.#maxConcurrentDecodes = options.maxConcurrentDecodes ?? 2;
+    this.#maxQueuedDecodes = options.maxQueuedDecodes ?? 8;
     if (!Number.isSafeInteger(this.#maxVoices) || this.#maxVoices < 1)
       throw new RangeError('Audio maxVoices must be a positive safe integer');
     if (!Number.isSafeInteger(this.#maxClipBytes) || this.#maxClipBytes < 1)
       throw new RangeError('Audio maxClipBytes must be a positive safe integer');
     if (!Number.isFinite(this.#maxClipDurationSeconds) || this.#maxClipDurationSeconds <= 0)
       throw new RangeError('Audio maxClipDurationSeconds must be finite and positive');
+    if (!Number.isSafeInteger(this.#maxConcurrentDecodes) || this.#maxConcurrentDecodes < 1)
+      throw new RangeError('Audio maxConcurrentDecodes must be a positive safe integer');
+    if (!Number.isSafeInteger(this.#maxQueuedDecodes) || this.#maxQueuedDecodes < 0)
+      throw new RangeError('Audio maxQueuedDecodes must be a non-negative safe integer');
   }
 
   get voiceCount(): number {
@@ -188,12 +210,17 @@ export class AudioRuntime {
     return this.#active;
   }
 
+  get capabilities(): AudioBackendCapabilities {
+    return this.#backend.getCapabilities();
+  }
+
   /** Host must call this from a trusted user gesture; no implicit autoplay/resume occurs. */
   async activateFromUserGesture(): Promise<void> {
     this.#assertActive();
     if (this.#active) return;
     try {
       await this.#backend.activateFromUserGesture();
+      this.#backend.updateListener(this.#listener);
       this.#active = true;
     } catch (cause) {
       throw new AudioError(
@@ -223,8 +250,9 @@ export class AudioRuntime {
     const load = (async (): Promise<AudioClipHandle> => {
       let clip: AudioClipHandle;
       try {
-        clip = await this.#backend.decodeClip(data);
+        clip = await this.#decodeWithLimit(data);
       } catch (cause) {
+        if (cause instanceof AudioError) throw cause;
         throw new AudioError('DECODE_FAILED', `Failed to decode audio clip ${data.id}`, { cause });
       }
       if (this.#disposed) {
@@ -282,7 +310,8 @@ export class AudioRuntime {
     if (!finiteVec3(listener.position))
       throw new AudioError('INVALID_LISTENER', 'Listener position must be finite');
     validateOrientation(listener.orientation);
-    this.#backend.updateListener(listener);
+    this.#listener = { position: [...listener.position], orientation: [...listener.orientation] };
+    if (this.#active) this.#backend.updateListener(this.#listener);
   }
 
   updateVoice(id: string, state: AudioSourceState): void {
@@ -322,6 +351,7 @@ export class AudioRuntime {
     this.#clips.clear();
     this.#active = false;
     this.#disposed = true;
+    for (const task of this.#decodeQueue.splice(0)) task.cancel();
     const pendingLoads = [...this.#loading.values()];
     if (pendingLoads.length === 0) {
       this.#backend.dispose();
@@ -330,6 +360,55 @@ export class AudioRuntime {
       // handles before the backend itself is torn down.
       void Promise.allSettled(pendingLoads).then(() => this.#backend.dispose());
     }
+  }
+
+  #decodeWithLimit(data: AudioClipData): Promise<AudioClipHandle> {
+    return new Promise((resolve, reject) => {
+      const start = () => {
+        if (this.#disposed) {
+          reject(new AudioError('DISPOSED', 'Audio runtime was disposed before decoding started'));
+          return;
+        }
+        this.#activeDecodes++;
+        this.#backend
+          .decodeClip(data)
+          .then(resolve, reject)
+          .finally(() => {
+            this.#activeDecodes--;
+            this.#pumpDecodeQueue();
+          });
+      };
+      if (this.#activeDecodes < this.#maxConcurrentDecodes) {
+        start();
+        return;
+      }
+      if (this.#decodeQueue.length >= this.#maxQueuedDecodes) {
+        reject(new AudioError('RESOURCE_LIMIT', 'Audio decode queue is full'));
+        return;
+      }
+      let settled = false;
+      this.#decodeQueue.push({
+        start: () => {
+          if (settled) return;
+          settled = true;
+          start();
+        },
+        cancel: () => {
+          if (settled) return;
+          settled = true;
+          reject(new AudioError('DISPOSED', 'Audio runtime was disposed while waiting to decode'));
+        },
+      });
+    });
+  }
+
+  #pumpDecodeQueue(): void {
+    while (
+      !this.#disposed &&
+      this.#activeDecodes < this.#maxConcurrentDecodes &&
+      this.#decodeQueue.length > 0
+    )
+      this.#decodeQueue.shift()!.start();
   }
 
   #requireVoice(id: string): void {
@@ -373,3 +452,5 @@ export class AudioVoice {
     if (this.#released) throw new AudioError('DISPOSED', 'Audio voice has been disposed');
   }
 }
+
+export { WebAudioBackend } from './web-audio.js';

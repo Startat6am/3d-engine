@@ -23,6 +23,7 @@ export default defineConfig({
       input: {
         index: resolve(appDir, 'index.html'),
         physicsPlayground: resolve(appDir, 'physics-playground.html'),
+        skinningTest: resolve(appDir, 'skinning-test.html'),
       },
     },
   },

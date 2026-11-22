@@ -17,22 +17,23 @@ Updated: 2026-11-22
 - M2–M5: complete.
 - M6 Physics/Input: functional scope closed by owner direction on 2026-11-19; physical profiling remains deferred.
 - M7 World & Voxels: complete and merged; owner acceptance recorded 2026-11-22.
-- M8 Animation & Audio: started; contract baseline and package boundaries documented, implementation not yet complete.
+- M8 Animation & Audio: implementation active on `feat/m8-animation-audio`; GLB import, renderer skinning, animated Player path and browser Web Audio backend are implemented with focused Chromium coverage. Full workspace CI, device validation and owner acceptance remain pending.
 - M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
 ## M8 current implementation
 
 - `@engine/animation` now exports validated clip/track contracts, STEP/LINEAR/CUBICSPLINE samplers, shortest-path quaternion slerp and normalization, pose blending, playback controls, looping/seek, cross-fade state, and CPU skinning palette calculation with column-major matrix validation.
-- `@engine/audio` now exports backend-neutral clip/voice/listener contracts, explicit user-gesture activation, deduplicated clip decoding, validated source/listener updates, inverse-distance attenuation, bounded voice count (default 32), encoded clip size (64 MiB) and decoded duration (600 seconds), and idempotent teardown that waits for pending decodes before backend disposal. It does not yet contain a Web Audio implementation.
-- Focused tests: 12 animation + 7 audio focused tests; GLB importer now has 37 tests. Full workspace verification passed: format, lint, typecheck, 307/307 Vitest tests and production builds. Full Chromium Playwright suite passed: 29/29 tests, including GLB import/save/reopen, directory-project streaming, renderer resource cleanup, Editor mobile workflows, physics playground and Player shutdown. The directory-project streaming test now has a 60-second budget; the clean suite completed successfully.
-- GLB importer now imports skin joint lists, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences, and supported TRS animation channels with bounded counts and strict validation. Renderer/GPU skinning, Web Audio backend and Player acceptance scene are not yet implemented.
+- `@engine/audio` exports backend-neutral clip/voice/listener contracts, explicit user-gesture activation, deduplicated clip decoding, inverse-distance attenuation, bounded voice count (default 32), encoded clip size (64 MiB), decoded duration (600 seconds), and teardown that waits for pending decodes. `WebAudioBackend` now implements lazy AudioContext activation, clip decoding, voice lifecycle, panning and attenuation.
+- GLB importer imports skin joint lists, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences and supported TRS animation channels with bounded counts and strict validation. Player advances the first imported clip, computes node world transforms and skinning palettes, and sends skinned render data to the renderer.
+- Renderer creates Three.js `SkinnedMesh` / `Skeleton` resources behind the package boundary, normalizes uploaded weights, updates joint matrices and releases skeleton resources on object removal/disposal.
+- Player Chromium suite passed 5/5: static scene, shutdown/resource cleanup, palette-driven mesh deformation, animated GLB playback and user-gesture Web Audio startup. Workspace Vitest passed 313/313; format, lint, typecheck and production builds passed. Full workspace Chromium suite and exact-head CI have not yet been run on this implementation head.
+- Known gaps: no physical-device GPU/audio validation, no performance profiling, no audio scene component/listener-camera synchronization, no animation selection/graph UI, and no morph targets. The Player audio control is a smoke-test harness.
 
 ## M8 immediate next steps
 
-1. Add backend-neutral skinned render inputs and renderer-owned GPU skinning resources.
-2. Add the real Web Audio decode/voice backend with bounded decode concurrency and browser lifecycle tests.
-3. Build the Player animated-character/spatial-audio acceptance scene and verify visible movement, user-gesture audio activation, spatial response and teardown.
-4. Rerun full workspace/Chromium CI and update this handoff with exact-head evidence.
+1. Run the remaining full Chromium E2E suites and address regressions.
+2. Add focused matrix/resource lifecycle coverage where the full browser tests expose gaps; assess audio listener synchronization and scene source ownership.
+3. Record exact-head CI and benchmark/device evidence, then request owner review. M8 remains unaccepted and must not be merged without explicit approval.
 
 ## M6 implementation and accepted limitations
 

@@ -555,3 +555,49 @@ export function computeSkinningPalette(
   }
   return palette;
 }
+
+/** Compose a local TRS transform into a column-major 4x4 matrix. */
+export function composeTransformMatrix(transform: NodeTransform): Float32Array {
+  const [tx, ty, tz] = transform.translation;
+  const [sx, sy, sz] = transform.scale;
+  if (![tx, ty, tz, sx, sy, sz].every(Number.isFinite))
+    throw new AnimationError('INVALID_SKIN', 'TRS transform contains a non-finite value');
+  const [x, y, z, w] = normalizeQuaternion(transform.rotation);
+  const xx = x * x;
+  const yy = y * y;
+  const zz = z * z;
+  const xy = x * y;
+  const xz = x * z;
+  const yz = y * z;
+  const wx = w * x;
+  const wy = w * y;
+  const wz = w * z;
+  return new Float32Array([
+    (1 - 2 * (yy + zz)) * sx,
+    2 * (xy + wz) * sx,
+    2 * (xz - wy) * sx,
+    0,
+    2 * (xy - wz) * sy,
+    (1 - 2 * (xx + zz)) * sy,
+    2 * (yz + wx) * sy,
+    0,
+    2 * (xz + wy) * sz,
+    2 * (yz - wx) * sz,
+    (1 - 2 * (xx + yy)) * sz,
+    0,
+    tx,
+    ty,
+    tz,
+    1,
+  ]);
+}
+
+/** Multiply two column-major 4x4 transform matrices. */
+export function multiplyTransformMatrices(
+  left: ArrayLike<number>,
+  right: ArrayLike<number>,
+): Float32Array {
+  validateMatrix4(left, 'Left transform matrix');
+  validateMatrix4(right, 'Right transform matrix');
+  return Float32Array.from(multiplyMatrix4(left, right));
+}

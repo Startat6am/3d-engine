@@ -33,7 +33,7 @@ An animation clip contains a stable name, duration, and tracks. Each track targe
 
 The runtime pose is a set of local TRS transforms keyed by imported node index. Clip blending uses normalized non-negative weights. A single base pose can be layered with weighted overrides; additive animation is explicitly out of the first M8 contract. Missing tracks preserve the bind/default local transform. Cross-fades advance both source and target clocks and interpolate their sampled poses over a caller-supplied duration.
 
-The skinning palette for a mesh node is computed as `inverse(meshWorld) * jointWorld * inverseBindMatrix` for each joint, using column-major matrices. `@engine/animation` now exposes `computeSkinningPalette` with singular-matrix, missing-joint and matrix-count validation. The CPU matrix order is fixture-tested; renderer integration and GPU upload remain pending. CPU palette output is backend-neutral; GPU texture/bone upload is renderer-owned.
+The skinning palette for a mesh node is computed as `inverse(meshWorld) * jointWorld * inverseBindMatrix` for each joint, using column-major matrices. `@engine/animation` now exposes `computeSkinningPalette` with singular-matrix, missing-joint and matrix-count validation. The CPU matrix order is fixture-tested. The Three.js adapter uploads `skinIndex` / normalized `skinWeight`, creates renderer-owned `SkinnedMesh` / `Skeleton` resources, applies the mesh-relative palette each frame, and releases skeleton/bone resources with the render object. The Player currently advances the first imported clip in a loop; clip-selection UI and animation graphs are outside this slice.
 
 ## 4. Animation runtime lifecycle
 
@@ -48,7 +48,7 @@ The skinning palette for a mesh node is computed as `inverse(meshWorld) * jointW
 
 A listener has a world position and orientation. A source has a clip reference, world position/orientation, gain, pitch, looping flag, reference distance, maximum distance, rolloff model, and spatial blend (2D to 3D). Distances are metres; gain is linear amplitude; pitch is a positive playback-rate multiplier.
 
-The engine-facing `AudioBackend` exposes capability discovery and opaque handles for decoded clips, listeners, and source voices. The Web Audio adapter maps sources to buffer-source/gain/panner nodes and owns all node connections. No `AudioContext` is created implicitly by module import or page load. The host explicitly initializes/resumes audio in response to a user gesture to comply with browser autoplay policy.
+The engine-facing `AudioBackend` exposes capability discovery and opaque handles for decoded clips, listeners, and source voices. The Web Audio adapter maps sources to buffer-source/gain/panner nodes and owns all node connections. `AudioRuntime` bounds decode concurrency (2 active / 8 queued by default), deduplicates in-flight loads, and enforces clip/voice limits. No `AudioContext` is created implicitly by module import or page load. The host explicitly initializes/resumes audio in response to a user gesture to comply with browser autoplay policy.
 
 M8 spatial attenuation contract is inverse-distance clamped: gain multiplier is `referenceDistance / (referenceDistance + rolloff * (distance - referenceDistance))` for distances beyond reference distance, clamped at zero beyond max distance. The backend may additionally apply HRTF/panning when supported; it must report the selected mode. A non-spatial 2D source bypasses positional attenuation.
 
@@ -59,7 +59,7 @@ Audio is presentation output: it does not advance the fixed simulation clock, af
 - Imported clip data is immutable CPU data. Decoded audio buffers and GPU skinning resources are backend-owned and reference-counted where shared.
 - Every voice, decoded clip lease, listener binding, and backend is released on owner disposal. Runtime disposal waits for pending decode promises to settle, releases any late decoded handle, then disposes the backend. Repeated dispose/release is safe.
 - Audio decode is asynchronous and cancellable where the platform allows; no file/network I/O occurs in frame callbacks.
-- Enforce configurable limits for encoded bytes, decoded duration, active voices, joint count, key count, and simultaneous decode jobs. The initial audio runtime defaults are 64 MiB per encoded clip, 600 seconds per decoded clip, and 32 active voices. The browser adapter phase must add a bounded concurrent-decode queue and document decoded channel/sample-rate ceilings before production acceptance. Importer phase must publish joint/key ceilings before accepting untrusted animated assets.
+- Enforce configurable limits for encoded bytes, decoded duration, active voices, joint count, key count, and simultaneous decode jobs. The initial audio runtime defaults are 64 MiB per encoded clip, 600 seconds per decoded clip, and 32 active voices. The runtime bounds concurrent decodes (2 active and 8 queued by default). Decoded channel-count/sample-rate ceilings and production device profiling remain open. Importer phase must publish joint/key ceilings before accepting untrusted animated assets.
 - Treat GLB accessors and audio files as untrusted. Validate ranges, finite values, counts, MIME/type and decoded sizes before allocation or backend submission.
 - Do not auto-play newly loaded assets. Playback requires an explicit caller action.
 
@@ -81,17 +81,17 @@ M8 first supports imported GLB animation/skin data in memory. Persisted editor a
 
 1. Contract + deterministic CPU animation primitives: validate tracks, sample STEP/LINEAR/CUBICSPLINE, blend poses, test cross-fade clock semantics.
 2. GLB import: skins, inverse-bind matrices, animation samplers/channels, joint validation, capability diagnostics and fixtures.
-3. Renderer skinning: palette convention tests, bounded GPU upload, skinned character visible in Player.
-4. Audio core/backend: fake backend contract, explicit Web Audio initialization, decode/play/stop/dispose, spatial listener/source updates and voice bounds.
-5. Player acceptance scene: one animated GLB character plus spatial sound source/listener; verify visible movement, audible user-initiated playback, pause/stop, and complete teardown.
+3. Renderer skinning: palette convention tests, bounded GPU upload, skinned character visible in Player. **Implemented and covered by Chromium deformation/animation/resource-teardown tests.**
+4. Audio core/backend: fake backend contract, explicit Web Audio initialization, decode/play/stop/dispose, spatial listener/source updates and voice bounds. **Implemented; Chromium verifies user-gesture activation and a spatial voice.**
+5. Player acceptance harness: animated GLB playback and a separate user-triggered spatial-audio smoke control. **Implemented; full listener/camera synchronization and a scene-authored sound source remain open.**
 
 ## 10. Acceptance gates
 
 - Valid GLB fixtures import skin and supported animation channels; malformed joint/accessor/channel data fails with stable errors.
 - CPU sampling tests cover key boundaries, STEP/LINEAR/slerp/CUBICSPLINE, looping, seek, negative/invalid time, and cross-fade blending.
-- Renderer conformance verifies skinning palette matrix order and resource cleanup; a real skinned character visibly animates in Chromium Player.
+- Renderer conformance verifies skinning palette matrix order and resource cleanup; a real skinned GLB visibly deforms and animates in Chromium Player (passed).
 - Audio backend tests cover user-gesture initialization boundary, decode failure, 2D/3D source configuration, attenuation, voice limits, stop/pause, and disposal.
-- Player acceptance verifies explicit user-triggered audio playback, spatial response to listener movement, and teardown with no retained voices/nodes.
+- Player Chromium smoke coverage verifies explicit user-triggered audio activation, a running spatial voice, and renderer/audio teardown. Listener movement response and full scene-authored audio integration remain acceptance gaps.
 - Format, lint, typecheck, full unit/contract suite, production build, Chromium E2E and benchmark outputs pass on exact PR head.
 - Browser/device claims are limited to actually tested environments; no unmeasured FPS, latency, VRAM, or audio-latency budgets are implied.
 

@@ -12,6 +12,7 @@ import {
 function createBackend(): AudioBackend {
   let next = 0;
   return {
+    getCapabilities: () => ({ spatialization: 'HRTF' }),
     activateFromUserGesture: vi.fn(async () => undefined),
     decodeClip: vi.fn(async (data: AudioClipData): Promise<AudioClipHandle> => ({
       id: data.id,
@@ -77,6 +78,19 @@ describe('spatial audio contracts', () => {
     expect(() => runtime.createVoice('ambience')).toThrowError(AudioError);
   });
 
+  it('caches listener transforms until explicit user-gesture activation', async () => {
+    const backend = createBackend();
+    const runtime = new AudioRuntime(backend);
+    runtime.setListener({ position: [4, 2, 1], orientation: [0, 0, 0, 1] });
+    expect(backend.updateListener).not.toHaveBeenCalled();
+    await runtime.activateFromUserGesture();
+    expect(backend.updateListener).toHaveBeenCalledWith({
+      position: [4, 2, 1],
+      orientation: [0, 0, 0, 1],
+    });
+    runtime.dispose();
+  });
+
   it('deduplicates concurrent clip decoding by asset id', async () => {
     const backend = createBackend();
     let finish: ((clip: AudioClipHandle) => void) | undefined;
@@ -94,6 +108,50 @@ describe('spatial audio contracts', () => {
     await expect(Promise.all([first, second])).resolves.toHaveLength(2);
     expect(backend.decodeClip).toHaveBeenCalledTimes(1);
     runtime.dispose();
+  });
+
+  it('bounds concurrent and queued decodes', async () => {
+    const backend = createBackend();
+    const finishes: Array<(clip: AudioClipHandle) => void> = [];
+    vi.mocked(backend.decodeClip).mockImplementation(
+      () => new Promise((resolve) => finishes.push(resolve)),
+    );
+    const runtime = new AudioRuntime(backend, { maxConcurrentDecodes: 1, maxQueuedDecodes: 1 });
+    await runtime.activateFromUserGesture();
+    const first = runtime.loadClip({ ...clipData, id: 'first' });
+    const second = runtime.loadClip({ ...clipData, id: 'second' });
+    await expect(runtime.loadClip({ ...clipData, id: 'third' })).rejects.toMatchObject({
+      code: 'RESOURCE_LIMIT',
+    });
+    expect(backend.decodeClip).toHaveBeenCalledTimes(1);
+    finishes[0]!({ id: 'first', durationSeconds: 1 });
+    await first;
+    expect(backend.decodeClip).toHaveBeenCalledTimes(2);
+    finishes[1]!({ id: 'second', durationSeconds: 1 });
+    await second;
+    runtime.dispose();
+  });
+
+  it('rejects queued decodes on disposal and waits only for active decodes', async () => {
+    const backend = createBackend();
+    let finish: ((clip: AudioClipHandle) => void) | undefined;
+    vi.mocked(backend.decodeClip).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const runtime = new AudioRuntime(backend, { maxConcurrentDecodes: 1, maxQueuedDecodes: 1 });
+    await runtime.activateFromUserGesture();
+    const first = runtime.loadClip({ ...clipData, id: 'active' });
+    const queued = runtime.loadClip({ ...clipData, id: 'queued' });
+    runtime.dispose();
+    await expect(queued).rejects.toMatchObject({ code: 'DISPOSED' });
+    expect(backend.dispose).not.toHaveBeenCalled();
+    finish?.({ id: 'late', durationSeconds: 1 });
+    await expect(first).rejects.toMatchObject({ code: 'DISPOSED' });
+    await Promise.resolve();
+    expect(backend.dispose).toHaveBeenCalledTimes(1);
   });
 
   it('waits for in-flight decode cleanup before disposing the backend', async () => {

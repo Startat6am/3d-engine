@@ -50,10 +50,68 @@ export interface MaterialDescriptor {
   readonly occlusionTexture?: TextureSource;
   readonly emissiveTexture?: TextureSource;
 }
+export interface SkinningDescriptor {
+  /** Four joint indices per vertex, in the same order as the weights. */
+  readonly jointIndices: Uint16Array;
+  /** Four non-negative influences per vertex; the renderer normalizes a private copy. */
+  readonly jointWeights: Float32Array;
+  /** Column-major mesh-relative joint matrices, 16 floats per joint. */
+  readonly palette: Float32Array;
+}
+
 interface RenderObjectBase {
   readonly id: string;
   readonly geometry: MeshData;
   readonly material: MaterialDescriptor;
+  /** Optional CPU skinning data. Palette contents may be updated in place every frame. */
+  readonly skinning?: SkinningDescriptor;
+}
+
+export function validateSkinningDescriptor(geometry: MeshData, skinning: SkinningDescriptor): void {
+  const vertexCount = geometry.positions.length / 3;
+  const jointCount = skinning.palette.length / 16;
+  if (
+    !Number.isInteger(vertexCount) ||
+    vertexCount < 1 ||
+    !(skinning.jointIndices instanceof Uint16Array) ||
+    !(skinning.jointWeights instanceof Float32Array) ||
+    !(skinning.palette instanceof Float32Array) ||
+    skinning.jointIndices.length !== vertexCount * 4 ||
+    skinning.jointWeights.length !== vertexCount * 4 ||
+    skinning.palette.length === 0 ||
+    skinning.palette.length % 16 !== 0
+  ) {
+    throw new RendererError(
+      'INVALID_SKIN',
+      'Skinning arrays must contain four influences per vertex and one 4x4 matrix per joint',
+    );
+  }
+  for (const value of skinning.palette) {
+    if (!Number.isFinite(value))
+      throw new RendererError(
+        'INVALID_SKIN',
+        'Skinning palette contains a non-finite matrix value',
+      );
+  }
+  for (let vertex = 0; vertex < vertexCount; vertex++) {
+    let totalWeight = 0;
+    for (let influence = 0; influence < 4; influence++) {
+      const index = vertex * 4 + influence;
+      if (
+        skinning.jointIndices[index]! >= jointCount ||
+        !Number.isFinite(skinning.jointWeights[index]) ||
+        skinning.jointWeights[index]! < 0
+      ) {
+        throw new RendererError(
+          'INVALID_SKIN',
+          `Vertex ${vertex} contains an invalid joint index or weight`,
+        );
+      }
+      totalWeight += skinning.jointWeights[index]!;
+    }
+    if (totalWeight <= 1e-8)
+      throw new RendererError('INVALID_SKIN', `Vertex ${vertex} has no positive skinning weight`);
+  }
 }
 
 /** Backend-neutral render input: local TRS or a propagated column-major world matrix. */
@@ -102,7 +160,7 @@ export interface RendererOptions {
   readonly pixelRatioCap?: number;
 }
 export type RendererErrorCode =
-  'WEBGL2_UNAVAILABLE' | 'CONTEXT_LOST' | 'INVALID_SCENE' | 'DISPOSED';
+  'WEBGL2_UNAVAILABLE' | 'CONTEXT_LOST' | 'INVALID_SCENE' | 'INVALID_SKIN' | 'DISPOSED';
 export class RendererError extends Error {
   constructor(
     readonly code: RendererErrorCode,

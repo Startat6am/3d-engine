@@ -1,4 +1,19 @@
 import type { AssetRecord } from '@engine/assets';
+import {
+  AnimationPlayer,
+  composeTransformMatrix,
+  computeSkinningPalette,
+  multiplyTransformMatrices,
+  type NodeTransform,
+  type SkeletonDescriptor,
+} from '@engine/animation';
+import {
+  AudioRuntime,
+  createAudioSourceState,
+  WebAudioBackend,
+  type AudioClipHandle,
+  type AudioVoice,
+} from '@engine/audio';
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
 import {
   createBoxGeometry,
@@ -19,6 +34,7 @@ import {
   ThreeWebGLRendererAdapter,
   type MaterialDescriptor,
   type RenderObject,
+  type SkinningDescriptor,
   type TextureSource,
 } from '@engine/renderer';
 import { createVoxelChunkSnapshot, meshVoxelChunkAsync } from '@engine/voxel';
@@ -67,6 +83,11 @@ const canvas = document.querySelector<HTMLCanvasElement>('#player');
 if (!canvas) throw new Error('Player canvas was not found');
 const loadButton = document.querySelector<HTMLButtonElement>('#load-project');
 const projectStatus = document.querySelector<HTMLOutputElement>('#project-status');
+const audioTestButton = document.querySelector<HTMLButtonElement>('#audio-test');
+const audioBackend = new WebAudioBackend();
+const audioRuntime = new AudioRuntime(audioBackend);
+let audioTestClip: AudioClipHandle | null = null;
+let audioTestVoice: AudioVoice | null = null;
 const projectProgress = document.createElement('section');
 projectProgress.setAttribute('role', 'status');
 projectProgress.setAttribute('aria-live', 'polite');
@@ -92,6 +113,88 @@ const setProjectStatus = (message: string, isError = false) => {
   projectStatus.value = message;
   projectStatus.style.color = isError ? '#fca5a5' : '#d9e7fa';
 };
+
+function createSpatialTestTone(): ArrayBuffer {
+  const sampleRate = 22_050;
+  const sampleCount = sampleRate;
+  const bytes = new ArrayBuffer(44 + sampleCount * 2);
+  const view = new DataView(bytes);
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index++)
+      view.setUint8(offset + index, value.charCodeAt(index));
+  };
+  writeText(0, 'RIFF');
+  view.setUint32(4, bytes.byteLength - 8, true);
+  writeText(8, 'WAVE');
+  writeText(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, 'data');
+  view.setUint32(40, sampleCount * 2, true);
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const envelope = Math.min(1, sample / 300, (sampleCount - sample) / 300);
+    const value = Math.sin((2 * Math.PI * 440 * sample) / sampleRate) * 0.22 * envelope;
+    view.setInt16(44 + sample * 2, Math.round(value * 32767), true);
+  }
+  return bytes;
+}
+
+if (audioTestButton) {
+  audioTestButton.addEventListener('click', async () => {
+    audioTestButton.disabled = true;
+    try {
+      await audioRuntime.activateFromUserGesture();
+      if (!audioTestClip) {
+        audioTestClip = await audioRuntime.loadClip({
+          id: 'builtin:spatial-audio-test-tone',
+          mimeType: 'audio/wav',
+          bytes: createSpatialTestTone(),
+        });
+      }
+      audioTestVoice?.dispose();
+      const sourcePosition: [number, number, number] = [
+        camera.position[0],
+        camera.position[1],
+        camera.position[2] - 5,
+      ];
+      audioTestVoice = audioRuntime.createVoice(
+        audioTestClip.id,
+        createAudioSourceState(sourcePosition, {
+          gain: 0.5,
+          loop: true,
+          spatialBlend: 1,
+          referenceDistance: 1,
+          maxDistance: 30,
+          rolloff: 1,
+        }),
+      );
+      audioTestVoice.play();
+      audioTestButton.textContent = 'Spatial audio playing';
+      if (import.meta.env.DEV) {
+        const debugWindow = window as Window & {
+          __playerAudioActive?: boolean;
+          __playerAudioVoices?: number;
+          __playerAudioSpatialization?: string;
+          __playerAudioContextState?: string;
+        };
+        debugWindow.__playerAudioActive = audioRuntime.active;
+        debugWindow.__playerAudioVoices = audioRuntime.voiceCount;
+        debugWindow.__playerAudioSpatialization = audioRuntime.capabilities.spatialization;
+        debugWindow.__playerAudioContextState = audioBackend.contextState;
+      }
+    } catch (error) {
+      audioTestButton.textContent = 'Audio test failed';
+      setProjectStatus(error instanceof Error ? error.message : 'Audio test failed', true);
+    } finally {
+      audioTestButton.disabled = false;
+    }
+  });
+}
 
 const engine = new EngineHost({
   rendererBackends: ['webgl2'],
@@ -128,9 +231,12 @@ const physicsReady = createPhysicsWorld({ gravity: [0, -9.81, 0] }).then(
     return null;
   },
 );
-const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
-  'Renderable',
-);
+const Renderable = defineComponent<{
+  geometry: MeshData;
+  material: MaterialDescriptor;
+  worldMatrix?: Float32Array;
+  skinning?: SkinningDescriptor;
+}>('Renderable');
 const addMeshRenderable = (
   position: readonly [number, number, number],
   geometry: MeshData,
@@ -141,6 +247,16 @@ const addMeshRenderable = (
   const entity = runtime.world.createEntity();
   runtime.world.add(entity, Transform, { position, rotation, scale, parent: null });
   runtime.world.add(entity, Renderable, { geometry, material });
+  return entity;
+};
+const addPreparedRenderable = (prepared: PreparedRenderable) => {
+  const entity = runtime.world.createEntity();
+  runtime.world.add(entity, Renderable, {
+    geometry: prepared.geometry,
+    material: prepared.material,
+    ...(prepared.worldMatrix ? { worldMatrix: prepared.worldMatrix } : {}),
+    ...(prepared.skinning ? { skinning: prepared.skinning } : {}),
+  });
   return entity;
 };
 const addRenderable = (
@@ -158,6 +274,7 @@ const sampleEntities = [
   addRenderable([1.25, 0, 0], createCylinderGeometry(), 0x34d399, [0.8, 0.9, 0.8]),
 ];
 const activeProjectEntities: Array<ReturnType<typeof runtime.world.createEntity>> = [];
+let activeAnimations: PreparedAnimationInstance[] = [];
 
 interface PreparedRenderable {
   position: readonly [number, number, number];
@@ -165,6 +282,21 @@ interface PreparedRenderable {
   scale: readonly [number, number, number];
   geometry: MeshData;
   material: MaterialDescriptor;
+  worldMatrix?: Float32Array;
+  skinning?: SkinningDescriptor;
+}
+
+interface PreparedAnimationInstance {
+  readonly nodes: GlbAsset['nodes'];
+  readonly rootMatrix: Float32Array;
+  readonly parentIndices: Int32Array;
+  readonly player: AnimationPlayer;
+  readonly renderablesByNode: ReadonlyMap<number, readonly PreparedRenderable[]>;
+  readonly skinBindings: readonly {
+    readonly nodeIndex: number;
+    readonly skeleton: SkeletonDescriptor;
+    readonly renderables: readonly PreparedRenderable[];
+  }[];
 }
 
 interface TransformSnapshot {
@@ -174,58 +306,6 @@ interface TransformSnapshot {
 }
 
 const glbImporter = new GlbImporter();
-
-function multiplyQuaternion(
-  a: readonly [number, number, number, number],
-  b: readonly [number, number, number, number],
-): [number, number, number, number] {
-  const [ax, ay, az, aw] = a;
-  const [bx, by, bz, bw] = b;
-  return [
-    aw * bx + ax * bw + ay * bz - az * by,
-    aw * by - ax * bz + ay * bw + az * bx,
-    aw * bz + ax * by - ay * bx + az * bw,
-    aw * bw - ax * bx - ay * by - az * bz,
-  ];
-}
-
-function rotateVector(
-  value: readonly [number, number, number],
-  rotation: readonly [number, number, number, number],
-): [number, number, number] {
-  const [x, y, z] = value;
-  const [qx, qy, qz, qw] = rotation;
-  const tx = 2 * (qy * z - qz * y);
-  const ty = 2 * (qz * x - qx * z);
-  const tz = 2 * (qx * y - qy * x);
-  return [
-    x + qw * tx + qy * tz - qz * ty,
-    y + qw * ty + qz * tx - qx * tz,
-    z + qw * tz + qx * ty - qy * tx,
-  ];
-}
-
-function composeTransform(parent: TransformSnapshot, local: TransformSnapshot): TransformSnapshot {
-  const scaledLocal: [number, number, number] = [
-    local.position[0] * parent.scale[0],
-    local.position[1] * parent.scale[1],
-    local.position[2] * parent.scale[2],
-  ];
-  const rotatedLocal = rotateVector(scaledLocal, parent.rotation);
-  return {
-    position: [
-      parent.position[0] + rotatedLocal[0],
-      parent.position[1] + rotatedLocal[1],
-      parent.position[2] + rotatedLocal[2],
-    ],
-    rotation: multiplyQuaternion(parent.rotation, local.rotation),
-    scale: [
-      parent.scale[0] * local.scale[0],
-      parent.scale[1] * local.scale[1],
-      parent.scale[2] * local.scale[2],
-    ],
-  };
-}
 
 function readQuaternion(value: unknown): readonly [number, number, number, number] {
   return Array.isArray(value) && value.length === 4 && value.every(Number.isFinite)
@@ -335,8 +415,54 @@ function decodeBase64(value: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function buildParentIndices(nodes: GlbAsset['nodes']): Int32Array {
+  const parents = new Int32Array(nodes.length).fill(-1);
+  for (const [parentIndex, node] of nodes.entries()) {
+    for (const childIndex of node.children) {
+      if (parents[childIndex] !== -1)
+        throw new Error(`GLB node ${childIndex} has more than one parent`);
+      parents[childIndex] = parentIndex;
+    }
+  }
+  return parents;
+}
+
+function computeAnimatedWorldMatrices(
+  nodes: GlbAsset['nodes'],
+  parentIndices: Int32Array,
+  rootMatrix: Float32Array,
+  pose: ReadonlyMap<number, Partial<NodeTransform>> = new Map(),
+): Map<number, Float32Array> {
+  const localMatrices = nodes.map((node, nodeIndex) => {
+    const animated = pose.get(nodeIndex);
+    return composeTransformMatrix({
+      translation: animated?.translation ?? node.translation,
+      rotation: animated?.rotation ?? node.rotation,
+      scale: animated?.scale ?? node.scale,
+    });
+  });
+  const worldMatrices = new Map<number, Float32Array>();
+  const visiting = new Set<number>();
+  const compute = (nodeIndex: number): Float32Array => {
+    const cached = worldMatrices.get(nodeIndex);
+    if (cached) return cached;
+    if (visiting.has(nodeIndex))
+      throw new Error(`GLB node hierarchy contains a cycle at node ${nodeIndex}`);
+    visiting.add(nodeIndex);
+    const parentIndex = parentIndices[nodeIndex]!;
+    const parentMatrix = parentIndex < 0 ? rootMatrix : compute(parentIndex);
+    const world = multiplyTransformMatrices(parentMatrix, localMatrices[nodeIndex]!);
+    visiting.delete(nodeIndex);
+    worldMatrices.set(nodeIndex, world);
+    return world;
+  };
+  for (let nodeIndex = 0; nodeIndex < nodes.length; nodeIndex++) compute(nodeIndex);
+  return worldMatrices;
+}
+
 async function prepareWorldEntities(document: WorldDocument) {
   const prepared: PreparedRenderable[] = [];
+  const animations: PreparedAnimationInstance[] = [];
   let unsupported = 0;
   const assetRecords = new Map<string, AssetRecord>();
   for (const value of document.assets) {
@@ -385,44 +511,100 @@ async function prepareWorldEntities(document: WorldDocument) {
       const asset = await loadGlbAsset(assetId);
       const record = assetRecords.get(assetId);
       if (!record) throw new Error(`GLB asset record is missing: ${assetId}`);
-      const childIndices = new Set<number>();
-      for (const node of asset.nodes) for (const child of node.children) childIndices.add(child);
+      const parentIndices = buildParentIndices(asset.nodes);
+      const rootMatrix = composeTransformMatrix({
+        translation: rootTransform.position,
+        rotation: rootTransform.rotation,
+        scale: rootTransform.scale,
+      });
+      const worldMatrices = computeAnimatedWorldMatrices(asset.nodes, parentIndices, rootMatrix);
+      const renderablesByNode = new Map<number, PreparedRenderable[]>();
+      const skinBindings: Array<{
+        nodeIndex: number;
+        skeleton: SkeletonDescriptor;
+        renderables: PreparedRenderable[];
+      }> = [];
       const roots = asset.nodes
         .map((_, index) => index)
-        .filter((index) => !childIndices.has(index));
+        .filter((index) => parentIndices[index] === -1);
       const visited = new Set<number>();
-      const visit = (nodeIndex: number, parent: TransformSnapshot): void => {
+      const visit = (nodeIndex: number): void => {
         if (visited.has(nodeIndex)) return;
         visited.add(nodeIndex);
         const node = asset.nodes[nodeIndex];
         if (!node) return;
-        const worldTransform = composeTransform(parent, {
-          position: node.translation,
-          rotation: node.rotation,
-          scale: node.scale,
-        });
         if (node.mesh !== null) {
           const mesh = asset.meshes[node.mesh];
           if (!mesh) {
             unsupported += 1;
           } else {
+            const nodeWorld = worldMatrices.get(nodeIndex)!;
+            const nodeRenderables: PreparedRenderable[] = [];
             for (const primitive of mesh.primitives) {
               const material =
                 primitive.material === null ? undefined : asset.materials[primitive.material];
-              prepared.push({
-                position: worldTransform.position,
-                rotation: worldTransform.rotation,
-                scale: worldTransform.scale,
+              const skin = node.skin === null ? undefined : asset.skins[node.skin];
+              let skinning: SkinningDescriptor | undefined;
+              if (skin) {
+                if (!primitive.joints0 || !primitive.weights0)
+                  throw new Error(`Skinned GLB node ${nodeIndex} is missing joint attributes`);
+                skinning = {
+                  jointIndices: primitive.joints0,
+                  jointWeights: primitive.weights0,
+                  palette: new Float32Array(skin.joints.length * 16),
+                };
+              }
+              const renderable: PreparedRenderable = {
+                position: [nodeWorld[12]!, nodeWorld[13]!, nodeWorld[14]!],
+                rotation: [0, 0, 0, 1],
+                scale: [1, 1, 1],
                 geometry: primitive.mesh,
                 material: materialFromGlb(asset, material, assetId, record.contentHash),
+                worldMatrix: nodeWorld.slice(),
+                ...(skinning ? { skinning } : {}),
+              };
+              prepared.push(renderable);
+              nodeRenderables.push(renderable);
+            }
+            renderablesByNode.set(nodeIndex, nodeRenderables);
+            if (node.skin !== null) {
+              const skin = asset.skins[node.skin];
+              if (!skin)
+                throw new Error(`GLB node ${nodeIndex} references missing skin ${node.skin}`);
+              skinBindings.push({
+                nodeIndex,
+                skeleton: {
+                  jointNodeIndices: skin.joints,
+                  inverseBindMatrices: skin.inverseBindMatrices,
+                },
+                renderables: nodeRenderables,
               });
             }
           }
         }
-        for (const child of node.children) visit(child, worldTransform);
+        for (const child of node.children) visit(child);
       };
-      for (const root of roots) visit(root, rootTransform);
+      for (const root of roots) visit(root);
       if (roots.length === 0 && asset.nodes.length > 0) unsupported += 1;
+      for (const binding of skinBindings) {
+        const meshWorld = worldMatrices.get(binding.nodeIndex);
+        if (!meshWorld)
+          throw new Error(`GLB skinned mesh node ${binding.nodeIndex} has no world matrix`);
+        const palette = computeSkinningPalette(binding.skeleton, worldMatrices, meshWorld);
+        for (const renderable of binding.renderables) renderable.skinning?.palette.set(palette);
+      }
+      if (asset.animations.length > 0) {
+        const player = new AnimationPlayer();
+        player.play(asset.animations[0]!, { loop: true });
+        animations.push({
+          nodes: asset.nodes,
+          rootMatrix,
+          parentIndices,
+          player,
+          renderablesByNode,
+          skinBindings,
+        });
+      }
     } catch {
       unsupported += 1;
     }
@@ -489,7 +671,7 @@ async function prepareWorldEntities(document: WorldDocument) {
       },
     });
   }
-  return { prepared, unsupported };
+  return { prepared, unsupported, animations };
 }
 
 type PlayerVoxelChunk = Awaited<ReturnType<typeof openVoxelWorldProject>>['chunks'][number];
@@ -872,6 +1054,7 @@ async function openProjectFolder(): Promise<void> {
   // until the user has selected a directory and we can begin reading it.
   setProjectProgress(0, '', false);
   setProjectStatus('Choose a project folder…');
+  let stagedAnimations: PreparedAnimationInstance[] = [];
   try {
     const directory = await picker({ mode: 'read' });
     projectDirectorySelected = true;
@@ -881,6 +1064,7 @@ async function openProjectFolder(): Promise<void> {
     setProjectProgress(52, 'Preparing scene entities and GLB models');
     await yieldToBrowser();
     const world = await prepareWorldEntities(project.document);
+    stagedAnimations = world.animations;
     setProjectProgress(68, 'Preparing voxel streaming window');
     await yieldToBrowser();
     const voxelStreamCandidates = project.chunks;
@@ -900,16 +1084,13 @@ async function openProjectFolder(): Promise<void> {
     voxelStream = null;
     for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
     activeProjectEntities.length = 0;
-    for (const entity of world.prepared) {
-      activeProjectEntities.push(
-        addMeshRenderable(
-          entity.position,
-          entity.geometry,
-          entity.material,
-          entity.rotation,
-          entity.scale,
-        ),
-      );
+    for (const entity of world.prepared) activeProjectEntities.push(addPreparedRenderable(entity));
+    for (const instance of activeAnimations) instance.player.dispose();
+    activeAnimations = stagedAnimations;
+    stagedAnimations = [];
+    if (import.meta.env.DEV) {
+      const debugWindow = window as Window & { __playerActiveAnimations?: number };
+      debugWindow.__playerActiveAnimations = activeAnimations.length;
     }
     const chunkBounds = project.chunks.flatMap((chunk) => {
       const origin = [
@@ -967,6 +1148,7 @@ async function openProjectFolder(): Promise<void> {
           : ''),
     );
   } catch (error) {
+    for (const instance of stagedAnimations) instance.player.dispose();
     if (error instanceof DOMException && error.name === 'AbortError') {
       setProjectProgress(0, '', false);
       setProjectStatus('Project selection cancelled.');
@@ -1053,6 +1235,7 @@ const renderFrame = (now: number) => {
   updateFps(now);
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
+  audioRuntime.setListener({ position: camera.position, orientation: camera.rotation });
   runtime.advance(delta);
   if (streamAnchor && cameraPanKeys.size > 0 && delta > 0) {
     const distance = Math.min(delta, 0.1) * 24;
@@ -1076,16 +1259,54 @@ const renderFrame = (now: number) => {
     physicsAccumulator -= physicsFixedStep;
   }
 
+  for (const instance of activeAnimations) {
+    const pose = instance.player.update(delta) as Map<number, Partial<NodeTransform>>;
+    const worldMatrices = computeAnimatedWorldMatrices(
+      instance.nodes,
+      instance.parentIndices,
+      instance.rootMatrix,
+      pose,
+    );
+    for (const [nodeIndex, renderables] of instance.renderablesByNode) {
+      const worldMatrix = worldMatrices.get(nodeIndex);
+      if (!worldMatrix) continue;
+      for (const renderable of renderables) {
+        renderable.worldMatrix?.set(worldMatrix);
+        renderable.position = [worldMatrix[12]!, worldMatrix[13]!, worldMatrix[14]!];
+      }
+    }
+    for (const binding of instance.skinBindings) {
+      const meshWorld = worldMatrices.get(binding.nodeIndex);
+      if (!meshWorld) continue;
+      const palette = computeSkinningPalette(binding.skeleton, worldMatrices, meshWorld);
+      for (const renderable of binding.renderables) renderable.skinning?.palette.set(palette);
+      if (import.meta.env.DEV) {
+        const debugWindow = window as Window & {
+          __playerAnimationFrames?: number;
+          __playerSkinPaletteX?: number;
+        };
+        debugWindow.__playerAnimationFrames = (debugWindow.__playerAnimationFrames ?? 0) + 1;
+        debugWindow.__playerSkinPaletteX = palette[12] ?? 0;
+      }
+    }
+  }
+
   const objects: RenderObject[] = [];
   runtime.world.query(Renderable).forEach((entity, renderableValue) => {
-    const renderable = renderableValue as { geometry: MeshData; material: MaterialDescriptor };
-    const worldMatrix = runtime.hierarchy.getWorldMatrix(entity);
+    const renderable = renderableValue as {
+      geometry: MeshData;
+      material: MaterialDescriptor;
+      worldMatrix?: Float32Array;
+      skinning?: SkinningDescriptor;
+    };
+    const worldMatrix = renderable.worldMatrix ?? runtime.hierarchy.getWorldMatrix(entity);
     if (!worldMatrix) return;
     objects.push({
       id: entity,
       geometry: renderable.geometry,
       material: renderable.material,
       worldMatrix,
+      ...(renderable.skinning ? { skinning: renderable.skinning } : {}),
     });
   });
 
@@ -1099,6 +1320,10 @@ const onPageHide = () => {
   pageDisposed = true;
   voxelStream?.dispose();
   voxelStream = null;
+  for (const instance of activeAnimations) instance.player.dispose();
+  activeAnimations = [];
+  audioTestVoice?.dispose();
+  audioRuntime.dispose();
   voxelColliderSet?.dispose();
   physicsWorld?.dispose();
   // Release WebGL resources synchronously during pagehide; EngineHost disposal

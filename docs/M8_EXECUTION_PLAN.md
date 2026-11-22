@@ -20,14 +20,14 @@ M8 delivers a complete first skeletal-animation path and a browser spatial-audio
 
 ## Sequencing
 
-| Phase                   | Work                                                                                 | Exit evidence                                                          | Status                                |
-| ----------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------- |
-| 0. Contracts            | This spec, plan, ADR 0013, package boundaries, error/limit policy                    | Docs reviewed, dependency direction checked, package API tests planned | Complete                              |
-| 1. CPU animation        | Track validation/sampling, quaternion interpolation, pose blend, playback/cross-fade | Deterministic unit tests and typed public API                          | Complete                              |
-| 2. GLB animation import | Skin joints, inverse bind matrices, animation sampler/channel data                   | Valid/malformed fixtures, accessor bounds and capability diagnostics   | Complete for M8 TRS + 4 influences    |
-| 3. Renderer skinning    | Palette calculation integration and backend upload                                   | Matrix fixtures, WebGL2 skinned-character E2E, GPU resource cleanup    | Not started                           |
-| 4. Spatial audio        | Audio contracts, Web Audio adapter, decode/voice lifecycle, attenuation              | Fake backend contract tests and browser audio lifecycle E2E            | Contracts complete; Web Audio pending |
-| 5. Acceptance/closeout  | Player example, docs, performance/resource evidence, owner review                    | Exact-head CI, Chromium review, explicit owner acceptance              | Not started                           |
+| Phase                   | Work                                                                                 | Exit evidence                                                          | Status                             |
+| ----------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ---------------------------------- |
+| 0. Contracts            | This spec, plan, ADR 0013, package boundaries, error/limit policy                    | Docs reviewed, dependency direction checked, package API tests planned | Complete                           |
+| 1. CPU animation        | Track validation/sampling, quaternion interpolation, pose blend, playback/cross-fade | Deterministic unit tests and typed public API                          | Complete                           |
+| 2. GLB animation import | Skin joints, inverse bind matrices, animation sampler/channel data                   | Valid/malformed fixtures, accessor bounds and capability diagnostics   | Complete for M8 TRS + 4 influences |
+| 3. Renderer skinning    | Palette calculation integration and backend upload                                   | Matrix fixtures, WebGL2 skinned-character E2E, GPU resource cleanup    | Implemented; Chromium E2E passed   |
+| 4. Spatial audio        | Audio contracts, Web Audio adapter, decode/voice lifecycle, attenuation              | Fake backend contract tests and browser audio lifecycle E2E            | Implemented; Chromium E2E passed   |
+| 5. Acceptance/closeout  | Player example, docs, performance/resource evidence, owner review                    | Exact-head CI, Chromium review, explicit owner acceptance              | In progress; owner review pending  |
 
 ## Architecture rules
 
@@ -100,3 +100,17 @@ Morph targets, retargeting, animation graph editor, root-motion physics, IK/ragd
 
 - `AudioRuntime.dispose()` now waits for pending clip decodes to settle before disposing the backend. Late decoded handles are released and report `DISPOSED`, avoiding a decode-completion-after-backend-disposal leak.
 - Added an explicit in-flight decode teardown test. Audio package suite is now 7 tests; workspace total is 307.
+
+### 2026-11-22 — Renderer skinning, Player animation and Web Audio backend
+
+- Added backend-neutral `SkinningDescriptor` to render objects and strict validation for four joint influences per vertex, finite palette matrices, in-range joint indices and positive aggregate weights. Three.js adapter uploads `skinIndex` / normalized `skinWeight`, owns `SkinnedMesh` / `Skeleton` resources, updates the palette each frame and releases bones/skeletons with the render object.
+- Player now builds the imported node-parent graph, composes animated world matrices, advances the first imported clip in a loop, calculates `inverse(meshWorld) * jointWorld * inverseBindMatrix`, and updates skinned renderables. No animation graph/editor, clip selection UI or morph targets are included.
+- Added a Web Audio backend with lazy AudioContext creation, explicit user-gesture resume, decoded AudioBuffer clips, bounded runtime voices, source playback/pause/stop/dispose, panning and inverse-distance attenuation. Player has a user-gesture spatial-audio smoke control; this is an acceptance harness, not a persisted audio-component authoring workflow.
+- Added renderer deformation, animated GLB Player and Web Audio browser tests. Player Chromium suite passed 5/5, including renderer resource teardown; workspace Vitest passed 313/313. `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm build` passed. Full workspace Chromium suite and exact-head CI are still pending.
+- Current limitations: GPU skinning is verified in Chromium with a deterministic synthetic GLB; no physical Android/iOS GPU validation or performance profiling yet. Web Audio browser coverage is Chromium-only; no device/browser matrix, audio listener/camera synchronization or scene-authored audio sources yet. M8 remains unaccepted and unmerged.
+
+### 2026-11-22 — M8 browser regression sweep
+
+- The first combined invocation of several E2E files had 3 `ERR_CONNECTION_REFUSED` failures after the Player Vite server exited during the long combined run; this was a test-host/server lifecycle failure, not an assertion failure. Each affected suite was rerun independently.
+- Independent Chromium suite results: Player 5/5, Editor 14/14, assets/GLB/project persistence 8/8, physics benchmark + playground 2/2, browser-memory lifecycle 1/1, diagnostics 2/2. All 32 tests passed across the isolated runs.
+- Exact-head GitHub Actions has not yet been run. M8 remains active, unmerged and not owner-accepted. Remaining acceptance gaps include physical-device validation/profiling, audio listener-camera synchronization and a scene-authored audio source workflow.

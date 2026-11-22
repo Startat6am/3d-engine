@@ -303,6 +303,12 @@ importers:
 
   apps/player:
     dependencies:
+      '@engine/audio':
+        specifier: workspace:*
+        version: link:../../packages/engine-audio
+      '@engine/animation':
+        specifier: workspace:*
+        version: link:../../packages/engine-animation
       '@engine/assets':
         specifier: workspace:*
         version: link:../../packages/engine-assets

@@ -4,6 +4,8 @@ import {
   AnimationPlayer,
   blendAnimationPoses,
   computeSkinningPalette,
+  composeTransformMatrix,
+  multiplyTransformMatrices,
   sampleAnimationTrack,
   validateAnimationClip,
   type AnimationClip,
@@ -188,5 +190,22 @@ describe('skinning palette', () => {
         identity,
       ),
     ).toThrowError(AnimationError);
+  });
+});
+
+describe('TRS matrix composition', () => {
+  it('composes translation, rotation and scale in column-major order', () => {
+    const matrix = composeTransformMatrix({
+      translation: [2, 3, 4],
+      rotation: [0, 0, 0, 1],
+      scale: [2, 3, 4],
+    });
+    expect([...matrix]).toEqual([2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 4, 0, 2, 3, 4, 1]);
+    const child = composeTransformMatrix({
+      translation: [1, 0, 0],
+      rotation: [0, 0, 0, 1],
+      scale: [1, 1, 1],
+    });
+    expect(multiplyTransformMatrices(matrix, child)[12]).toBe(4);
   });
 });

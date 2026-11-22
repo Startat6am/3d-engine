@@ -9,8 +9,9 @@ import type {
   RenderObject,
   RendererPickHit,
   TextureSource,
+  SkinningDescriptor,
 } from './contracts.js';
-import { RendererError } from './contracts.js';
+import { RendererError, validateSkinningDescriptor } from './contracts.js';
 import { applyMaterialState } from './material-state.js';
 export * from './contracts.js';
 
@@ -25,8 +26,11 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #objects = new Map<
     string,
     {
-      readonly mesh: THREE.Mesh;
+      mesh: THREE.Mesh;
+      bones: THREE.Bone[];
+      skeleton: THREE.Skeleton | null;
       geometrySource: object;
+      skinSource: SkinningDescriptor | undefined;
       materialSource: object;
       geometryLease: AssetResourceLease<THREE.BufferGeometry>;
       materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
@@ -39,6 +43,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #materialCache = new AssetResourceCache<THREE.MeshStandardMaterial>();
   readonly #textureCache = new AssetResourceCache<THREE.Texture>();
   readonly #geometryKeys = new WeakMap<object, string>();
+  readonly #skinningKeys = new WeakMap<object, string>();
   readonly #validatedGeometry = new WeakSet<object>();
   readonly #materialKeys = new WeakMap<object, string>();
   #nextResourceKey = 1;
@@ -117,6 +122,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       this.#syncObjects(scene.objects);
       this.#lastObjects = scene.objects;
     }
+    this.#updateSkinning(scene.objects);
     this.#scene.background = new THREE.Color(scene.background);
     const camera = this.#applyCamera(scene.camera);
     this.#activeCamera = camera;
@@ -192,95 +198,85 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         this.#objects.delete(id);
       }
     for (const item of objects) {
+      this.#validateGeometryOnce(item.geometry);
+      if (item.skinning) validateSkinningDescriptor(item.geometry, item.skinning);
       let entry = this.#objects.get(item.id);
-      let materialChanged = false;
-      const geometryKey = this.#keyFor(item.geometry, this.#geometryKeys, 'geometry');
+      const skinKey = item.skinning
+        ? this.#keyFor(item.skinning, this.#skinningKeys, 'skinning')
+        : 'static';
+      const geometryKey = `${this.#keyFor(item.geometry, this.#geometryKeys, 'geometry')}:${skinKey}`;
       const materialKey = this.#keyFor(item.material, this.#materialKeys, 'material');
+      let materialChanged = false;
+
       if (!entry) {
-        this.#validateGeometryOnce(item.geometry);
         const geometryLease = this.#geometryCache.acquireSync(
           geometryKey,
-          () => {
-            const geometry = new THREE.BufferGeometry();
-            geometry.setAttribute(
-              'position',
-              new THREE.BufferAttribute(item.geometry.positions, 3),
-            );
-            geometry.setAttribute('normal', new THREE.BufferAttribute(item.geometry.normals, 3));
-            if (item.geometry.uvs) {
-              const uv = new THREE.BufferAttribute(item.geometry.uvs, 2);
-              geometry.setAttribute('uv', uv);
-              geometry.setAttribute('uv2', uv);
-            }
-            geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
-            return geometry;
-          },
+          () => this.#createGeometry(item.geometry, item.skinning),
           (geometry) => geometry.dispose(),
         );
         let materialLease: AssetResourceLease<THREE.MeshStandardMaterial> | undefined;
-        let mesh: THREE.Mesh;
         try {
           materialLease = this.#materialCache.acquireSync(
             materialKey,
             () => new THREE.MeshStandardMaterial(),
             (material) => material.dispose(),
           );
-          mesh = new THREE.Mesh(geometryLease.resource, materialLease.resource);
-          mesh.userData['engineEntityId'] = item.id;
+          const created = this.#createMesh(
+            item.id,
+            geometryLease.resource,
+            materialLease.resource,
+            item.skinning,
+          );
+          entry = {
+            mesh: created.mesh,
+            bones: created.bones,
+            skeleton: created.skeleton,
+            active: true,
+            textureSources: new Map(),
+            textureLeases: new Map(),
+            geometrySource: item.geometry,
+            skinSource: item.skinning,
+            materialSource: item.material,
+            geometryLease,
+            materialLease,
+          };
+          this.#objects.set(item.id, entry);
+          this.#scene.add(entry.mesh);
         } catch (error) {
           materialLease?.release();
           geometryLease.release();
           throw error;
         }
         materialChanged = true;
-        entry = {
-          mesh,
-          active: true,
-          textureSources: new Map(),
-          textureLeases: new Map(),
-          geometrySource: item.geometry,
-          materialSource: item.material,
-          geometryLease,
-          materialLease,
-        };
-        this.#objects.set(item.id, entry);
-        this.#scene.add(mesh);
       } else {
-        // Acquire replacements before releasing the current leases. If creating either
-        // resource fails, the existing mesh remains valid and its leases stay intact.
+        const geometryChanged =
+          entry.geometrySource !== item.geometry || entry.skinSource !== item.skinning;
+        const materialChangedNow = entry.materialSource !== item.material;
         let nextGeometryLease: AssetResourceLease<THREE.BufferGeometry> | undefined;
         let nextMaterialLease: AssetResourceLease<THREE.MeshStandardMaterial> | undefined;
+        let replacement:
+          { mesh: THREE.Mesh; bones: THREE.Bone[]; skeleton: THREE.Skeleton | null } | undefined;
         try {
-          if (entry.geometrySource !== item.geometry) {
-            this.#validateGeometryOnce(item.geometry);
+          if (geometryChanged) {
             nextGeometryLease = this.#geometryCache.acquireSync(
               geometryKey,
-              () => {
-                const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute(
-                  'position',
-                  new THREE.BufferAttribute(item.geometry.positions, 3),
-                );
-                geometry.setAttribute(
-                  'normal',
-                  new THREE.BufferAttribute(item.geometry.normals, 3),
-                );
-                if (item.geometry.uvs) {
-                  const uv = new THREE.BufferAttribute(item.geometry.uvs, 2);
-                  geometry.setAttribute('uv', uv);
-                  geometry.setAttribute('uv2', uv);
-                }
-                geometry.setIndex(new THREE.BufferAttribute(item.geometry.indices, 1));
-                return geometry;
-              },
+              () => this.#createGeometry(item.geometry, item.skinning),
               (geometry) => geometry.dispose(),
             );
           }
-          if (entry.materialSource !== item.material) {
+          if (materialChangedNow) {
             nextMaterialLease = this.#materialCache.acquireSync(
               materialKey,
               () => new THREE.MeshStandardMaterial(),
               (material) => material.dispose(),
+            );
+          }
+          if (entry.skinSource !== item.skinning) {
+            replacement = this.#createMesh(
+              item.id,
+              nextGeometryLease?.resource ?? entry.geometryLease.resource,
+              nextMaterialLease?.resource ?? entry.materialLease.resource,
+              item.skinning,
             );
           }
         } catch (error) {
@@ -288,25 +284,36 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
           nextMaterialLease?.release();
           throw error;
         }
+        if (replacement) {
+          this.#scene.remove(entry.mesh);
+          this.#disposeSkin(entry);
+          entry.mesh = replacement.mesh;
+          entry.bones = replacement.bones;
+          entry.skeleton = replacement.skeleton;
+          entry.skinSource = item.skinning;
+          this.#scene.add(entry.mesh);
+        } else if (nextGeometryLease) {
+          entry.mesh.geometry = nextGeometryLease.resource;
+        }
         if (nextGeometryLease) {
           const previousLease = entry.geometryLease;
           entry.geometryLease = nextGeometryLease;
           entry.geometrySource = item.geometry;
-          entry.mesh.geometry = nextGeometryLease.resource;
           previousLease.release();
         }
         if (nextMaterialLease) {
-          materialChanged = true;
           const previousLease = entry.materialLease;
           for (const textureLease of entry.textureLeases.values()) textureLease.release();
           entry.textureLeases.clear();
           entry.textureSources.clear();
           entry.materialLease = nextMaterialLease;
           entry.materialSource = item.material;
-          entry.mesh.material = nextMaterialLease.resource;
+          if (!replacement) entry.mesh.material = nextMaterialLease.resource;
           previousLease.release();
+          materialChanged = true;
         }
       }
+
       const mesh = entry.mesh;
       if (materialChanged) {
         const material = entry.materialLease.resource;
@@ -336,6 +343,100 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
         mesh.scale.set(...item.scale);
       }
     }
+  }
+
+  #createGeometry(geometryData: MeshData, skinning?: SkinningDescriptor): THREE.BufferGeometry {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(geometryData.positions, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(geometryData.normals, 3));
+    if (geometryData.uvs) {
+      const uv = new THREE.BufferAttribute(geometryData.uvs, 2);
+      geometry.setAttribute('uv', uv);
+      geometry.setAttribute('uv2', uv);
+    }
+    geometry.setIndex(new THREE.BufferAttribute(geometryData.indices, 1));
+    if (skinning) {
+      const normalizedWeights = skinning.jointWeights.slice();
+      for (let vertex = 0; vertex < normalizedWeights.length; vertex += 4) {
+        const total =
+          normalizedWeights[vertex]! +
+          normalizedWeights[vertex + 1]! +
+          normalizedWeights[vertex + 2]! +
+          normalizedWeights[vertex + 3]!;
+        for (let influence = 0; influence < 4; influence++)
+          normalizedWeights[vertex + influence] = normalizedWeights[vertex + influence]! / total;
+      }
+      geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinning.jointIndices, 4));
+      geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(normalizedWeights, 4));
+    }
+    return geometry;
+  }
+
+  #createMesh(
+    id: string,
+    geometry: THREE.BufferGeometry,
+    material: THREE.MeshStandardMaterial,
+    skinning?: SkinningDescriptor,
+  ): { mesh: THREE.Mesh; bones: THREE.Bone[]; skeleton: THREE.Skeleton | null } {
+    if (!skinning) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.userData['engineEntityId'] = id;
+      return { mesh, bones: [], skeleton: null };
+    }
+    const bones: THREE.Bone[] = [];
+    let skeleton: THREE.Skeleton | null = null;
+    try {
+      const jointCount = skinning.palette.length / 16;
+      for (let joint = 0; joint < jointCount; joint++) {
+        const bone = new THREE.Bone();
+        bone.matrixAutoUpdate = false;
+        bone.matrix.fromArray(skinning.palette, joint * 16);
+        bone.matrixWorldNeedsUpdate = true;
+        bones.push(bone);
+        this.#scene.add(bone);
+      }
+      skeleton = new THREE.Skeleton(
+        bones,
+        bones.map(() => new THREE.Matrix4()),
+      );
+      const mesh = new THREE.SkinnedMesh(geometry, material);
+      mesh.bind(skeleton, new THREE.Matrix4());
+      mesh.frustumCulled = false;
+      mesh.userData['engineEntityId'] = id;
+      return { mesh, bones, skeleton };
+    } catch (error) {
+      for (const bone of bones) this.#scene.remove(bone);
+      skeleton?.dispose();
+      throw error;
+    }
+  }
+
+  #updateSkinning(objects: readonly RenderObject[]): void {
+    for (const item of objects) {
+      if (!item.skinning) continue;
+      const entry = this.#objects.get(item.id);
+      if (
+        !entry?.skeleton ||
+        entry.skinSource !== item.skinning ||
+        item.skinning.palette.length !== entry.bones.length * 16
+      ) {
+        throw new RendererError(
+          'INVALID_SKIN',
+          `Render object ${item.id} has no matching skinned mesh resources`,
+        );
+      }
+      for (let joint = 0; joint < entry.bones.length; joint++) {
+        entry.bones[joint]!.matrix.fromArray(item.skinning.palette, joint * 16);
+        entry.bones[joint]!.matrixWorldNeedsUpdate = true;
+      }
+    }
+  }
+
+  #disposeSkin(entry: { bones: THREE.Bone[]; skeleton: THREE.Skeleton | null }): void {
+    for (const bone of entry.bones) this.#scene.remove(bone);
+    entry.skeleton?.dispose();
+    entry.bones = [];
+    entry.skeleton = null;
   }
 
   #syncTexture(
@@ -514,6 +615,8 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
 
   #releaseObject(entry: {
     readonly mesh: THREE.Mesh;
+    bones: THREE.Bone[];
+    skeleton: THREE.Skeleton | null;
     readonly geometryLease: AssetResourceLease<THREE.BufferGeometry>;
     readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
     textureSources: Map<TextureChannel, TextureSource>;
@@ -525,6 +628,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     for (const lease of entry.textureLeases.values()) lease.release();
     entry.textureLeases.clear();
     entry.textureSources.clear();
+    this.#disposeSkin(entry);
     entry.geometryLease.release();
     entry.materialLease.release();
   }

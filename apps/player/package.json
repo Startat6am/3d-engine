@@ -10,7 +10,9 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@engine/animation": "workspace:*",
     "@engine/assets": "workspace:*",
+    "@engine/audio": "workspace:*",
     "@engine/core": "workspace:*",
     "@engine/geometry": "workspace:*",
     "@engine/gltf-importer": "workspace:*",
