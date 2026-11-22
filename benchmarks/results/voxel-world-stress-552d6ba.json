@@ -1,0 +1,117 @@
+{
+  "benchmark": "choreon-voxel-world-stress-v1",
+  "generatedFixtures": true,
+  "configuration": {
+    "chunkDimensions": [
+      16,
+      16,
+      16
+    ],
+    "chunkCells": 4096,
+    "voxelSize": 1,
+    "repeats": 8,
+    "lifecycleCycles": 32
+  },
+  "environment": {
+    "node": "22.23.5",
+    "platform": "linux",
+    "arch": "x64",
+    "cpuCount": 4,
+    "totalMemoryMiB": 15983
+  },
+  "memoryBeforeMiB": {
+    "rss": 44.27,
+    "heapTotal": 5.35,
+    "heapUsed": 4.23,
+    "external": 1.37,
+    "arrayBuffers": 0.05
+  },
+  "memoryAfterMiB": {
+    "rss": 96.87,
+    "heapTotal": 60.23,
+    "heapUsed": 34.96,
+    "external": 7.81,
+    "arrayBuffers": 6.41
+  },
+  "meshing": [
+    {
+      "fixture": "empty",
+      "occupiedCells": 0,
+      "chunkPayloadBytes": 8192,
+      "meshParts": 0,
+      "exposedFaces": 0,
+      "geometryBytes": 0,
+      "repeats": 8,
+      "wallMs": {
+        "min": 0.023,
+        "median": 0.079,
+        "p95": 0.281,
+        "max": 0.338
+      }
+    },
+    {
+      "fixture": "single",
+      "occupiedCells": 1,
+      "chunkPayloadBytes": 8192,
+      "meshParts": 1,
+      "exposedFaces": 6,
+      "geometryBytes": 912,
+      "repeats": 8,
+      "wallMs": {
+        "min": 0.089,
+        "median": 0.092,
+        "p95": 0.21,
+        "max": 0.369
+      }
+    },
+    {
+      "fixture": "solid",
+      "occupiedCells": 4096,
+      "chunkPayloadBytes": 8192,
+      "meshParts": 1,
+      "exposedFaces": 1536,
+      "geometryBytes": 233472,
+      "repeats": 8,
+      "wallMs": {
+        "min": 1.342,
+        "median": 1.508,
+        "p95": 4.533,
+        "max": 4.734
+      }
+    },
+    {
+      "fixture": "checkerboard",
+      "occupiedCells": 2048,
+      "chunkPayloadBytes": 8192,
+      "meshParts": 1,
+      "exposedFaces": 12288,
+      "geometryBytes": 1867776,
+      "repeats": 8,
+      "wallMs": {
+        "min": 10.941,
+        "median": 11.765,
+        "p95": 12.496,
+        "max": 15.661
+      }
+    }
+  ],
+  "lifecycle": {
+    "cycles": 32,
+    "totalExposedFaces": 192,
+    "peakResidentChunks": 1,
+    "releasedResidents": 32,
+    "wallMs": {
+      "min": 15.232,
+      "median": 16.189,
+      "p95": 16.297,
+      "max": 17.727
+    },
+    "schedulerDisposed": true,
+    "residentChunksAfterDispose": 0
+  },
+  "notes": [
+    "CPU meshing wall time is measured synchronously; no renderer, GPU upload, physics cooking, or disk I/O is included.",
+    "Lifecycle timing includes snapshot creation, one revisioned edit, cooperative async meshing, scheduler publication, and explicit eviction.",
+    "Results are diagnostic raw measurements, not portable performance guarantees or CI thresholds."
+  ]
+}
