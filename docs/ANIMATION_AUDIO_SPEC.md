@@ -134,7 +134,7 @@ Integration/acceptance:
 ## 10. Known baseline gaps
 
 At the M8 planning baseline:
-- `@engine/animation` and `@engine/audio` packages do not exist.
+- `@engine/animation` now exists with validated animation track/clip/skin data contracts and keyframe sampling; GLB import, playback system and renderer integration remain unimplemented. `@engine/audio` does not exist.
 - `GlbAsset` currently exposes meshes, materials, nodes, images, samplers and textures only; no skins or animation channels are imported.
 - The ECS scheduler exposes pre-update, fixed-update, variable-update, post-update and transform-propagation phases, suitable for the planned ordering but not yet integrated with animation/audio.
 - Renderer render objects currently carry geometry/material and transform data; no skinning palette contract exists.
