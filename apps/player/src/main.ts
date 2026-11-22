@@ -21,7 +21,7 @@ import {
   type RenderObject,
   type TextureSource,
 } from '@engine/renderer';
-import { meshVoxelChunkAsync } from '@engine/voxel';
+import { createVoxelChunkSnapshot, meshVoxelChunkAsync } from '@engine/voxel';
 import { WorldChunkScheduler, type ChunkCoordinate3 } from '@engine/world';
 import { selectVoxelStreamingWindow } from './voxel-streaming.js';
 import {
@@ -510,17 +510,111 @@ interface VoxelStreamResident {
   readonly byteLength: number;
 }
 
+let projectDirectorySelected = false;
 let voxelStream: {
   update(position: readonly [number, number, number]): void;
   dispose(): void;
 } | null = null;
+
+function createSampleVoxelScene(): {
+  readonly candidates: readonly PlayerVoxelChunk[];
+  readonly loadChunk: (coordinate: ChunkCoordinate3) => Promise<PlayerVoxelChunkSnapshot>;
+  readonly project: VoxelStreamProject;
+} {
+  const palette = [
+    { material: { kind: 'builtin' as const, key: 'grass' } },
+    { material: { kind: 'builtin' as const, key: 'dirt' } },
+    { material: { kind: 'builtin' as const, key: 'stone' } },
+  ];
+  const snapshots = new Map<string, PlayerVoxelChunkSnapshot>();
+  const candidates: PlayerVoxelChunk[] = [];
+
+  // A 9×7 field of 16³ chunks gives the Player enough room to demonstrate
+  // camera-window streaming, eviction, and re-entry without opening a folder.
+  for (let chunkZ = -3; chunkZ <= 3; chunkZ += 1) {
+    for (let chunkX = -4; chunkX <= 4; chunkX += 1) {
+      const coordinate = { x: chunkX, y: 0, z: chunkZ };
+      const cells = new Uint16Array(16 * 16 * 16);
+      for (let z = 0; z < 16; z += 1) {
+        for (let x = 0; x < 16; x += 1) {
+          // Keep the sample terrain deliberately light: one grass layer per
+          // chunk still exercises meshing/collision/streaming without a huge demo load.
+          cells[x + 16 * z] = 1;
+        }
+      }
+      // A small stone lookout tower in the center chunk makes the demo easy to orient in.
+      if (chunkX === 0 && chunkZ === 0) {
+        for (let y = 2; y < 9; y += 1) {
+          for (let z = 6; z <= 9; z += 1) {
+            for (let x = 6; x <= 9; x += 1) {
+              if (x === 6 || x === 9 || z === 6 || z === 9 || y === 8) {
+                cells[x + 16 * (y + 16 * z)] = 3;
+              }
+            }
+          }
+        }
+      }
+      const snapshot = createVoxelChunkSnapshot({ coordinate, palette, cells });
+      const key = chunkKey(chunkX, 0, chunkZ);
+      snapshots.set(key, snapshot);
+      candidates.push({
+        coordinate,
+        revision: snapshot.revision,
+        palette,
+        payload: {
+          assetId: `sample-voxel-chunk:${key}`,
+          byteLength: cells.byteLength,
+          codecVersion: 1,
+          contentHash: `sample:${key}`,
+        },
+      });
+    }
+  }
+
+  const document: WorldDocument = {
+    format: 'universal-3d-world',
+    schemaVersion: '1.0.0',
+    engineVersion: '0.1.0',
+    world: {
+      id: 'player-sample-voxel-world',
+      name: 'Voxel Streaming Test Scene',
+      settings: {},
+      entities: [],
+    },
+    assets: [],
+    extensions: {},
+  };
+  return {
+    candidates,
+    loadChunk: async (coordinate) => {
+      const snapshot = snapshots.get(chunkKey(coordinate.x, coordinate.y, coordinate.z));
+      if (!snapshot)
+        throw new Error(
+          `Sample voxel chunk not found: ${chunkKey(coordinate.x, coordinate.y, coordinate.z)}`,
+        );
+      // Yield between chunk reads just like the asynchronous project-backed loader.
+      if (import.meta.env.DEV) {
+        const debugWindow = window as Window & { __playerSampleChunkLoads?: number };
+        debugWindow.__playerSampleChunkLoads = (debugWindow.__playerSampleChunkLoads ?? 0) + 1;
+      }
+      await Promise.resolve();
+      return snapshot;
+    },
+    project: {
+      settings: { voxelSize: 1, chunkDimensions: { x: 16, y: 16, z: 16 } },
+      document,
+    },
+  };
+}
 
 function createVoxelStream(
   candidates: readonly PlayerVoxelChunk[],
   loadChunk: (coordinate: ChunkCoordinate3) => Promise<PlayerVoxelChunkSnapshot>,
   project: VoxelStreamProject,
   physics: NonNullable<Awaited<typeof physicsReady>>,
+  options: { readonly enableColliders?: boolean } = {},
 ) {
+  const enableColliders = options.enableColliders ?? true;
   const candidateByKey = new Map(
     candidates.map((candidate) => [
       chunkKey(candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z),
@@ -548,6 +642,7 @@ function createVoxelStream(
   let latestPosition: readonly [number, number, number] | null = null;
 
   const syncColliders = () => {
+    if (!enableColliders) return;
     physics.colliders.sync(
       createVoxelChunkColliderInputs(
         [...sourceCache.values()],
@@ -728,7 +823,7 @@ function createVoxelStream(
             error instanceof Error &&
             (('code' in error && error.code === 'WORLD_JOB_CANCELLED') ||
               error.message === 'WORLD_JOB_CANCELLED');
-          if (!wasCancelled) {
+          if (!wasCancelled && !disposed) {
             setProjectStatus(
               `Voxel chunk ${key} failed to stream: ${error instanceof Error ? error.message : String(error)}`,
               true,
@@ -758,7 +853,7 @@ function createVoxelStream(
       sourcePending.clear();
       sourceKeepKeys.clear();
       activeColliderKeys.clear();
-      physics.colliders.sync([]);
+      if (enableColliders) physics.colliders.sync([]);
     },
   };
 }
@@ -779,6 +874,7 @@ async function openProjectFolder(): Promise<void> {
   setProjectStatus('Choose a project folder…');
   try {
     const directory = await picker({ mode: 'read' });
+    projectDirectorySelected = true;
     setProjectProgress(8, 'Reading project manifest and assets');
     await yieldToBrowser();
     const project = await openVoxelWorldProject(new BrowserProjectFileStore(directory));
@@ -892,6 +988,45 @@ loadButton?.addEventListener('click', () => void openProjectFolder());
 
 let camera = createDefaultCamera();
 let streamAnchor: readonly [number, number, number] | null = null;
+
+async function preloadSampleVoxelScene(): Promise<void> {
+  try {
+    setProjectProgress(8, 'Preparing built-in voxel test scene');
+    await yieldToBrowser();
+    const sample = createSampleVoxelScene();
+    const physics = await physicsReady;
+    if (!physics || pageDisposed || projectDirectorySelected) return;
+    for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+    voxelStream?.dispose();
+    voxelStream = createVoxelStream(sample.candidates, sample.loadChunk, sample.project, physics, {
+      enableColliders: false,
+    });
+    const target: readonly [number, number, number] = [8, 0, 0];
+    camera = {
+      ...createDefaultCamera(),
+      position: [120, 85, 120],
+      rotation: lookAtQuaternion([120, 85, 120], target),
+    };
+    streamAnchor = target;
+    voxelStream.update(target);
+    setProjectProgress(100, 'Test scene ready');
+    setProjectStatus(
+      'Voxel test scene ready · 63 chunks available · WASD/RF to stream · Open project folder to load your world',
+    );
+  } catch (error) {
+    setProjectProgress(0, '', false);
+    setProjectStatus(
+      `Could not prepare voxel test scene: ${error instanceof Error ? error.message : String(error)}`,
+      true,
+    );
+  } finally {
+    if (progressValue?.textContent === '100%') {
+      window.setTimeout(() => setProjectProgress(100, 'Test scene ready', false), 650);
+    }
+  }
+}
+void preloadSampleVoxelScene();
+
 const cameraPanKeys = new Set<string>();
 window.addEventListener('keydown', (event) => {
   const target = event.target;
@@ -966,6 +1101,9 @@ const onPageHide = () => {
   voxelStream = null;
   voxelColliderSet?.dispose();
   physicsWorld?.dispose();
+  // Release WebGL resources synchronously during pagehide; EngineHost disposal
+  // remains responsible for the rest of the service lifecycle.
+  renderer.dispose();
   void engine.dispose();
 };
 window.addEventListener('pagehide', onPageHide, { once: true });
