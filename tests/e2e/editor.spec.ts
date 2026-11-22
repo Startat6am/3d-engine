@@ -211,6 +211,40 @@ test('editor creates project-backed voxel material assets and paints with them',
   await expect(page.getByText(/SAVED LOCALLY|UNSAVED CHANGES/)).toBeVisible();
 });
 
+test('undo and redo share one history across objects and voxel edits', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /^Cylinder/ })
+    .click();
+  await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Cylinder' })).toBeVisible();
+  await page.getByRole('button', { name: 'Delete selected object' }).click();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page
+    .locator('#hierarchy-add-menu')
+    .getByRole('button', { name: /Voxel chunk/ })
+    .click();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
+  await page.getByLabel('Voxel cell X').fill('2');
+  await page.getByLabel('Voxel cell Y').fill('3');
+  await page.getByLabel('Voxel cell Z').fill('4');
+  await page.getByRole('button', { name: 'Paint cell' }).click();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
+  await expect(page.getByText('Revision 0 · 0 materials')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.getByText('Revision 1 · 1 materials')).toBeVisible();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
+});
+
 test('editor autosaves voxel edits locally and restores them after reload', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Add object' }).click();

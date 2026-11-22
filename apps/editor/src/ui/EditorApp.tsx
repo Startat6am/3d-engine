@@ -263,12 +263,24 @@ export function EditorApp() {
   const [isDirty, setIsDirty] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const entitiesRef = useRef(entities);
-  const history = useRef(new EditorHistory<SceneEntity[]>(100));
+  const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
+  const voxelChunksRef = useRef<readonly VoxelChunkSnapshot[]>(voxelChunks);
+  const history = useRef(
+    new EditorHistory<{ entities: SceneEntity[]; voxelChunks: readonly VoxelChunkSnapshot[] }>(100),
+  );
   const [historyVersion, setHistoryVersion] = useState(0);
   void historyVersion;
 
+  const commitVoxelChunks = (next: readonly VoxelChunkSnapshot[]) => {
+    history.current.commit({ entities: entitiesRef.current, voxelChunks: voxelChunksRef.current });
+    voxelChunksRef.current = next;
+    setVoxelChunks(next);
+    setIsDirty(true);
+    setHistoryVersion((version) => version + 1);
+  };
+
   const commitEntities = (next: SceneEntity[]) => {
-    history.current.commit(entitiesRef.current);
+    history.current.commit({ entities: entitiesRef.current, voxelChunks: voxelChunksRef.current });
     entitiesRef.current = next;
     setEntities(next);
     setIsDirty(true);
@@ -276,27 +288,63 @@ export function EditorApp() {
   };
 
   const undo = useCallback(() => {
-    const previous = history.current.undo(entitiesRef.current);
+    const previous = history.current.undo({
+      entities: entitiesRef.current,
+      voxelChunks: voxelChunksRef.current,
+    });
     if (!previous) return;
-    entitiesRef.current = previous;
-    setEntities(previous);
+    entitiesRef.current = previous.entities;
+    voxelChunksRef.current = previous.voxelChunks;
+    setEntities(previous.entities);
+    setVoxelChunks(previous.voxelChunks);
     setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
-      previous.some((entity) => entity.id === current) ? current : (previous[0]?.id ?? ''),
+      previous.entities.some((entity) => entity.id === current)
+        ? current
+        : (previous.entities[0]?.id ?? ''),
     );
+    setSelectedVoxelChunkKey((current) => {
+      const exists = previous.voxelChunks.some(
+        (chunk) => `${chunk.coordinate.x},${chunk.coordinate.y},${chunk.coordinate.z}` === current,
+      );
+      const first = previous.voxelChunks[0];
+      return exists
+        ? current
+        : first
+          ? `${first.coordinate.x},${first.coordinate.y},${first.coordinate.z}`
+          : null;
+    });
   }, []);
 
   const redo = useCallback(() => {
-    const next = history.current.redo(entitiesRef.current);
+    const next = history.current.redo({
+      entities: entitiesRef.current,
+      voxelChunks: voxelChunksRef.current,
+    });
     if (!next) return;
-    entitiesRef.current = next;
-    setEntities(next);
+    entitiesRef.current = next.entities;
+    voxelChunksRef.current = next.voxelChunks;
+    setEntities(next.entities);
+    setVoxelChunks(next.voxelChunks);
     setIsDirty(true);
     setHistoryVersion((version) => version + 1);
     setSelectedId((current) =>
-      next.some((entity) => entity.id === current) ? current : (next[0]?.id ?? ''),
+      next.entities.some((entity) => entity.id === current)
+        ? current
+        : (next.entities[0]?.id ?? ''),
     );
+    setSelectedVoxelChunkKey((current) => {
+      const exists = next.voxelChunks.some(
+        (chunk) => `${chunk.coordinate.x},${chunk.coordinate.y},${chunk.coordinate.z}` === current,
+      );
+      const first = next.voxelChunks[0];
+      return exists
+        ? current
+        : first
+          ? `${first.coordinate.x},${first.coordinate.y},${first.coordinate.z}`
+          : null;
+    });
   }, []);
 
   useEffect(() => {
@@ -343,7 +391,6 @@ export function EditorApp() {
     voxelSize: 1,
     chunkDimensions: { x: 16, y: 16, z: 16 },
   });
-  const [voxelChunks, setVoxelChunks] = useState<readonly VoxelChunkSnapshot[]>([]);
   const [selectedVoxelChunkKey, setSelectedVoxelChunkKey] = useState<string | null>(null);
   const [voxelCell, setVoxelCell] = useState({ x: 0, y: 1, z: 0 });
   const [voxelChunkTarget, setVoxelChunkTarget] = useState({
@@ -665,7 +712,7 @@ export function EditorApp() {
       palette: [],
       cells,
     });
-    setVoxelChunks([...voxelChunks, chunk]);
+    commitVoxelChunks([...voxelChunksRef.current, chunk]);
     setSelectedVoxelChunkKey(x + ',0,0');
     setSelectedId('');
     setIsDirty(true);
@@ -693,14 +740,13 @@ export function EditorApp() {
       selectedVoxelChunk.coordinate.y +
       ',' +
       selectedVoxelChunk.coordinate.z;
-    setVoxelChunks((current) =>
-      current.map((chunk) =>
+    commitVoxelChunks(
+      voxelChunksRef.current.map((chunk) =>
         chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
           ? snapshot
           : chunk,
       ),
     );
-    setIsDirty(true);
     pushDiagnostic({
       level: 'info',
       source: 'Voxel editor',
@@ -905,8 +951,8 @@ export function EditorApp() {
       selectedVoxelChunk.coordinate.y +
       ',' +
       selectedVoxelChunk.coordinate.z;
-    setVoxelChunks((current) =>
-      current.map((chunk) =>
+    commitVoxelChunks(
+      voxelChunksRef.current.map((chunk) =>
         chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === chunkKey
           ? result.snapshot
           : chunk,
@@ -966,8 +1012,8 @@ export function EditorApp() {
       palette: selectedVoxelChunk.palette,
       cells: selectedVoxelChunk.copyCells(),
     });
-    setVoxelChunks((current) =>
-      current.map((chunk) =>
+    commitVoxelChunks(
+      voxelChunksRef.current.map((chunk) =>
         chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z === currentKey
           ? snapshot
           : chunk,
@@ -991,8 +1037,8 @@ export function EditorApp() {
       selectedVoxelChunk.coordinate.y +
       ',' +
       selectedVoxelChunk.coordinate.z;
-    setVoxelChunks((current) =>
-      current.filter(
+    commitVoxelChunks(
+      voxelChunksRef.current.filter(
         (chunk) =>
           chunk.coordinate.x + ',' + chunk.coordinate.y + ',' + chunk.coordinate.z !== chunkKey,
       ),
@@ -1441,7 +1487,10 @@ export function EditorApp() {
         },
       );
       const restoredVoxelChunks = options.voxelWorld?.chunks ?? [];
+      voxelChunksRef.current = restoredVoxelChunks;
       setVoxelChunks(restoredVoxelChunks);
+      history.current.clear();
+      setHistoryVersion((version) => version + 1);
       const firstRestoredChunk = restoredVoxelChunks[0];
       setSelectedVoxelChunkKey(
         firstRestoredChunk
