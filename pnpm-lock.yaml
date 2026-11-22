@@ -333,6 +333,9 @@ importers:
       '@engine/voxel':
         specifier: workspace:*
         version: link:../../packages/engine-voxel
+      '@engine/world':
+        specifier: workspace:*
+        version: link:../../packages/engine-world
     devDependencies:
       vite:
         specifier: 7.3.8

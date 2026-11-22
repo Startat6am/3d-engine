@@ -125,17 +125,6 @@ const geometryFor: Record<Primitive, () => MeshData> = {
   Plane: () => createPlaneGeometry(4, 4, 1, 1),
   Cylinder: () => createCylinderGeometry(),
 };
-const initialEntity = (): SceneEntity => ({
-  id: 'entity-1',
-  name: 'Box',
-  primitive: 'Box',
-  geometry: createBoxGeometry(),
-  material: createDefaultMaterial(),
-  position: [0, 0, 0],
-  rotation: [0, 0, 0, 1],
-  scale: [1, 1, 1],
-});
-
 const MAX_VOXEL_TEXTURE_BYTES = 16 * 1024 * 1024;
 
 const ASSET_KINDS: readonly AssetKind[] = [
@@ -268,7 +257,7 @@ export function EditorApp() {
   const fpsRef = useRef<HTMLOutputElement>(null);
   const renderedFrameCountRef = useRef(0);
   const rendererRef = useRef<ThreeWebGLRendererAdapter | null>(null);
-  const [entities, setEntities] = useState<SceneEntity[]>([initialEntity()]);
+  const [entities, setEntities] = useState<SceneEntity[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
   const entitiesRef = useRef(entities);
@@ -330,7 +319,7 @@ export function EditorApp() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [redo, undo]);
-  const [selectedId, setSelectedId] = useState('entity-1');
+  const [selectedId, setSelectedId] = useState('');
   const [rendererError, setRendererError] = useState('');
   const [rendererStatus, setRendererStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [diagnostics, setDiagnostics] = useState<DiagnosticEntry[]>([]);

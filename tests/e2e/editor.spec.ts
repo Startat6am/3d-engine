@@ -3,8 +3,9 @@ import { expect, test } from '@playwright/test';
 test('editor shell loads with a 3D viewport and hierarchy', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle(/Choreon/);
-  await expect(page.getByText('HIERARCHY')).toBeVisible();
-  await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
+  await expect(page.getByText('HIERARCHY ＋', { exact: true })).toBeVisible();
+  await expect(page.locator('.tree-row.entity-row')).toHaveCount(0);
+  await expect(page.getByText('Empty scene')).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
   await expect.poll(() => page.getByLabel('Frames per second').textContent()).toMatch(/^FPS \d+$/);
@@ -15,9 +16,10 @@ test('editor remains usable on a 360px mobile viewport', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByLabel('3D scene viewport')).toBeVisible();
-  await expect(page.getByText('HIERARCHY')).toBeVisible();
+  await expect(page.getByText('HIERARCHY ＋', { exact: true })).toBeVisible();
   await expect(page.getByText('INSPECTOR')).toBeVisible();
   await expect(page.getByText('File ▾')).toBeVisible();
+  await expect(page.getByText('Empty scene')).toBeVisible();
 
   const dimensions = await page.evaluate(() => ({
     viewportWidth: document.documentElement.clientWidth,
@@ -27,6 +29,8 @@ test('editor remains usable on a 360px mobile viewport', async ({ page }) => {
   expect(dimensions.pageWidth).toBe(dimensions.viewportWidth);
   expect(dimensions.canvasWidth).toBeGreaterThan(300);
 
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page.locator('#hierarchy-add-menu').getByRole('button', { name: /^Box/ }).click();
   await page.getByLabel('Position X').fill('2.5');
   await page.getByLabel('Position X').press('Enter');
   await expect(page.getByLabel('Position X')).toHaveValue('2.5');
@@ -98,6 +102,8 @@ test('two-finger pinch changes camera zoom without horizontal page scrolling', a
 test('mobile transform pad nudges the selected object on the chosen axis', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page.locator('#hierarchy-add-menu').getByRole('button', { name: /^Box/ }).click();
   await expect(page.getByLabel('Position X')).toHaveValue('0');
 
   await page.getByRole('button', { name: 'Increase X' }).click();
@@ -170,11 +176,8 @@ test('editor reports real renderer and save state without placeholder components
   await expect(page.getByText('SAVED')).toBeVisible();
 });
 
-test('empty scenes show an actionable state instead of an empty placeholder inspector', async ({
-  page,
-}) => {
+test('editor opens with an empty scene and shows an actionable state', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Delete selected object' }).click();
   await expect(page.getByText('Empty scene')).toBeVisible();
   await expect(
     page.getByText('Select an object or voxel chunk in the Hierarchy, or add content to begin.'),
@@ -214,9 +217,8 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   const menu = page.locator('#hierarchy-add-menu');
   await menu.getByRole('button', { name: /Voxel chunk/ }).click();
 
-  await expect(page.getByText('1 OBJECTS', { exact: true })).toBeVisible();
+  await expect(page.getByText('0 OBJECTS', { exact: true })).toBeVisible();
   await expect(page.getByText('1 VOXEL CHUNKS', { exact: true })).toBeVisible();
-  await expect(page.locator('.tree-row.entity-row').filter({ hasText: 'Box' })).toBeVisible();
   await expect(page.getByLabel('3D scene viewport')).toHaveAttribute('data-renderer', 'webgl2');
   await expect(page.getByLabel('Voxel chunk editor')).toBeVisible();
   await expect(page.getByText('Revision 0 · 0 materials')).toBeVisible();

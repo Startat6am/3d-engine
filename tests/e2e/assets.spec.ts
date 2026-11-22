@@ -599,23 +599,31 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect(page.getByText('AfterMissingBlob')).toBeVisible();
 
   // The exact saved Editor folder must also load in Player as a mixed voxel/mesh
-  // scene, including the GLB geometry, PBR material, embedded image and static voxel collider.
+  // scene, including GLB geometry, PBR material, embedded image, static voxel collider,
+  // and camera-windowed voxel mesh residency.
   await page.goto('http://127.0.0.1:5174');
   await page.evaluate((entries) => {
     const state = window as Window & {
       __glbImageBitmapUploads: number;
       __playerDeletedBuffers: number;
       __playerDeletedTextures: number;
+      __playerCreatedBuffers: number;
       __playerDrawCalls: number;
     };
     state.__glbImageBitmapUploads = 0;
     state.__playerDeletedBuffers = 0;
     state.__playerDeletedTextures = 0;
+    state.__playerCreatedBuffers = 0;
     state.__playerDrawCalls = 0;
     const drawElements = WebGL2RenderingContext.prototype.drawElements;
     WebGL2RenderingContext.prototype.drawElements = function (...args) {
       state.__playerDrawCalls += 1;
       return drawElements.apply(this, args);
+    };
+    const createBuffer = WebGL2RenderingContext.prototype.createBuffer;
+    WebGL2RenderingContext.prototype.createBuffer = function () {
+      state.__playerCreatedBuffers += 1;
+      return createBuffer.call(this);
     };
     const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
     WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
@@ -680,10 +688,15 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await page.getByRole('button', { name: 'Open project folder' }).click();
   const playerStatus = page.locator('#project-status');
   await expect(playerStatus).toContainText('Loaded');
-  await expect(playerStatus).toContainText('rendered mesh parts');
-  await expect(playerStatus).toContainText('3 voxel mesh parts');
+  await expect(playerStatus).toContainText('non-voxel mesh parts');
+  await expect(playerStatus).toContainText('voxel chunks available for streaming');
   await expect(playerStatus).toContainText('static voxel colliders');
   await expect(playerStatus).not.toContainText('unsupported');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
+    )
+    .toBeGreaterThan(0);
   await expect
     .poll(() =>
       page.evaluate(
@@ -697,6 +710,32 @@ test('directory project saves content-addressed blobs and opens atomically', asy
       page.evaluate(() => (window as Window & { __playerDrawCalls: number }).__playerDrawCalls),
     )
     .toBeGreaterThan(0);
+  const beforeEviction = await page.evaluate(
+    () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
+  );
+  await page.keyboard.down('d');
+  await page.waitForTimeout(2800);
+  await page.keyboard.up('d');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeEviction);
+  const beforeReload = await page.evaluate(
+    () => (window as Window & { __playerCreatedBuffers: number }).__playerCreatedBuffers,
+  );
+  await page.keyboard.down('a');
+  await page.waitForTimeout(2800);
+  await page.keyboard.up('a');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerCreatedBuffers: number }).__playerCreatedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeReload);
   const beforeDispose = await page.evaluate(() => {
     const state = window as Window & {
       __playerDeletedBuffers: number;

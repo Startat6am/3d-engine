@@ -21,7 +21,9 @@ import {
   type RenderObject,
   type TextureSource,
 } from '@engine/renderer';
-import { meshVoxelChunk } from '@engine/voxel';
+import { meshVoxelChunkAsync } from '@engine/voxel';
+import { WorldChunkScheduler, type ChunkCoordinate3 } from '@engine/world';
+import { selectVoxelStreamingWindow } from './voxel-streaming.js';
 import { resolveVoxelMaterialStyle } from './voxel-material.js';
 import { createPhysicsWorld, StaticMeshColliderSet, type PhysicsWorld } from '@engine/physics';
 import { createVoxelChunkColliderInputs } from './voxel-collision.js';
@@ -484,6 +486,185 @@ async function prepareWorldEntities(document: WorldDocument) {
   return { prepared, unsupported };
 }
 
+type PlayerVoxelChunk = Awaited<ReturnType<typeof loadVoxelWorldProject>>['chunks'][number];
+
+interface VoxelStreamProject {
+  readonly settings: {
+    readonly voxelSize: number;
+    readonly chunkDimensions: { readonly x: number; readonly y: number; readonly z: number };
+  };
+  readonly document: WorldDocument;
+}
+
+interface VoxelStreamResident {
+  readonly release: () => void;
+  readonly byteLength: number;
+}
+
+let voxelStream: {
+  update(position: readonly [number, number, number]): void;
+  dispose(): void;
+} | null = null;
+
+function createVoxelStream(
+  candidates: readonly { coordinate: ChunkCoordinate3; value: PlayerVoxelChunk }[],
+  chunksByCoordinate: Map<string, PlayerVoxelChunk>,
+  project: VoxelStreamProject,
+) {
+  const renderEntities = new Map<string, ReturnType<typeof runtime.world.createEntity>[]>();
+  const scheduler = new WorldChunkScheduler<VoxelStreamResident>({
+    limits: {
+      maxConcurrentJobs: 2,
+      maxQueuedJobs: 256,
+      maxResidentChunks: 128,
+      maxChunkPayloadBytes: 64 * 1024 * 1024,
+    },
+    releaseResident: (resident) => resident.release(),
+  });
+  const pending = new Set<string>();
+  const radius = 2;
+  const verticalRadius = 1;
+  let disposed = false;
+  let latestPosition: readonly [number, number, number] | null = null;
+
+  const update = (position: readonly [number, number, number]) => {
+    if (disposed) return;
+    latestPosition = [...position];
+    const desired = selectVoxelStreamingWindow(
+      candidates,
+      position,
+      project.settings.voxelSize,
+      project.settings.chunkDimensions,
+      radius,
+      verticalRadius,
+    );
+    const desiredKeys = new Set(
+      desired.map(({ coordinate }) => chunkKey(coordinate.x, coordinate.y, coordinate.z)),
+    );
+    for (const candidate of candidates) {
+      const key = chunkKey(candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z);
+      if (!desiredKeys.has(key)) scheduler.evict(candidate.coordinate);
+    }
+    for (const entry of desired) {
+      const key = chunkKey(entry.coordinate.x, entry.coordinate.y, entry.coordinate.z);
+      if (pending.has(key) || scheduler.getResident(entry.coordinate)) continue;
+      pending.add(key);
+      const chunk = entry.value;
+      const { x, y, z } = chunk.coordinate;
+      const neighbor = (dx: number, dy: number, dz: number) =>
+        chunksByCoordinate.get(chunkKey(x + dx, y + dy, z + dz));
+      const neighbors = {
+        ...(neighbor(1, 0, 0) ? { positiveX: neighbor(1, 0, 0)! } : {}),
+        ...(neighbor(-1, 0, 0) ? { negativeX: neighbor(-1, 0, 0)! } : {}),
+        ...(neighbor(0, 1, 0) ? { positiveY: neighbor(0, 1, 0)! } : {}),
+        ...(neighbor(0, -1, 0) ? { negativeY: neighbor(0, -1, 0)! } : {}),
+        ...(neighbor(0, 0, 1) ? { positiveZ: neighbor(0, 0, 1)! } : {}),
+        ...(neighbor(0, 0, -1) ? { negativeZ: neighbor(0, 0, -1)! } : {}),
+      };
+      let wasCancelled = false;
+      void scheduler
+        .request({
+          coordinate: chunk.coordinate,
+          revision: chunk.revision,
+          priority: -entry.distanceSquared,
+          run: async (signal) => {
+            const mesh = await meshVoxelChunkAsync(
+              chunk,
+              neighbors,
+              project.settings.voxelSize,
+              signal,
+            );
+            completedMeshes.set(key, mesh);
+            const byteLength = mesh.parts.reduce(
+              (total, part) =>
+                total +
+                part.geometry.positions.byteLength +
+                part.geometry.normals.byteLength +
+                (part.geometry.uvs?.byteLength ?? 0) +
+                part.geometry.indices.byteLength,
+              0,
+            );
+            let released = false;
+            return {
+              value: {
+                byteLength,
+                release: () => {
+                  if (released) return;
+                  released = true;
+                  const entities = renderEntities.get(key) ?? [];
+                  for (const entity of entities) runtime.world.destroyEntity(entity);
+                  renderEntities.delete(key);
+                  completedMeshes.delete(key);
+                },
+              },
+              byteLength,
+            };
+          },
+        })
+        .then((resident) => {
+          if (disposed || scheduler.getResident(entry.coordinate)?.value !== resident) return;
+          const origin: [number, number, number] = [
+            chunk.coordinate.x * project.settings.chunkDimensions.x * project.settings.voxelSize,
+            chunk.coordinate.y * project.settings.chunkDimensions.y * project.settings.voxelSize,
+            chunk.coordinate.z * project.settings.chunkDimensions.z * project.settings.voxelSize,
+          ];
+          const entities: ReturnType<typeof runtime.world.createEntity>[] = [];
+          // Re-mesh is deliberately not repeated here: scheduler payload owns the CPU result.
+          // The resident is populated below from a per-request mesh cache.
+          const mesh = completedMeshes.get(key);
+          if (!mesh) return;
+          for (const part of mesh.parts) {
+            const style = resolveVoxelMaterialStyle(
+              part.material,
+              project.document.assets as readonly AssetRecord[],
+              project.document.assetPayloads ?? [],
+            );
+            entities.push(
+              addMeshRenderable(origin, part.geometry, {
+                ...createDefaultMaterial(style.color),
+                roughness: style.roughness,
+                ...(style.baseColorTexture ? { baseColorTexture: style.baseColorTexture } : {}),
+              }),
+            );
+          }
+          renderEntities.set(key, entities);
+        })
+        .catch((error: unknown) => {
+          if (!scheduler.getResident(entry.coordinate)) completedMeshes.delete(key);
+          wasCancelled =
+            error instanceof Error && 'code' in error && error.code === 'WORLD_JOB_CANCELLED';
+          if (!wasCancelled) {
+            setProjectStatus(
+              `Voxel chunk ${key} failed to stream: ${error instanceof Error ? error.message : String(error)}`,
+              true,
+            );
+          }
+        })
+        .finally(() => {
+          pending.delete(key);
+          // An evicted job may settle after the camera has re-entered its chunk.
+          // Reconcile once more so a brief exit/re-entry cannot leave a desired hole.
+          if (wasCancelled && !disposed && latestPosition) update(latestPosition);
+        });
+    }
+  };
+
+  const completedMeshes = new Map<string, Awaited<ReturnType<typeof meshVoxelChunkAsync>>>();
+  return {
+    update,
+    dispose: () => {
+      if (disposed) return;
+      disposed = true;
+      scheduler.dispose();
+      for (const entities of renderEntities.values()) {
+        for (const entity of entities) runtime.world.destroyEntity(entity);
+      }
+      renderEntities.clear();
+      completedMeshes.clear();
+    },
+  };
+}
+
 async function openProjectFolder(): Promise<void> {
   const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
   if (!picker) {
@@ -506,7 +687,7 @@ async function openProjectFolder(): Promise<void> {
     setProjectProgress(52, 'Preparing scene entities and GLB models');
     await yieldToBrowser();
     const world = await prepareWorldEntities(project.document);
-    setProjectProgress(68, 'Building voxel meshes');
+    setProjectProgress(68, 'Preparing voxel streaming window');
     await yieldToBrowser();
     const chunksByCoordinate = new Map(
       project.chunks.map((chunk) => [
@@ -514,47 +695,10 @@ async function openProjectFolder(): Promise<void> {
         chunk,
       ]),
     );
-    const voxelObjects = project.chunks.flatMap((chunk) => {
-      const { x, y, z } = chunk.coordinate;
-      const neighbor = (dx: number, dy: number, dz: number) =>
-        chunksByCoordinate.get(chunkKey(x + dx, y + dy, z + dz));
-      const positiveX = neighbor(1, 0, 0);
-      const negativeX = neighbor(-1, 0, 0);
-      const positiveY = neighbor(0, 1, 0);
-      const negativeY = neighbor(0, -1, 0);
-      const positiveZ = neighbor(0, 0, 1);
-      const negativeZ = neighbor(0, 0, -1);
-      const neighbors = {
-        ...(positiveX ? { positiveX } : {}),
-        ...(negativeX ? { negativeX } : {}),
-        ...(positiveY ? { positiveY } : {}),
-        ...(negativeY ? { negativeY } : {}),
-        ...(positiveZ ? { positiveZ } : {}),
-        ...(negativeZ ? { negativeZ } : {}),
-      };
-      const mesh = meshVoxelChunk(chunk, neighbors, project.settings.voxelSize);
-      const origin: [number, number, number] = [
-        chunk.coordinate.x * project.settings.chunkDimensions.x * project.settings.voxelSize,
-        chunk.coordinate.y * project.settings.chunkDimensions.y * project.settings.voxelSize,
-        chunk.coordinate.z * project.settings.chunkDimensions.z * project.settings.voxelSize,
-      ];
-      return mesh.parts.map((part) => ({
-        position: origin,
-        geometry: part.geometry,
-        material: (() => {
-          const style = resolveVoxelMaterialStyle(
-            part.material,
-            project.document.assets as readonly AssetRecord[],
-            project.document.assetPayloads ?? [],
-          );
-          return {
-            ...createDefaultMaterial(style.color),
-            roughness: style.roughness,
-            ...(style.baseColorTexture ? { baseColorTexture: style.baseColorTexture } : {}),
-          };
-        })(),
-      }));
-    });
+    const voxelStreamCandidates = project.chunks.map((chunk) => ({
+      coordinate: chunk.coordinate,
+      value: chunk,
+    }));
 
     // Prepare and register static voxel collision before replacing the visible scene.
     // The revision token includes the source chunk and all six neighbor revisions.
@@ -570,7 +714,11 @@ async function openProjectFolder(): Promise<void> {
     physics.colliders.sync(colliderInputs);
 
     // Commit the replacement only after every referenced blob, render mesh and collider is ready.
+    streamAnchor = null;
+    camera = createDefaultCamera();
     for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+    voxelStream?.dispose();
+    voxelStream = null;
     for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
     activeProjectEntities.length = 0;
     for (const entity of world.prepared) {
@@ -582,11 +730,6 @@ async function openProjectFolder(): Promise<void> {
           entity.rotation,
           entity.scale,
         ),
-      );
-    }
-    for (const object of voxelObjects) {
-      activeProjectEntities.push(
-        addMeshRenderable(object.position, object.geometry, object.material),
       );
     }
     const chunkBounds = project.chunks.flatMap((chunk) => {
@@ -625,16 +768,20 @@ async function openProjectFolder(): Promise<void> {
         position: cameraPosition,
         rotation: lookAtQuaternion(cameraPosition, target),
       };
+      // The current Player camera is a fixed orbit camera without navigation controls;
+      // stream around its look-at target rather than its intentionally distant eye.
+      streamAnchor = target;
     }
     setProjectProgress(88, 'Applying loaded scene');
     await yieldToBrowser();
     const chunkCount = project.chunks.length;
-    // Voxel mesh parts are registered as Renderable entities alongside prepared
-    // document entities; include both so the status reflects what is on screen.
-    const meshCount = world.prepared.length + voxelObjects.length;
+    const stream = createVoxelStream(voxelStreamCandidates, chunksByCoordinate, project);
+    voxelStream = stream;
+    stream.update(streamAnchor ?? camera.position);
+    const meshCount = world.prepared.length;
     setProjectProgress(100, 'Project loaded');
     setProjectStatus(
-      `Loaded “${project.document.world.name}” · ${chunkCount} voxel chunks · ${voxelObjects.length} voxel mesh parts · ${meshCount} rendered mesh parts` +
+      `Loaded “${project.document.world.name}” · ${chunkCount} voxel chunks available for streaming · ${meshCount} non-voxel mesh parts` +
         ` · ${colliderInputs.length} static voxel colliders` +
         (world.unsupported
           ? ` · ${world.unsupported} unsupported entities or GLB parts skipped`
@@ -661,6 +808,23 @@ async function openProjectFolder(): Promise<void> {
 loadButton?.addEventListener('click', () => void openProjectFolder());
 
 let camera = createDefaultCamera();
+let streamAnchor: readonly [number, number, number] | null = null;
+const cameraPanKeys = new Set<string>();
+window.addEventListener('keydown', (event) => {
+  const target = event.target;
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable ||
+      target.closest('input, textarea, select, [contenteditable="true"]'))
+  ) {
+    return;
+  }
+  if (['w', 'a', 's', 'd', 'r', 'f'].includes(event.key.toLowerCase())) {
+    cameraPanKeys.add(event.key.toLowerCase());
+  }
+});
+window.addEventListener('keyup', (event) => cameraPanKeys.delete(event.key.toLowerCase()));
+window.addEventListener('blur', () => cameraPanKeys.clear());
 const updateFps = attachFpsCounter(canvas);
 let previousFrame = 0;
 let animationFrame = 0;
@@ -672,6 +836,20 @@ const renderFrame = (now: number) => {
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
   runtime.advance(delta);
+  if (streamAnchor && cameraPanKeys.size > 0 && delta > 0) {
+    const distance = Math.min(delta, 0.1) * 24;
+    const dx = (Number(cameraPanKeys.has('d')) - Number(cameraPanKeys.has('a'))) * distance;
+    const dy = (Number(cameraPanKeys.has('r')) - Number(cameraPanKeys.has('f'))) * distance;
+    const dz = (Number(cameraPanKeys.has('s')) - Number(cameraPanKeys.has('w'))) * distance;
+    if (dx !== 0 || dy !== 0 || dz !== 0) {
+      streamAnchor = [streamAnchor[0] + dx, streamAnchor[1] + dy, streamAnchor[2] + dz];
+      camera = {
+        ...camera,
+        position: [camera.position[0] + dx, camera.position[1] + dy, camera.position[2] + dz],
+      };
+      voxelStream?.update(streamAnchor);
+    }
+  }
 
   // Keep Rapier on a bounded fixed timestep; large tab-resume deltas are clamped.
   physicsAccumulator += Math.min(delta, maxPhysicsFrameDelta);
@@ -701,6 +879,8 @@ const renderFrame = (now: number) => {
 const onPageHide = () => {
   window.cancelAnimationFrame(animationFrame);
   pageDisposed = true;
+  voxelStream?.dispose();
+  voxelStream = null;
   voxelColliderSet?.dispose();
   physicsWorld?.dispose();
   void engine.dispose();
