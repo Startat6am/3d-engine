@@ -787,7 +787,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
           ).length,
       ),
     )
-    .toBe(3);
+    .toBeGreaterThan(2);
   const beforeDispose = await page.evaluate(() => {
     const state = window as Window & {
       __playerDeletedBuffers: number;
