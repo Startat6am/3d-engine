@@ -128,3 +128,10 @@ Morph targets, retargeting, animation graph editor, root-motion physics, IK/ragd
 - Hardened repeated audio activation: every explicit user gesture now asks the backend to resume again, allowing recovery after browser tab/device suspension. Added a runtime test proving a second gesture reaches the backend.
 - Moved Player listener synchronization after camera input, so the listener follows the current camera transform in the same frame. Added a Player Chromium assertion that listener position changes when the camera moves.
 - After these two local hardening changes: Vitest 314/314, Player Chromium 5/5, format, lint and typecheck passed. The hardening changes are not yet included in the GitHub CI run above; exact-head CI must be rerun after they are pushed.
+
+### 2026-11-22 — Exact-head CI and persisted audio schema review
+
+- GitHub Actions CI run #699 completed successfully on exact PR head `2aea6a48d267f9a752f13554d219c50343be8f9f`. The verify job passed install, format, lint, typecheck, unit tests, production build, GLB geometry/embedded-image stress benchmarks, voxel-world stress benchmark, Chromium installation and the full Playwright E2E suite. All four Vercel status checks on the same head are successful.
+- Reviewed `engine-serialization` world schema v1.0.0, migration registry, asset-reference validator, Editor save/load shape, and Player entity loading. Found that component payloads are open JSON, but only MeshRenderer references are cross-validated; `parseWorld` defaults to an empty migration registry; Editor only serializes renderable entities; Player currently requires MeshRenderer.
+- Added ADR 0014 proposing the coherent AudioSource persistence contract: schema 1.1.0 with a built-in 1.0.0 migration, validated audio-kind asset references, transform-only audio entities, portable source settings, and user-gesture-gated playback. This is an architecture review/proposal, not an implemented persisted component. No AudioSource persistence has been enabled yet.
+- PR #91 remains Draft, open and unmerged. Physical-device validation and performance profiling remain outstanding.
