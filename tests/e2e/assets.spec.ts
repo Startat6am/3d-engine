@@ -753,6 +753,16 @@ test('directory project saves content-addressed blobs and opens atomically', asy
       ),
     )
     .toBeGreaterThan(beforeEviction);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerProjectReads: string[] }).__playerProjectReads.filter(
+            (path) => path.startsWith('voxel/chunks/sha256/'),
+          ).length,
+      ),
+    )
+    .toBe(2);
   const beforeReload = await page.evaluate(
     () => (window as Window & { __playerCreatedBuffers: number }).__playerCreatedBuffers,
   );
@@ -766,6 +776,16 @@ test('directory project saves content-addressed blobs and opens atomically', asy
       ),
     )
     .toBeGreaterThan(beforeReload);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerProjectReads: string[] }).__playerProjectReads.filter(
+            (path) => path.startsWith('voxel/chunks/sha256/'),
+          ).length,
+      ),
+    )
+    .toBe(3);
   const beforeDispose = await page.evaluate(() => {
     const state = window as Window & {
       __playerDeletedBuffers: number;
