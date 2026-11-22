@@ -152,3 +152,10 @@ Interpretation:
 - These are diagnostic comparisons, not controlled microbenchmark guarantees. The benchmark excludes project disk reads, browser rendering, GPU upload, physics cooking, and mobile-device thermal/runtime behavior. It therefore does not quantify the end-to-end benefit of lazy payload streaming or prove Android performance.
 
 Raw inputs: `benchmarks/results/voxel-world-stress-422026f.json` and `benchmarks/results/voxel-world-stress-552d6ba.json`. The additional 50-repeat/100-cycle local sandbox run used Node 25.9.0 on Linux arm64 and is intentionally excluded from this comparison because its runtime and hardware differ from the Node 22 x64 CI baselines.
+
+## Large-world streaming traversal stress — 2026-11-22
+
+- Added a deterministic Player streaming-window stress test that traverses a synthetic 1,000-chunk linear world from end to end and back (1,999 camera positions), crossing every chunk boundary in both directions.
+- The active horizontal window remained bounded to at most 5 chunks (radius 2); the source cache plus retained neighbor ring peaked at 7 entries in this one-dimensional fixture, well below the production 256-entry LRU cap. The test also verifies that the traversal remains contiguous and that reverse travel reloads evicted source entries without unbounded cache growth.
+- Extended the built-in Player sample-scene Chromium E2E to move forward and back, verify new source payload reads, observe GPU buffer deletion after leaving the active window, and verify buffer recreation when returning.
+- This adds large-world traversal and GPU residency churn coverage, not a claim of infinite-world scalability. The existing before/after CPU meshing comparison above remains the controlled comparative benchmark; this traversal test is a deterministic correctness/resource-bound stress test rather than a portable timing benchmark.

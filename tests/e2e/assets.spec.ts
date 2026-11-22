@@ -1281,9 +1281,16 @@ test('Player preloads the built-in voxel streaming test scene on startup', async
     const state = window as Window & {
       __sampleDrawCalls: number;
       __sampleCreatedBuffers: number;
+      __sampleDeletedBuffers: number;
     };
     state.__sampleDrawCalls = 0;
     state.__sampleCreatedBuffers = 0;
+    state.__sampleDeletedBuffers = 0;
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__sampleDeletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
     const drawElements = WebGL2RenderingContext.prototype.drawElements;
     WebGL2RenderingContext.prototype.drawElements = function (...args) {
       state.__sampleDrawCalls += 1;
@@ -1313,9 +1320,14 @@ test('Player preloads the built-in voxel streaming test scene on startup', async
     )
     .toBeGreaterThan(0);
 
-  const loadsBeforeTravel = await page.evaluate(
-    () => (window as Window & { __playerSampleChunkLoads: number }).__playerSampleChunkLoads,
-  );
+  const beforeTravel = await page.evaluate(() => {
+    const state = window as Window & {
+      __playerSampleChunkLoads: number;
+      __sampleCreatedBuffers: number;
+      __sampleDeletedBuffers: number;
+    };
+    return { ...state };
+  });
   await page.keyboard.down('d');
   await page.waitForTimeout(5200);
   await page.keyboard.up('d');
@@ -1325,5 +1337,26 @@ test('Player preloads the built-in voxel streaming test scene on startup', async
         () => (window as Window & { __playerSampleChunkLoads: number }).__playerSampleChunkLoads,
       ),
     )
-    .toBeGreaterThan(loadsBeforeTravel);
+    .toBeGreaterThan(beforeTravel.__playerSampleChunkLoads);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __sampleDeletedBuffers: number }).__sampleDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeTravel.__sampleDeletedBuffers);
+
+  const createdAfterForwardTravel = await page.evaluate(
+    () => (window as Window & { __sampleCreatedBuffers: number }).__sampleCreatedBuffers,
+  );
+  await page.keyboard.down('a');
+  await page.waitForTimeout(5200);
+  await page.keyboard.up('a');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __sampleCreatedBuffers: number }).__sampleCreatedBuffers,
+      ),
+    )
+    .toBeGreaterThan(createdAfterForwardTravel);
 });

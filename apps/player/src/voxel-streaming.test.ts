@@ -75,3 +75,68 @@ describe('Player voxel streaming window', () => {
     ).toThrow('Duplicate voxel streaming coordinate');
   });
 });
+
+describe('Player large-world streaming stress', () => {
+  it('keeps the active window bounded across a 1,000-chunk forward and reverse traversal', async () => {
+    const { pruneVoxelSourceCache, readVoxelSourceCache, writeVoxelSourceCache } =
+      await import('./voxel-source-cache.js');
+    const candidates = Array.from({ length: 1_000 }, (_, x) => candidate(x, 0, 0));
+    const candidateKeys = new Set(candidates.map(({ coordinate }) => `${coordinate.x},0,0`));
+    const sourceCache = new Map<string, number>();
+    let maxActive = 0;
+    let maxCached = 0;
+    let sourceReads = 0;
+    let previousCenter = -1;
+
+    const traversal = [
+      ...Array.from({ length: 1_000 }, (_, index) => index),
+      ...Array.from({ length: 999 }, (_, index) => 998 - index),
+    ];
+
+    for (const center of traversal) {
+      const selected = selectVoxelStreamingWindow(
+        candidates,
+        [center * 16 + 8, 0, 0],
+        1,
+        dimensions,
+        2,
+        0,
+      );
+      const desiredKeys = new Set(
+        selected.map(({ coordinate }) => `${coordinate.x},${coordinate.y},${coordinate.z}`),
+      );
+      const keepKeys = new Set(desiredKeys);
+      for (const entry of selected) {
+        for (const dx of [-1, 1]) {
+          const neighborKey = `${entry.coordinate.x + dx},0,0`;
+          if (candidateKeys.has(neighborKey)) keepKeys.add(neighborKey);
+        }
+      }
+
+      pruneVoxelSourceCache(sourceCache, keepKeys);
+      for (const key of keepKeys) {
+        if (readVoxelSourceCache(sourceCache, key) === undefined) {
+          sourceReads += 1;
+          writeVoxelSourceCache(sourceCache, key, Number(key.split(',')[0]), 256);
+        }
+      }
+
+      maxActive = Math.max(maxActive, selected.length);
+      maxCached = Math.max(maxCached, sourceCache.size);
+      expect(selected.every(({ coordinate }) => Math.abs(coordinate.x - center) <= 2)).toBe(true);
+      expect(sourceCache.size).toBeLessThanOrEqual(256);
+      expect(
+        center === previousCenter ||
+          Math.abs(center - previousCenter) === 1 ||
+          previousCenter === -1,
+      ).toBe(true);
+      previousCenter = center;
+    }
+
+    expect(maxActive).toBe(5);
+    expect(maxCached).toBeLessThanOrEqual(7);
+    expect(sourceCache.size).toBeLessThanOrEqual(7);
+    expect(sourceReads).toBeGreaterThan(1_000);
+    expect(sourceReads).toBeLessThan(3_000);
+  });
+});
