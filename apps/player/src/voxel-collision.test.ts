@@ -34,6 +34,19 @@ describe('createVoxelChunkColliderInputs', () => {
     expect(adjacent.indices.length).toBeLessThan(isolated.indices.length);
   });
 
+  it('builds colliders only for active chunks while retaining loaded neighbors for face culling', () => {
+    const isolated = createVoxelChunkColliderInputs([chunk(0)])[0]!;
+    const streamed = createVoxelChunkColliderInputs(
+      [chunk(0), chunk(1)],
+      1,
+      { x: 16, y: 16, z: 16 },
+      new Set(['0,0,0']),
+    );
+    expect(streamed).toHaveLength(1);
+    expect(streamed[0]?.key).toBe('0,0,0');
+    expect(streamed[0]?.indices.length).toBeLessThan(isolated.indices.length);
+  });
+
   it('changes collider tokens when a neighboring chunk revision changes', () => {
     const first = createVoxelChunkColliderInputs([chunk(0), chunk(1, 1)])[0]!;
     const second = createVoxelChunkColliderInputs([chunk(0), chunk(1, 2)])[0]!;

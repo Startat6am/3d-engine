@@ -9,7 +9,7 @@ import {
 } from '@engine/geometry';
 import {
   BrowserProjectFileStore,
-  loadVoxelWorldProject,
+  openVoxelWorldProject,
   type DirectoryHandleLike,
 } from '@engine/project-storage';
 import {
@@ -486,7 +486,10 @@ async function prepareWorldEntities(document: WorldDocument) {
   return { prepared, unsupported };
 }
 
-type PlayerVoxelChunk = Awaited<ReturnType<typeof loadVoxelWorldProject>>['chunks'][number];
+type PlayerVoxelChunk = Awaited<ReturnType<typeof openVoxelWorldProject>>['chunks'][number];
+type PlayerVoxelChunkSnapshot = Awaited<
+  ReturnType<Awaited<ReturnType<typeof openVoxelWorldProject>>['loadChunk']>
+>;
 
 interface VoxelStreamProject {
   readonly settings: {
@@ -507,11 +510,22 @@ let voxelStream: {
 } | null = null;
 
 function createVoxelStream(
-  candidates: readonly { coordinate: ChunkCoordinate3; value: PlayerVoxelChunk }[],
-  chunksByCoordinate: Map<string, PlayerVoxelChunk>,
+  candidates: readonly PlayerVoxelChunk[],
+  loadChunk: (coordinate: ChunkCoordinate3) => Promise<PlayerVoxelChunkSnapshot>,
   project: VoxelStreamProject,
+  physics: NonNullable<Awaited<typeof physicsReady>>,
 ) {
+  const candidateByKey = new Map(
+    candidates.map((candidate) => [
+      chunkKey(candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z),
+      candidate,
+    ]),
+  );
   const renderEntities = new Map<string, ReturnType<typeof runtime.world.createEntity>[]>();
+  const sourceCache = new Map<string, PlayerVoxelChunkSnapshot>();
+  const sourcePending = new Map<string, Promise<PlayerVoxelChunkSnapshot>>();
+  const activeColliderKeys = new Set<string>();
+  let sourceKeepKeys = new Set<string>();
   const scheduler = new WorldChunkScheduler<VoxelStreamResident>({
     limits: {
       maxConcurrentJobs: 2,
@@ -527,11 +541,53 @@ function createVoxelStream(
   let disposed = false;
   let latestPosition: readonly [number, number, number] | null = null;
 
+  const syncColliders = () => {
+    physics.colliders.sync(
+      createVoxelChunkColliderInputs(
+        [...sourceCache.values()],
+        project.settings.voxelSize,
+        project.settings.chunkDimensions,
+        activeColliderKeys,
+      ),
+    );
+  };
+
+  const getSourceChunk = (coordinate: ChunkCoordinate3): Promise<PlayerVoxelChunkSnapshot> => {
+    const key = chunkKey(coordinate.x, coordinate.y, coordinate.z);
+    const cached = sourceCache.get(key);
+    if (cached) {
+      // Refresh insertion order for a small, deterministic LRU cache.
+      sourceCache.delete(key);
+      sourceCache.set(key, cached);
+      return Promise.resolve(cached);
+    }
+    const existing = sourcePending.get(key);
+    if (existing) return existing;
+    const request = loadChunk(coordinate).then((chunk) => {
+      if (!disposed && sourceKeepKeys.has(key)) sourceCache.set(key, chunk);
+      while (sourceCache.size > 256) {
+        const oldest = sourceCache.keys().next().value as string | undefined;
+        if (!oldest) break;
+        sourceCache.delete(oldest);
+      }
+      return chunk;
+    });
+    sourcePending.set(key, request);
+    void request.finally(() => sourcePending.delete(key)).catch(() => undefined);
+    return request;
+  };
+
+  const pruneSourceCache = (keepKeys: ReadonlySet<string>) => {
+    for (const key of sourceCache.keys()) {
+      if (!keepKeys.has(key)) sourceCache.delete(key);
+    }
+  };
+
   const update = (position: readonly [number, number, number]) => {
     if (disposed) return;
     latestPosition = [...position];
     const desired = selectVoxelStreamingWindow(
-      candidates,
+      candidates.map((candidate) => ({ coordinate: candidate.coordinate, value: candidate })),
       position,
       project.settings.voxelSize,
       project.settings.chunkDimensions,
@@ -541,6 +597,26 @@ function createVoxelStream(
     const desiredKeys = new Set(
       desired.map(({ coordinate }) => chunkKey(coordinate.x, coordinate.y, coordinate.z)),
     );
+    activeColliderKeys.clear();
+    for (const key of desiredKeys) activeColliderKeys.add(key);
+    sourceKeepKeys = new Set(desiredKeys);
+    for (const entry of desired) {
+      const { x, y, z } = entry.coordinate;
+      for (const [dx, dy, dz] of [
+        [1, 0, 0],
+        [-1, 0, 0],
+        [0, 1, 0],
+        [0, -1, 0],
+        [0, 0, 1],
+        [0, 0, -1],
+      ]) {
+        const key = chunkKey(x + dx!, y + dy!, z + dz!);
+        if (candidateByKey.has(key)) sourceKeepKeys.add(key);
+      }
+    }
+    pruneSourceCache(sourceKeepKeys);
+    syncColliders();
+
     for (const candidate of candidates) {
       const key = chunkKey(candidate.coordinate.x, candidate.coordinate.y, candidate.coordinate.z);
       if (!desiredKeys.has(key)) scheduler.evict(candidate.coordinate);
@@ -549,25 +625,44 @@ function createVoxelStream(
       const key = chunkKey(entry.coordinate.x, entry.coordinate.y, entry.coordinate.z);
       if (pending.has(key) || scheduler.getResident(entry.coordinate)) continue;
       pending.add(key);
-      const chunk = entry.value;
-      const { x, y, z } = chunk.coordinate;
-      const neighbor = (dx: number, dy: number, dz: number) =>
-        chunksByCoordinate.get(chunkKey(x + dx, y + dy, z + dz));
-      const neighbors = {
-        ...(neighbor(1, 0, 0) ? { positiveX: neighbor(1, 0, 0)! } : {}),
-        ...(neighbor(-1, 0, 0) ? { negativeX: neighbor(-1, 0, 0)! } : {}),
-        ...(neighbor(0, 1, 0) ? { positiveY: neighbor(0, 1, 0)! } : {}),
-        ...(neighbor(0, -1, 0) ? { negativeY: neighbor(0, -1, 0)! } : {}),
-        ...(neighbor(0, 0, 1) ? { positiveZ: neighbor(0, 0, 1)! } : {}),
-        ...(neighbor(0, 0, -1) ? { negativeZ: neighbor(0, 0, -1)! } : {}),
-      };
       let wasCancelled = false;
       void scheduler
         .request({
-          coordinate: chunk.coordinate,
-          revision: chunk.revision,
+          coordinate: entry.coordinate,
+          revision: entry.value.revision,
           priority: -entry.distanceSquared,
           run: async (signal) => {
+            const chunk = await getSourceChunk(entry.coordinate);
+            if (signal.aborted) {
+              throw new Error('WORLD_JOB_CANCELLED');
+            }
+            const { x, y, z } = chunk.coordinate;
+            const neighbor = async (dx: number, dy: number, dz: number) => {
+              const coordinate = { x: x + dx, y: y + dy, z: z + dz };
+              if (!candidateByKey.has(chunkKey(coordinate.x, coordinate.y, coordinate.z))) {
+                return undefined;
+              }
+              return getSourceChunk(coordinate);
+            };
+            const [positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ] =
+              await Promise.all([
+                neighbor(1, 0, 0),
+                neighbor(-1, 0, 0),
+                neighbor(0, 1, 0),
+                neighbor(0, -1, 0),
+                neighbor(0, 0, 1),
+                neighbor(0, 0, -1),
+              ]);
+            if (signal.aborted) throw new Error('WORLD_JOB_CANCELLED');
+            const neighbors = {
+              ...(positiveX ? { positiveX } : {}),
+              ...(negativeX ? { negativeX } : {}),
+              ...(positiveY ? { positiveY } : {}),
+              ...(negativeY ? { negativeY } : {}),
+              ...(positiveZ ? { positiveZ } : {}),
+              ...(negativeZ ? { negativeZ } : {}),
+            };
+            syncColliders();
             const mesh = await meshVoxelChunkAsync(
               chunk,
               neighbors,
@@ -603,14 +698,14 @@ function createVoxelStream(
         })
         .then((resident) => {
           if (disposed || scheduler.getResident(entry.coordinate)?.value !== resident) return;
+          const chunk = sourceCache.get(key);
+          if (!chunk) return;
           const origin: [number, number, number] = [
             chunk.coordinate.x * project.settings.chunkDimensions.x * project.settings.voxelSize,
             chunk.coordinate.y * project.settings.chunkDimensions.y * project.settings.voxelSize,
             chunk.coordinate.z * project.settings.chunkDimensions.z * project.settings.voxelSize,
           ];
           const entities: ReturnType<typeof runtime.world.createEntity>[] = [];
-          // Re-mesh is deliberately not repeated here: scheduler payload owns the CPU result.
-          // The resident is populated below from a per-request mesh cache.
           const mesh = completedMeshes.get(key);
           if (!mesh) return;
           for (const part of mesh.parts) {
@@ -632,7 +727,9 @@ function createVoxelStream(
         .catch((error: unknown) => {
           if (!scheduler.getResident(entry.coordinate)) completedMeshes.delete(key);
           wasCancelled =
-            error instanceof Error && 'code' in error && error.code === 'WORLD_JOB_CANCELLED';
+            error instanceof Error &&
+            (('code' in error && error.code === 'WORLD_JOB_CANCELLED') ||
+              error.message === 'WORLD_JOB_CANCELLED');
           if (!wasCancelled) {
             setProjectStatus(
               `Voxel chunk ${key} failed to stream: ${error instanceof Error ? error.message : String(error)}`,
@@ -642,8 +739,6 @@ function createVoxelStream(
         })
         .finally(() => {
           pending.delete(key);
-          // An evicted job may settle after the camera has re-entered its chunk.
-          // Reconcile once more so a brief exit/re-entry cannot leave a desired hole.
           if (wasCancelled && !disposed && latestPosition) update(latestPosition);
         });
     }
@@ -661,6 +756,11 @@ function createVoxelStream(
       }
       renderEntities.clear();
       completedMeshes.clear();
+      sourceCache.clear();
+      sourcePending.clear();
+      sourceKeepKeys.clear();
+      activeColliderKeys.clear();
+      physics.colliders.sync([]);
     },
   };
 }
@@ -681,37 +781,21 @@ async function openProjectFolder(): Promise<void> {
   setProjectStatus('Choose a project folder…');
   try {
     const directory = await picker({ mode: 'read' });
-    setProjectProgress(8, 'Reading manifest, assets and voxel chunks');
+    setProjectProgress(8, 'Reading project manifest and assets');
     await yieldToBrowser();
-    const project = await loadVoxelWorldProject(new BrowserProjectFileStore(directory));
+    const project = await openVoxelWorldProject(new BrowserProjectFileStore(directory));
     setProjectProgress(52, 'Preparing scene entities and GLB models');
     await yieldToBrowser();
     const world = await prepareWorldEntities(project.document);
     setProjectProgress(68, 'Preparing voxel streaming window');
     await yieldToBrowser();
-    const chunksByCoordinate = new Map(
-      project.chunks.map((chunk) => [
-        chunkKey(chunk.coordinate.x, chunk.coordinate.y, chunk.coordinate.z),
-        chunk,
-      ]),
-    );
-    const voxelStreamCandidates = project.chunks.map((chunk) => ({
-      coordinate: chunk.coordinate,
-      value: chunk,
-    }));
+    const voxelStreamCandidates = project.chunks;
 
-    // Prepare and register static voxel collision before replacing the visible scene.
-    // The revision token includes the source chunk and all six neighbor revisions.
-    setProjectProgress(80, 'Building static voxel collision');
+    // Physics and render data are both made resident only for the camera window.
+    setProjectProgress(80, 'Preparing streamed collision');
     await yieldToBrowser();
     const physics = await physicsReady;
     if (!physics) throw new Error('Rapier physics world is unavailable');
-    const colliderInputs = createVoxelChunkColliderInputs(
-      project.chunks,
-      project.settings.voxelSize,
-      project.settings.chunkDimensions,
-    );
-    physics.colliders.sync(colliderInputs);
 
     // Commit the replacement only after every referenced blob, render mesh and collider is ready.
     streamAnchor = null;
@@ -775,14 +859,14 @@ async function openProjectFolder(): Promise<void> {
     setProjectProgress(88, 'Applying loaded scene');
     await yieldToBrowser();
     const chunkCount = project.chunks.length;
-    const stream = createVoxelStream(voxelStreamCandidates, chunksByCoordinate, project);
+    const stream = createVoxelStream(voxelStreamCandidates, project.loadChunk, project, physics);
     voxelStream = stream;
     stream.update(streamAnchor ?? camera.position);
     const meshCount = world.prepared.length;
     setProjectProgress(100, 'Project loaded');
     setProjectStatus(
       `Loaded “${project.document.world.name}” · ${chunkCount} voxel chunks available for streaming · ${meshCount} non-voxel mesh parts` +
-        ` · ${colliderInputs.length} static voxel colliders` +
+        ` · streamed voxel collision enabled` +
         (world.unsupported
           ? ` · ${world.unsupported} unsupported entities or GLB parts skipped`
           : ''),

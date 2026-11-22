@@ -22,6 +22,7 @@ export function createVoxelChunkColliderInputs(
   chunks: readonly VoxelChunkSnapshot[],
   voxelSize = 1,
   chunkDimensions: VoxelChunkDimensions = { x: 16, y: 16, z: 16 },
+  activeChunkKeys?: ReadonlySet<string>,
 ) {
   if (!Number.isFinite(voxelSize) || voxelSize <= 0) {
     throw new RangeError('Voxel collision size must be a finite positive number');
@@ -41,6 +42,8 @@ export function createVoxelChunkColliderInputs(
   const inputs = [];
   for (const chunk of chunks) {
     const { x, y, z } = chunk.coordinate;
+    const key = chunkKey(x, y, z);
+    if (activeChunkKeys && !activeChunkKeys.has(key)) continue;
     const neighbor = (dx: number, dy: number, dz: number) =>
       byCoordinate.get(chunkKey(x + dx, y + dy, z + dz));
     const positiveX = neighbor(1, 0, 0);
@@ -60,7 +63,6 @@ export function createVoxelChunkColliderInputs(
     const mesh = createVoxelChunkCollisionMesh(chunk, neighbors, voxelSize);
     if (!isVoxelChunkCollisionMeshCurrent(mesh, chunk, neighbors) || !mesh.geometry) continue;
 
-    const key = chunkKey(x, y, z);
     inputs.push({
       key,
       entity: `voxel-chunk:${key}` as EntityId,

@@ -7,6 +7,7 @@ import {
   MemoryProjectFileStore,
   ProjectAssetStoreError,
   loadVoxelWorldProject,
+  openVoxelWorldProject,
   saveVoxelWorldProject,
 } from './index.js';
 
@@ -32,6 +33,12 @@ const settings = { voxelSize: 0.5, chunkDimensions: { x: 16, y: 16, z: 16 } };
 
 class RecordingStore extends MemoryProjectFileStore {
   readonly writes: string[] = [];
+  readonly reads: string[] = [];
+
+  override async readFile(path: string) {
+    this.reads.push(path);
+    return super.readFile(path);
+  }
 
   override async writeFile(
     path: string,
@@ -157,6 +164,29 @@ describe('voxel world project persistence', () => {
       mimeType: 'application/vnd.choreon.voxel-material+json',
       encoding: 'base64',
       data: btoa(String.fromCharCode(...source)),
+    });
+  });
+
+  it('opens chunk descriptors without reading payloads and verifies each chunk on demand', async () => {
+    const store = new RecordingStore();
+    await saveVoxelWorldProject(store, document, settings, [chunk(-1), chunk(1)]);
+    store.reads.length = 0;
+
+    const opened = await openVoxelWorldProject(store);
+    expect(opened.chunks).toHaveLength(2);
+    expect(opened.chunks.map((entry) => entry.coordinate)).toEqual([
+      { x: -1, y: -2, z: 3 },
+      { x: 1, y: -2, z: 3 },
+    ]);
+    expect(store.reads).toEqual(['worlds/main.world']);
+
+    const loaded = await opened.loadChunk({ x: 1, y: -2, z: 3 });
+    expect(loaded.coordinate).toEqual({ x: 1, y: -2, z: 3 });
+    expect(loaded.copyCells()).toEqual(new Uint16Array(4096).fill(1));
+    expect(store.reads).toHaveLength(2);
+    expect(store.reads[1]).toMatch(/^voxel\/chunks\/sha256\//);
+    await expect(opened.loadChunk({ x: 99, y: 0, z: 0 })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
     });
   });
 

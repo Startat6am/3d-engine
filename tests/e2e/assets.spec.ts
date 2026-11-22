@@ -690,7 +690,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
   await expect(playerStatus).toContainText('Loaded');
   await expect(playerStatus).toContainText('non-voxel mesh parts');
   await expect(playerStatus).toContainText('voxel chunks available for streaming');
-  await expect(playerStatus).toContainText('static voxel colliders');
+  await expect(playerStatus).toContainText('streamed voxel collision enabled');
   await expect(playerStatus).not.toContainText('unsupported');
   await expect
     .poll(() =>

@@ -23,7 +23,7 @@ export interface VoxelWorldSettings {
   readonly chunkDimensions: Readonly<{ x: number; y: number; z: number }>;
 }
 
-interface VoxelChunkDescriptor {
+export interface VoxelChunkDescriptor {
   readonly coordinate: ChunkCoordinate3;
   readonly revision: number;
   readonly palette: readonly VoxelPaletteEntry[];
@@ -134,11 +134,12 @@ export async function saveVoxelWorldProject(
   return saveDirectoryProject(store, next);
 }
 
-/** Loads and verifies every referenced chunk blob before exposing decoded snapshots. */
-export async function loadVoxelWorldProject(store: ProjectFileStore): Promise<{
+/** Opens the manifest and chunk descriptors without reading any voxel payload blobs. */
+export async function openVoxelWorldProject(store: ProjectFileStore): Promise<{
   readonly document: WorldDocument;
   readonly settings: VoxelWorldSettings;
-  readonly chunks: readonly VoxelChunkSnapshot[];
+  readonly chunks: readonly VoxelChunkDescriptor[];
+  loadChunk(coordinate: ChunkCoordinate3): Promise<VoxelChunkSnapshot>;
 }> {
   const document = await loadDirectoryProject(store);
   const raw = document.extensions[VOXEL_WORLD_EXTENSION_KEY];
@@ -160,7 +161,7 @@ export async function loadVoxelWorldProject(store: ProjectFileStore): Promise<{
   const settings = raw.settings as unknown as VoxelWorldSettings;
   validateSettings(settings);
   const seen = new Set<string>();
-  const chunks: VoxelChunkSnapshot[] = [];
+  const descriptors: VoxelChunkDescriptor[] = [];
   for (const [index, rawChunk] of raw.chunks.entries()) {
     if (
       !isRecord(rawChunk) ||
@@ -184,6 +185,9 @@ export async function loadVoxelWorldProject(store: ProjectFileStore): Promise<{
     if (seen.has(key))
       throw new ProjectAssetStoreError(`Duplicate voxel chunk coordinate: ${key}`, 'INVALID_PATH');
     seen.add(key);
+    if (!Number.isSafeInteger(rawChunk.revision) || (rawChunk.revision as number) < 0) {
+      throw new ProjectAssetStoreError(`Invalid voxel chunk revision: ${key}`, 'INVALID_EXTENSION');
+    }
     const payload = rawChunk.payload;
     if (payload.codecVersion !== VOXEL_CHUNK_PAYLOAD_VERSION) {
       throw new ProjectAssetStoreError(
@@ -197,34 +201,68 @@ export async function loadVoxelWorldProject(store: ProjectFileStore): Promise<{
     ) {
       throw new ProjectAssetStoreError(`Invalid voxel payload metadata: ${key}`, 'MISSING_PAYLOAD');
     }
+    chunkBlobPath(payload.contentHash);
     if (payload.assetId !== `voxel-chunk:${payload.contentHash.slice(7)}`) {
       throw new ProjectAssetStoreError(
         `Voxel payload asset ID does not match its hash: ${key}`,
         'INVALID_EXTENSION',
       );
     }
-    const bytes = await store.readFile(chunkBlobPath(payload.contentHash));
+    descriptors.push({
+      coordinate: { ...coordinate },
+      revision: rawChunk.revision as number,
+      palette: rawChunk.palette as VoxelPaletteEntry[],
+      payload: {
+        assetId: payload.assetId as string,
+        byteLength: payload.byteLength as number,
+        codecVersion: payload.codecVersion as number,
+        contentHash: payload.contentHash as string,
+      },
+    });
+  }
+  const descriptorByCoordinate = new Map(
+    descriptors.map((descriptor) => [coordinateKey(descriptor.coordinate), descriptor]),
+  );
+  const loadChunk = async (coordinate: ChunkCoordinate3): Promise<VoxelChunkSnapshot> => {
+    const key = coordinateKey(coordinate);
+    const descriptor = descriptorByCoordinate.get(key);
+    if (!descriptor) {
+      throw new ProjectAssetStoreError(`Voxel chunk does not exist: ${key}`, 'NOT_FOUND');
+    }
+    const path = chunkBlobPath(descriptor.payload.contentHash);
+    const bytes = await store.readFile(path);
     if (
-      bytes.byteLength !== payload.byteLength ||
-      (await hashPayload(bytes)) !== payload.contentHash
+      bytes.byteLength !== descriptor.payload.byteLength ||
+      (await hashPayload(bytes)) !== descriptor.payload.contentHash
     ) {
       throw new ProjectAssetStoreError(
         `Voxel chunk payload hash or length mismatch: ${key}`,
         'HASH_MISMATCH',
       );
     }
-    chunks.push(
-      decodeVoxelChunkPayload(
-        {
-          coordinate,
-          revision: rawChunk.revision as number,
-          palette: rawChunk.palette as VoxelPaletteEntry[],
-        },
-        bytes,
-      ),
+    return decodeVoxelChunkPayload(
+      {
+        coordinate: descriptor.coordinate,
+        revision: descriptor.revision,
+        palette: descriptor.palette,
+      },
+      bytes,
     );
-  }
-  return { document, settings, chunks };
+  };
+  return { document, settings, chunks: descriptors, loadChunk };
+}
+
+/** Eager compatibility loader for tools that explicitly need every decoded chunk. */
+export async function loadVoxelWorldProject(store: ProjectFileStore): Promise<{
+  readonly document: WorldDocument;
+  readonly settings: VoxelWorldSettings;
+  readonly chunks: readonly VoxelChunkSnapshot[];
+}> {
+  const opened = await openVoxelWorldProject(store);
+  const chunks = await Promise.all(
+    opened.chunks.map(({ coordinate }) => opened.loadChunk(coordinate)),
+  );
+  return { document: opened.document, settings: opened.settings, chunks };
 }
 
 export type { VoxelChunkSnapshot } from '@engine/voxel';
