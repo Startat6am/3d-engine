@@ -355,16 +355,32 @@ test('Player activates Web Audio from a user gesture and starts a spatial voice'
       __playerAudioVoices?: number;
       __playerAudioSpatialization?: string;
       __playerAudioContextState?: string;
+      __playerAudioListenerPosition?: readonly [number, number, number];
     };
     return {
       active: state.__playerAudioActive,
       voices: state.__playerAudioVoices,
       spatialization: state.__playerAudioSpatialization,
       contextState: state.__playerAudioContextState,
+      listenerPosition: state.__playerAudioListenerPosition,
     };
   });
   expect(audio.active).toBe(true);
   expect(audio.voices).toBe(1);
   expect(['HRTF', 'equalpower']).toContain(audio.spatialization);
   expect(audio.contextState).toBe('running');
+  expect(audio.listenerPosition).toHaveLength(3);
+  const initialListenerPosition = audio.listenerPosition;
+  await page.keyboard.down('w');
+  await page.waitForTimeout(180);
+  await page.keyboard.up('w');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerAudioListenerPosition?: readonly [number, number, number] })
+            .__playerAudioListenerPosition,
+      ),
+    )
+    .not.toEqual(initialListenerPosition);
 });

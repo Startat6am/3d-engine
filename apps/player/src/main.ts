@@ -1235,7 +1235,6 @@ const renderFrame = (now: number) => {
   updateFps(now);
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
-  audioRuntime.setListener({ position: camera.position, orientation: camera.rotation });
   runtime.advance(delta);
   if (streamAnchor && cameraPanKeys.size > 0 && delta > 0) {
     const distance = Math.min(delta, 0.1) * 24;
@@ -1250,6 +1249,15 @@ const renderFrame = (now: number) => {
       };
       voxelStream?.update(streamAnchor);
     }
+  }
+
+  // Keep the Web Audio listener in lockstep with the camera after input has been applied.
+  audioRuntime.setListener({ position: camera.position, orientation: camera.rotation });
+  if (import.meta.env.DEV) {
+    const debugWindow = window as Window & {
+      __playerAudioListenerPosition?: readonly [number, number, number];
+    };
+    debugWindow.__playerAudioListenerPosition = [...camera.position];
   }
 
   // Keep Rapier on a bounded fixed timestep; large tab-resume deltas are clamped.

@@ -83,7 +83,7 @@ M8 first supports imported GLB animation/skin data in memory. Persisted editor a
 2. GLB import: skins, inverse-bind matrices, animation samplers/channels, joint validation, capability diagnostics and fixtures.
 3. Renderer skinning: palette convention tests, bounded GPU upload, skinned character visible in Player. **Implemented and covered by Chromium deformation/animation/resource-teardown tests.**
 4. Audio core/backend: fake backend contract, explicit Web Audio initialization, decode/play/stop/dispose, spatial listener/source updates and voice bounds. **Implemented; Chromium verifies user-gesture activation and a spatial voice.**
-5. Player acceptance harness: animated GLB playback and a separate user-triggered spatial-audio smoke control. **Implemented; full listener/camera synchronization and a scene-authored sound source remain open.**
+5. Player acceptance harness: animated GLB playback and a separate user-triggered spatial-audio smoke control. **Implemented; Player updates the audio listener from the active camera after per-frame input, with a browser regression test. Scene-authored sound sources remain open.**
 
 ## 10. Acceptance gates
 
@@ -91,7 +91,7 @@ M8 first supports imported GLB animation/skin data in memory. Persisted editor a
 - CPU sampling tests cover key boundaries, STEP/LINEAR/slerp/CUBICSPLINE, looping, seek, negative/invalid time, and cross-fade blending.
 - Renderer conformance verifies skinning palette matrix order and resource cleanup; a real skinned GLB visibly deforms and animates in Chromium Player (passed).
 - Audio backend tests cover user-gesture initialization boundary, decode failure, 2D/3D source configuration, attenuation, voice limits, stop/pause, and disposal.
-- Player Chromium smoke coverage verifies explicit user-triggered audio activation, a running spatial voice, and renderer/audio teardown. Listener movement response and full scene-authored audio integration remain acceptance gaps.
+- Player Chromium smoke coverage verifies explicit user-triggered audio activation, a running spatial voice, and renderer/audio teardown. Listener follows camera movement in the Player Chromium test; scene-authored audio integration remains an acceptance gap.
 - Format, lint, typecheck, full unit/contract suite, production build, Chromium E2E and benchmark outputs pass on exact PR head.
 - Browser/device claims are limited to actually tested environments; no unmeasured FPS, latency, VRAM, or audio-latency budgets are implied.
 

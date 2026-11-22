@@ -217,8 +217,9 @@ export class AudioRuntime {
   /** Host must call this from a trusted user gesture; no implicit autoplay/resume occurs. */
   async activateFromUserGesture(): Promise<void> {
     this.#assertActive();
-    if (this.#active) return;
     try {
+      // Re-run activation even after the first successful gesture: browsers may
+      // suspend an AudioContext when the tab is backgrounded or the device sleeps.
       await this.#backend.activateFromUserGesture();
       this.#backend.updateListener(this.#listener);
       this.#active = true;

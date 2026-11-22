@@ -78,6 +78,16 @@ describe('spatial audio contracts', () => {
     expect(() => runtime.createVoice('ambience')).toThrowError(AudioError);
   });
 
+  it('allows a fresh user gesture to resume an already activated backend', async () => {
+    const backend = createBackend();
+    const runtime = new AudioRuntime(backend);
+    await runtime.activateFromUserGesture();
+    await runtime.activateFromUserGesture();
+    expect(backend.activateFromUserGesture).toHaveBeenCalledTimes(2);
+    expect(backend.updateListener).toHaveBeenCalledTimes(2);
+    runtime.dispose();
+  });
+
   it('caches listener transforms until explicit user-gesture activation', async () => {
     const backend = createBackend();
     const runtime = new AudioRuntime(backend);
