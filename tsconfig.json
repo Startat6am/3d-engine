@@ -5,6 +5,12 @@
       "path": "packages/engine-assets"
     },
     {
+      "path": "packages/engine-animation"
+    },
+    {
+      "path": "packages/engine-audio"
+    },
+    {
       "path": "packages/engine-core"
     },
     {
