@@ -15,6 +15,7 @@ The format is an architectural direction, not yet a finalized or implemented pub
 - `packages/engine-core` — renderer-independent engine lifecycle and generation-safe entity handles.
 - `packages/engine-geometry` — CPU-side mesh contracts and primitive geometry.
 - `packages/engine-renderer` — Three.js WebGL2 implementation behind an engine-owned adapter.
+- `packages/engine-animation` — renderer-independent animation track/clip/skin contracts and keyframe sampling (M8 in progress).
 - `apps/editor` — React authoring shell with hierarchy, inspector and live 3D viewport.
 - `apps/player` — minimal runtime host and Physics Playground sample; no React or editor dependency.
 
