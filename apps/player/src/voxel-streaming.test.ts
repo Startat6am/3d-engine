@@ -32,6 +32,20 @@ describe('Player voxel streaming window', () => {
     expect(result.map(({ value }) => value)).toEqual(['-1,0,0', '-2,0,0', '0,0,0']);
   });
 
+  it('tracks repeated forward and reverse crossings at exact chunk boundaries', () => {
+    const candidates = Array.from({ length: 9 }, (_, index) => candidate(index - 4, 0, 0));
+    const positions = [15.99, 16, 31.99, 32, 31.99, 16, 15.99, 0, -0.01, -16];
+    const centers = [0, 1, 1, 2, 1, 1, 0, 0, -1, -1];
+
+    for (const [index, position] of positions.entries()) {
+      const result = selectVoxelStreamingWindow(candidates, [position, 0, 0], 1, dimensions, 1, 0);
+      expect(result.map(({ coordinate }) => coordinate.x)).toContain(centers[index]);
+      expect(result.every(({ coordinate }) => Math.abs(coordinate.x - centers[index]!) <= 1)).toBe(
+        true,
+      );
+    }
+  });
+
   it('prioritizes nearest chunks and uses stable coordinate tie-breakers', () => {
     const result = selectVoxelStreamingWindow(
       [candidate(0, 0, 1), candidate(1, 0, 0), candidate(0, 0, 0)],

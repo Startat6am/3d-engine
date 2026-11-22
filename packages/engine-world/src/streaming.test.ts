@@ -184,6 +184,68 @@ describe('bounded world chunk scheduler', () => {
     expect(scheduler.residentCount).toBe(0);
   });
 
+  it('survives rapid desired-window churn without publishing stale chunks', async () => {
+    const scheduler = new WorldChunkScheduler<string>({
+      limits: {
+        maxConcurrentJobs: 2,
+        maxQueuedJobs: 256,
+        maxResidentChunks: 3,
+        maxChunkPayloadBytes: 64,
+      },
+    });
+    const promises: Promise<unknown>[] = [];
+    let previousWindow = new Set<number>();
+
+    for (let center = 0; center < 100; center += 1) {
+      const nextWindow = new Set([center - 1, center, center + 1]);
+      for (const x of previousWindow) {
+        if (!nextWindow.has(x)) scheduler.evict({ x, y: 0, z: 0 });
+      }
+      for (const x of nextWindow) {
+        promises.push(
+          scheduler
+            .request({
+              coordinate: { x, y: 0, z: 0 },
+              revision: 1,
+              priority: -Math.abs(x - center),
+              run: (signal) =>
+                new Promise((resolve, reject) => {
+                  const timeout = setTimeout(() => resolve(result(`chunk-${x}`)), 5);
+                  signal.addEventListener(
+                    'abort',
+                    () => {
+                      clearTimeout(timeout);
+                      reject(new Error('aborted stale chunk job'));
+                    },
+                    { once: true },
+                  );
+                }),
+            })
+            .catch((error: unknown) => {
+              if (
+                error instanceof Error &&
+                'code' in error &&
+                error.code === 'WORLD_JOB_CANCELLED'
+              ) {
+                return undefined;
+              }
+              throw error;
+            }),
+        );
+      }
+      previousWindow = nextWindow;
+    }
+
+    await Promise.all(promises);
+    expect(scheduler.activeCount).toBe(0);
+    expect(scheduler.queuedCount).toBe(0);
+    expect(scheduler.residentCount).toBe(3);
+    expect(
+      [-1, 0, 1].map((offset) => scheduler.getResident({ x: 99 + offset, y: 0, z: 0 })?.value),
+    ).toEqual(['chunk-98', 'chunk-99', 'chunk-100']);
+    scheduler.dispose();
+  });
+
   it('keeps residency bounded across repeated load and explicit eviction cycles', async () => {
     const release = vi.fn();
     const scheduler = new WorldChunkScheduler<string>({
