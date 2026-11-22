@@ -18,7 +18,13 @@
 | 11. Runtime & packaging                      | Scene boot, game loop, packaging, profiling                                                                                                                                                        | Player builds and runs all acceptance scenes                                                                                                                                                                                         |
 | 12. Hardening                                | Benchmarks, accessibility, docs, compatibility matrix                                                                                                                                              | Release checklist and measured baseline signed off                                                                                                                                                                                   |
 
-## M8 planning baseline — 2026-11-22\n\n- M7 PR #90 was merged; the old M7 active/draft wording in the handoff and roadmap is superseded.\n- M8 is contract-first. No animation/audio runtime capability is claimed yet.\n- See [M8 Execution Plan](M8_EXECUTION_PLAN.md), [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md), and [ADR-0013](ADR/0013-animation-audio-package-boundaries.md).\n\n## M5 closeout — 2026-11-15
+## M8 planning baseline — 2026-11-22
+
+- M7 PR #90 was merged; the old M7 active/draft wording in the handoff and roadmap is superseded.
+- M8 is contract-first. No animation/audio runtime capability is claimed yet.
+- See [M8 Execution Plan](M8_EXECUTION_PLAN.md), [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md), and [ADR-0013](ADR/0013-animation-audio-package-boundaries.md).
+
+## M5 closeout — 2026-11-15
 
 - PRs #73–#80, #82, #83, and #84 are merged into `main`.
 - PR #81 was superseded by PR #83 and closed.
@@ -49,7 +55,7 @@ After the M5 asset identity, serialization, and import-lifecycle gates are stabl
 
 All source formats must normalize into the same versioned, format-neutral Choreon asset representation. Importer support is capability-based: report what was actually imported (geometry, hierarchy, materials, textures, skinning, animation), and emit actionable diagnostics for unsupported features. Format names alone must never imply complete feature support. This list is a proposed direction, not a committed delivery date or promise; each importer requires a contract, fixtures, compatibility notes, security limits, and license review. See [Asset Pipeline](ASSET_PIPELINE.md).
 
-## M6 integration and M7 progress — 2026-11-19
+## Historical M6 integration and M7 development notes — superseded by M7 closeout
 
 - M6 was integrated into `main` by PR #87 at squash commit `54def102`. Exact-head CI run #506 passed. Physical-device profiling, controlled WASM-memory/allocation and GPU/frame-time measurements, physical gamepad checks, and cross-browser support remain explicitly deferred.
 - PR #86 was closed as superseded because its planning docs were included in PR #87. Original stacked M7 PR #89 was closed and replaced with clean main-based PR #90 after the M6 squash merge. PR #88 (desktop camera controls) remains a separate change for independent review/rebase.
