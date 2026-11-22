@@ -53,9 +53,9 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [M6 acceptance](docs/acceptance/M6_PHYSICS_INPUT.md) | Physics, input, editor UX and CI exit gates                     |
 | [M7 execution plan](docs/M7_EXECUTION_PLAN.md)       | World and voxel milestone sequencing and acceptance             |
 | [M8 execution plan](docs/M8_EXECUTION_PLAN.md)       | Animation and audio milestone sequencing and acceptance         |
-| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle        |
+| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle       |
 | [M8 execution plan](docs/M8_EXECUTION_PLAN.md)       | Animation and audio milestone sequencing and acceptance         |
-| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle        |
+| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle       |
 | [World/voxel spec](docs/VOXEL_WORLD_SPEC.md)         | Chunk, voxel, meshing, streaming and generation contracts       |
 | [Editor](docs/EDITOR_SPEC.md)                        | Authoring application                                           |
 | [Runtime](docs/RUNTIME_SPEC.md)                      | Player lifecycle and frame scheduling                           |
