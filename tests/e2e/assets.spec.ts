@@ -746,7 +746,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     () => (window as Window & { __playerDeletedBuffers: number }).__playerDeletedBuffers,
   );
   await page.keyboard.down('d');
-  await page.waitForTimeout(2800);
+  await page.waitForTimeout(5200);
   await page.keyboard.up('d');
   await expect
     .poll(() =>
@@ -769,7 +769,7 @@ test('directory project saves content-addressed blobs and opens atomically', asy
     () => (window as Window & { __playerCreatedBuffers: number }).__playerCreatedBuffers,
   );
   await page.keyboard.down('a');
-  await page.waitForTimeout(2800);
+  await page.waitForTimeout(5200);
   await page.keyboard.up('a');
   await expect
     .poll(() =>
@@ -1274,4 +1274,56 @@ test('renderer restores its WebGL context and reuploads scene textures after con
   await expect(page.getByText('TriangleNode')).toBeVisible();
   expect(pageErrors).toEqual([]);
   expect(consoleErrors).toEqual([]);
+});
+
+test('Player preloads the built-in voxel streaming test scene on startup', async ({ page }) => {
+  await page.addInitScript(() => {
+    const state = window as Window & {
+      __sampleDrawCalls: number;
+      __sampleCreatedBuffers: number;
+    };
+    state.__sampleDrawCalls = 0;
+    state.__sampleCreatedBuffers = 0;
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (...args) {
+      state.__sampleDrawCalls += 1;
+      return drawElements.apply(this, args);
+    };
+    const createBuffer = WebGL2RenderingContext.prototype.createBuffer;
+    WebGL2RenderingContext.prototype.createBuffer = function () {
+      state.__sampleCreatedBuffers += 1;
+      return createBuffer.call(this);
+    };
+  });
+
+  await page.goto('http://127.0.0.1:5174');
+  const status = page.locator('#project-status');
+  await expect(status).toContainText('Voxel test scene ready');
+  await expect(status).toContainText('63 chunks available');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __sampleDrawCalls: number }).__sampleDrawCalls),
+    )
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __sampleCreatedBuffers: number }).__sampleCreatedBuffers,
+      ),
+    )
+    .toBeGreaterThan(0);
+
+  const loadsBeforeTravel = await page.evaluate(
+    () => (window as Window & { __playerSampleChunkLoads: number }).__playerSampleChunkLoads,
+  );
+  await page.keyboard.down('d');
+  await page.waitForTimeout(5200);
+  await page.keyboard.up('d');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerSampleChunkLoads: number }).__playerSampleChunkLoads,
+      ),
+    )
+    .toBeGreaterThan(loadsBeforeTravel);
 });
