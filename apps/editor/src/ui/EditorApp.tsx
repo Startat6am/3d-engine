@@ -2573,9 +2573,11 @@ export function EditorApp() {
           <div className="panel-heading">
             INSPECTOR{' '}
             <button
-              aria-label="Delete selected object"
-              disabled={!selected}
-              onClick={removeSelected}
+              aria-label={
+                selectedVoxelChunk ? 'Delete selected voxel chunk' : 'Delete selected object'
+              }
+              disabled={!selected && !selectedVoxelChunk}
+              onClick={selectedVoxelChunk ? removeSelectedVoxelChunk : removeSelected}
             >
               ⌫
             </button>
