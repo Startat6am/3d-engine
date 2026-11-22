@@ -797,7 +797,8 @@ async function openProjectFolder(): Promise<void> {
     const physics = await physicsReady;
     if (!physics) throw new Error('Rapier physics world is unavailable');
 
-    // Commit the replacement only after every referenced blob, render mesh and collider is ready.
+    // Commit after the manifest and non-voxel assets are validated. Voxel payloads
+    // remain lazy and surface integrity/read failures when their chunks are requested.
     streamAnchor = null;
     camera = createDefaultCamera();
     for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
