@@ -1519,6 +1519,7 @@ const renderFrame = (now: number) => {
   runtime.advance(delta);
   for (const source of activeAudioSources) {
     const worldMatrix = runtime.hierarchy.getWorldMatrix(source.entity);
+    if (!worldMatrix) continue;
     source.state = {
       ...source.state,
       position: [worldMatrix[12]!, worldMatrix[13]!, worldMatrix[14]!],
