@@ -9,6 +9,8 @@ importers:
         specifier: 12.18.0
         version: 12.18.0
 
+  packages/engine-audio: {}
+
   packages/engine-world: {}
 
 packages:
@@ -306,6 +308,9 @@ importers:
       '@engine/animation':
         specifier: workspace:*
         version: link:../../packages/engine-animation
+      '@engine/audio':
+        specifier: workspace:*
+        version: link:../../packages/engine-audio
       '@engine/assets':
         specifier: workspace:*
         version: link:../../packages/engine-assets
