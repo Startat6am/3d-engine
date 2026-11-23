@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** M8.0–M8.2 complete; M8.3 renderer skinning in progress.
+**Status:** M8.0–M8.2 complete; M8.3 renderer and Player integration in progress.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -52,10 +52,12 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 
 ### M8.3 — Renderer skinning path
 
-- Add explicit backend-neutral skinning palette/vertex influence contract and bounded joint palette support.
-- Adapt Three.js renderer to render skinned GLB fixtures; keep backend objects private.
-- Tests: CPU contract/validation and Chromium render acceptance for at least one animated character.
-- Exit: Player visually renders two clips and cross-fade without editor imports.
+- Implemented: `RenderSkinning` carries four palette-local influences per vertex and column-major mesh-local joint matrices, bounded to 256 joints.
+- Implemented: Three.js adapter creates isolated skinned geometry, uses detached bind matrices and a bone texture, applies engine palettes before draws, handles skinning changes and disposes skeleton/geometry resources. Skinned meshes disable frustum culling until animated bounds are maintained.
+- Implemented: Player reconstructs the imported GLB bind pose and node-parent graph, starts the first clip and updates all mesh-local palettes before rendering. Player declares the direct animation workspace dependency.
+- Unit tests cover geometry isolation, palette mapping/update, joint-count validation and weighted vertex deformation.
+- Pending: browser-rendered Khronos Fox acceptance, visible deformation, clip switching/cross-fade and browser resource-teardown coverage.
+- Exit: exact-head Chromium acceptance visibly verifies animated deformation and cross-fade without Editor imports; all workspace quality gates pass. Do not mark M8.3 complete before this gate.
 
 ### M8.4 — Audio contracts and Web Audio adapter
 
@@ -106,4 +108,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-M8.1 importer coverage includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 is complete: headless player, cross-fade, local-pose evaluation, hierarchy-aware skinning matrices and ECS variable-update integration passed the exact-head Node 22 and Chromium CI gate. M8.3 is now the active slice: define the backend-neutral skinning palette and per-vertex influence contract, then add the Three.js adapter path and a browser-rendered Fox acceptance fixture. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
+M8.1 importer coverage includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 is complete: headless player, cross-fade, local-pose evaluation, hierarchy-aware skinning matrices and ECS variable-update integration passed the exact-head Node 22 and Chromium CI gate. M8.3 is active. The backend-neutral palette contract, Three.js `SkinnedMesh` bridge and Player GLB animation/palette path are implemented. Next: add a browser-rendered Khronos Fox fixture and Chromium assertions for visible deformation, clip switching/cross-fade and teardown. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
