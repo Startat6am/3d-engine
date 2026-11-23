@@ -1164,6 +1164,18 @@ async function openProjectFolder(): Promise<void> {
     for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
     activeProjectEntities.length = 0;
     activeAnimations.splice(0, activeAnimations.length, ...world.animations);
+    for (const source of activeAudioSources) source.voice?.dispose();
+    activeAudioSources.length = 0;
+    for (const source of world.audioSources) {
+      activeAudioSources.push(addAudioSourceRuntimeEntity(source));
+    }
+    if (audioTestButton) {
+      audioTestButton.textContent =
+        activeAudioSources.length > 0 ? 'Enable project audio' : 'Play spatial audio test';
+    }
+    if (audioRuntime.active && activeAudioSources.length > 0) {
+      void activateProjectAudioSources();
+    }
     for (const entity of world.prepared) {
       activeProjectEntities.push(
         addMeshRenderable(
@@ -1306,6 +1318,18 @@ async function preloadSampleVoxelScene(): Promise<void> {
       for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
       activeProjectEntities.length = 0;
       activeAnimations.splice(0, activeAnimations.length, ...world.animations);
+      for (const source of activeAudioSources) source.voice?.dispose();
+      activeAudioSources.length = 0;
+      for (const source of world.audioSources) {
+        activeAudioSources.push(addAudioSourceRuntimeEntity(source));
+      }
+      if (audioTestButton) {
+        audioTestButton.textContent =
+          activeAudioSources.length > 0 ? 'Enable project audio' : 'Play spatial audio test';
+      }
+      if (audioRuntime.active && activeAudioSources.length > 0) {
+        void activateProjectAudioSources();
+      }
       for (const entity of world.prepared) {
         activeProjectEntities.push(
           addMeshRenderable(
