@@ -132,7 +132,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     // Palettes may be updated in place while the render-object array remains stable.
     for (const item of scene.objects) {
       const entry = this.#objects.get(item.id);
-      if (entry) this.#syncSkinning(entry, item.skinning);
+      if (entry) this.#syncSkinning(entry, item.skinning, item.geometry);
     }
     this.#scene.background = new THREE.Color(scene.background);
     const camera = this.#applyCamera(scene.camera);
@@ -366,6 +366,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       geometryLease: AssetResourceLease<THREE.BufferGeometry>;
     },
     skinning: RenderSkinning | undefined,
+    geometry: MeshData,
   ): void {
     const baseGeometry = entry.geometryLease.resource;
     if (!skinning) {
@@ -396,11 +397,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       entry.skinningJointIndices !== skinning.jointIndices ||
       entry.skinningJointWeights !== skinning.jointWeights;
     if (needsGeometry) {
-      validateRenderSkinning(
-        // The renderer contract validates against the engine-owned source geometry.
-        (entry as { geometrySource: MeshData }).geometrySource,
-        skinning,
-      );
+      validateRenderSkinning(geometry, skinning);
       const nextGeometry = createThreeSkinningGeometry(baseGeometry, skinning);
       entry.skinningGeometry?.dispose();
       entry.skinningGeometry = nextGeometry;
