@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** M8.0–M8.3 complete; M8.4 audio runtime and Web Audio integration in progress.
+**Status:** M8.0–M8.4 complete; M8.5 AudioSource persistence and world-schema migration is next.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -65,13 +65,12 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Implemented: `@engine/audio` runtime contracts for clip handles, bounded/deduplicated decoding, concurrent decode and voice limits, source/listener state, inverse-distance attenuation, cancellation and idempotent voice/runtime disposal.
 - Implemented: Web Audio backend with explicit user-gesture activation/resume, positional panning and browser capability reporting.
 - Implemented: Player smoke control generates a short WAV tone, starts a spatial voice only after a click and updates the listener from the camera after input.
-- Tests: audio runtime fake-backend coverage is ported; Player Chromium E2E verifies gesture activation, running AudioContext, spatial capability, voice creation and listener movement. Exact-head CI is in progress.
-- Pending: final exact-head CI, richer source authoring, and persisted AudioSource component integration (separate M8.5 schema slice).
-- Exit: source/listener movement affects spatial playback and resources release on removal/stop; browser autoplay remains gesture-gated.
+- Verified: 11 audio runtime unit tests cover lifecycle, bounded decoding, cancellation, voice limits, attenuation and disposal. Player Chromium E2E verifies gesture activation, running AudioContext, spatial capability, voice creation and camera-follow listener movement.
+- Completed: exact-head GitHub Actions [#45241932301](https://github.com/Startat6am/3d-engine/actions/runs/45241932301) passed all quality gates, 335 unit tests and 32 Chromium E2E tests. M8.4 is complete; browser autoplay remains gesture-gated.
 
 ### M8.5 — Player integration and project persistence
 
-- Implement the versioned `components.AudioSource` record and explicit world 1.0.0 → 1.1.0 migration; register it in the default parse path.
+- Implement the versioned `components.AudioSource` record and explicit world 1.0.0 → 1.1.0 migration; register it in the default parse path, following [ADR-0014](ADR/0014-persisted-audio-source-schema.md).
 - Validate audio asset references and spatial settings consistently in serialization, project storage, Editor and Player; allow audio-only transformed entities.
 - Verify save/load/reopen of audio-enabled scenes without serializing AudioContext nodes, decoded buffers, voice IDs or playback clocks.
 - Exit: authored audio sources round-trip through Editor and Player, remain gesture-gated, and tear down cleanly.
@@ -110,4 +109,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-M8.1 importer coverage includes rotation/scale channels, the attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 and M8.3 are complete: headless playback, cross-fade, hierarchy-aware skinning, Three.js `SkinnedMesh` rendering, Player GLB playback, visible Fox deformation and skinning GPU-resource teardown passed exact-head Node 22/Chromium CI. M8.4 is active: finish the gesture-gated spatial-audio E2E and record exact-head CI. Next is M8.5: implement the versioned `AudioSource` world-schema 1.1.0 migration and shared Editor/Player/project-storage validation under ADR-0014. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
+M8.1 importer coverage includes rotation/scale channels, the attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 and M8.3 are complete: headless playback, cross-fade, hierarchy-aware skinning, Three.js `SkinnedMesh` rendering, Player GLB playback, visible Fox deformation and skinning GPU-resource teardown passed exact-head Node 22/Chromium CI. M8.4 is complete: gesture-gated spatial playback and camera-follow listener passed exact-head CI [#45241932301] (335 unit tests, 32 Chromium E2E tests). Next is M8.5: implement the versioned `AudioSource` world-schema 1.1.0 migration and shared Editor/Player/project-storage validation under ADR-0014. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
