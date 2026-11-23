@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** M8.0–M8.2 complete; M8.3 renderer and Player integration in progress.
+**Status:** M8.0–M8.3 complete; M8.4 audio runtime and Web Audio integration in progress.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -57,16 +57,16 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Implemented: Player reconstructs the imported GLB bind pose and node-parent graph, starts the first clip and updates all mesh-local palettes before rendering. Player declares the direct animation workspace dependency.
 - Unit tests cover geometry isolation, palette mapping/update, joint-count validation and weighted vertex deformation.
 - Implemented: a `?fixture=fox` Player acceptance route loads the attributed Khronos Fox asset. Chromium verifies actual WebGL draw calls, visible pixels and Survey-to-Walk cross-fade via the `]` shortcut. The first fixture E2E run passed.
-- Pending: skinned-resource teardown E2E on the Fox fixture and a new exact-head CI run after that test.
-- Exit: exact-head Chromium acceptance verifies visible deformation, cross-fade and skeleton/bone-texture/geometry teardown without Editor imports; all workspace quality gates pass. Do not mark M8.3 complete before this gate.
+- Completed: exact-head Chromium acceptance verifies visible Fox rendering, Survey-to-Walk cross-fade and skeleton/bone-texture/geometry teardown; full workspace CI passed. M8.3 is complete.
 
 ### M8.4 — Audio contracts and Web Audio adapter
 
-- Add `@engine/audio` core contracts, clip registry/leases, source/listener state, attenuation and lifecycle.
-- Implement Web Audio adapter with explicit gesture-gated resume, mono spatial and stereo non-spatial playback.
-- Add graceful unsupported/autoplay-denied fallback and bounded async decode.
-- Tests: fake backend lifecycle, attenuation, leases, cancellation, permission and disposal; Chromium browser acceptance.
-- Exit: source/listener movement affects spatial playback and resources release on removal/stop.
+- Implemented: `@engine/audio` runtime contracts for clip handles, bounded/deduplicated decoding, concurrent decode and voice limits, source/listener state, inverse-distance attenuation, cancellation and idempotent voice/runtime disposal.
+- Implemented: Web Audio backend with explicit user-gesture activation/resume, positional panning and browser capability reporting.
+- Implemented: Player smoke control generates a short WAV tone, starts a spatial voice only after a click and updates the listener from the camera after input.
+- Tests: audio runtime fake-backend coverage is ported; Player Chromium E2E verifies gesture activation, running AudioContext, spatial capability, voice creation and listener movement. Exact-head CI is in progress.
+- Pending: final exact-head CI, richer source authoring, and persisted AudioSource component integration (separate M8.5 schema slice).
+- Exit: source/listener movement affects spatial playback and resources release on removal/stop; browser autoplay remains gesture-gated.
 
 ### M8.5 — Player integration and project persistence
 
