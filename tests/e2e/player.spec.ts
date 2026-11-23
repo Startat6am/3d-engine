@@ -5,6 +5,15 @@ test('player renders and cross-fades the Khronos Fox skeletal animation fixture'
 }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__foxDrawCalls', { value: 0, writable: true });
+    const original = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (mode, count, type, offset) {
+      const target = window as unknown as { __foxDrawCalls: number };
+      target.__foxDrawCalls += 1;
+      return original.call(this, mode, count, type, offset);
+    };
+  });
   await page.goto('http://127.0.0.1:5174/?fixture=fox');
 
   const canvas = page.locator('#player');
@@ -12,13 +21,31 @@ test('player renders and cross-fades the Khronos Fox skeletal animation fixture'
   await expect(canvas).toBeVisible();
   await expect(status).toContainText('Fox animation fixture ready');
   await expect(status).toContainText('1 animation instances');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __foxDrawCalls: number }).__foxDrawCalls),
+    )
+    .toBeGreaterThan(0);
 
   const beforeCrossFade = await canvas.screenshot();
   await page.keyboard.press(']');
   await expect(status).toContainText('Cross-fading to Walk');
   await page.waitForTimeout(700);
   const afterCrossFade = await canvas.screenshot();
+  const litPixels = await canvas.evaluate((element) => {
+    if (!(element instanceof HTMLCanvasElement)) return 0;
+    const gl = element.getContext('webgl2');
+    if (!gl) return 0;
+    const pixels = new Uint8Array(element.width * element.height * 4);
+    gl.readPixels(0, 0, element.width, element.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let count = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] !== 21 || pixels[index + 1] !== 26 || pixels[index + 2] !== 35) count += 1;
+    }
+    return count;
+  });
 
+  expect(litPixels).toBeGreaterThan(500);
   expect(afterCrossFade.equals(beforeCrossFade)).toBe(false);
   expect(pageErrors).toEqual([]);
 });
