@@ -1,6 +1,6 @@
 # Project and World Data Format
 
-**Status:** proposed schema baseline.
+**Status:** world schema 1.1.0 implemented; AudioSource persistence validation is active.
 
 ## Purpose
 
@@ -10,13 +10,13 @@ Define a durable project container independent of runtime implementation. glTF/G
 
 A `.world` file is a UTF-8 JSON manifest (human-diffable and streamable). In a directory project, binary payloads live as immutable content-addressed files under `assets/sha256/` and are referenced by stable asset IDs, SHA-256 hashes, and project-relative URIs. The current Editor also supports optional Base64 `assetPayloads` for portable single-file `.world` import/export; directory-project saves omit those inline payloads. This preserves one logical v1 world schema for both storage modes. The accepted design is recorded in [ADR-0002](ADR/0002-project-asset-store.md).
 
-## Top-level schema (v1)
+## Top-level schema (v1.1.0)
 
 ```json
 {
-  "$schema": "https://choreon.dev/schemas/world-v1.schema.json",
+  "$schema": "https://choreon.dev/schemas/world-v1.1.schema.json",
   "format": "universal-3d-world",
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "engineVersion": "0.1.0",
   "world": {
     "id": "world:...",
@@ -38,7 +38,7 @@ A `.world` file is a UTF-8 JSON manifest (human-diffable and streamable). In a d
 }
 ```
 
-The normative v1 envelope is defined by the [world-v1 JSON Schema](../packages/engine-serialization/src/schemas/world-v1.schema.json) and enforced by `@engine/serialization` at runtime. The schema deliberately leaves component and extension payloads open; cross-record invariants such as asset reference resolution and dependency acyclicity are enforced by semantic validation after schema validation. Transform rotation is quaternion XYZW; units are meters, seconds, radians, and linear color unless a field says otherwise.
+The normative v1.1 envelope is defined by the [world-v1.1 JSON Schema](../packages/engine-serialization/src/schemas/world-v1.1.schema.json) and enforced by `@engine/serialization` at runtime. The schema deliberately leaves component and extension payloads open; cross-record invariants such as asset reference resolution and dependency acyclicity are enforced by semantic validation after schema validation. Transform rotation is quaternion XYZW; units are meters, seconds, radians, and linear color unless a field says otherwise.
 
 ## Component and extension rules
 
@@ -52,12 +52,14 @@ For imported models, keep the source identity and the normalized/derived asset i
 
 The world/project schema describes asset references and relationships; it does not embed format-specific parser state or require the runtime to understand Blender, FBX, or USD internals.
 
-Within one world document, asset IDs are unique. Every `MeshRenderer.assetId`, embedded `assetPayloads[].assetId`, and declared asset dependency must resolve to an asset record in the same document. Asset dependencies must be acyclic. Validation reports the offending JSON path and rejects the document before editor state is changed; unknown optional component payloads remain opaque and are not recursively interpreted as asset references.
+Within one world document, asset IDs are unique. Every `MeshRenderer.assetId`, `AudioSource.assetId`, embedded `assetPayloads[].assetId`, and declared asset dependency must resolve to an asset record in the same document. `AudioSource.assetId` must resolve to an asset with `kind: "audio"`. Asset dependencies must be acyclic. Validation reports the offending JSON path and rejects the document before editor state is changed; unknown optional component payloads remain opaque and are not recursively interpreted as asset references.
 
 ## Migrations and compatibility
 
 - `schemaVersion` uses semver; readers reject unsupported future major versions.
-- Migrations are deterministic pure transforms: v1 -> v2, etc., each with fixtures.
+- The default reader migrates world `1.0.0` to `1.1.0` by changing only `schemaVersion`; entities, components, assets, payloads and extensions are preserved.
+- `AudioSource` is a typed v1.1 component requiring `assetId`, `spatial`, `loop`, `gain`, `referenceDistance`, `maxDistance` and `playOnEnable`. Gain is in [0, 1]; distances are finite and positive with `maxDistance >= referenceDistance`; the entity must have `Transform` and reference an audio asset.
+- Migrations are deterministic pure transforms: each version edge has a fixture and semantic-preservation tests.
 - Preserve unknown optional fields where possible.
 - Write atomically (temporary file then replace) and validate before commit.
 - Backups are created before destructive migration; migration never silently drops unknown required data.
@@ -69,4 +71,4 @@ Parsing and validation happen off the render path. Large scenes may use streamin
 
 ## Tests and acceptance
 
-Golden fixtures cover empty, hierarchy, mixed mesh/voxel, physics, custom component, missing asset, unknown extension, corrupted JSON, and every migration. Save-load-save is stable (canonical ordering and normalized numeric representation).
+Golden fixtures cover empty, hierarchy, mixed mesh/voxel, physics, audio-only entities, custom component, missing/wrong-kind asset references, unknown extension, corrupted JSON, and every migration. Save-load-save is stable (canonical ordering and normalized numeric representation).
