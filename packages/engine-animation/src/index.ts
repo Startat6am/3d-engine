@@ -1,3 +1,4 @@
+packages/engine-animation/src/index.ts 91ms (unchanged)
 export type AnimationPath = 'translation' | 'rotation' | 'scale';
 export type AnimationInterpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 export type AnimationValueSize = 3 | 4;
@@ -33,9 +34,7 @@ export interface AnimationSkin {
 }
 
 export type AnimationDataErrorCode =
-  | 'ANIMATION_INVALID_DATA'
-  | 'ANIMATION_UNSUPPORTED_FEATURE'
-  | 'ANIMATION_RESOURCE_LIMIT';
+  'ANIMATION_INVALID_DATA' | 'ANIMATION_UNSUPPORTED_FEATURE' | 'ANIMATION_RESOURCE_LIMIT';
 
 export class AnimationDataError extends Error {
   constructor(
@@ -70,14 +69,16 @@ export function createAnimationTrack(options: {
 }): AnimationTrack {
   const { path, times, values } = options;
   const interpolation = options.interpolation ?? 'LINEAR';
-  if (!Object.hasOwn(COMPONENTS, path)) throw new AnimationDataError(`Unsupported animation path: ${path}`);
+  if (!Object.hasOwn(COMPONENTS, path))
+    throw new AnimationDataError(`Unsupported animation path: ${path}`);
   if (!['STEP', 'LINEAR', 'CUBICSPLINE'].includes(interpolation)) {
     throw new AnimationDataError(
       `Unsupported animation interpolation: ${interpolation}`,
       'ANIMATION_UNSUPPORTED_FEATURE',
     );
   }
-  if (times.length < 1) throw new AnimationDataError('Animation track must contain at least one key');
+  if (times.length < 1)
+    throw new AnimationDataError('Animation track must contain at least one key');
   assertFiniteArray(times, 'Animation key times');
   assertFiniteArray(values, 'Animation output values');
 
@@ -104,7 +105,9 @@ export function createAnimationTrack(options: {
   // Float32 conversion can collapse distinct, closely spaced source timestamps.
   for (let index = 1; index < ownedTimes.length; index++) {
     if (ownedTimes[index]! <= ownedTimes[index - 1]!) {
-      throw new AnimationDataError('Animation key times must remain strictly increasing in Float32');
+      throw new AnimationDataError(
+        'Animation key times must remain strictly increasing in Float32',
+      );
     }
   }
   return Object.freeze({ path, interpolation, valueSize, times: ownedTimes, values: ownedValues });
@@ -141,8 +144,7 @@ function sampleSlerp(
   const sinTheta = Math.sin(theta);
   const left = Math.sin((1 - alpha) * theta) / sinTheta;
   const right = (Math.sin(alpha * theta) / sinTheta) * sign;
-  for (let index = 0; index < 4; index++)
-    target[index] = a[index]! * left + b[index]! * right;
+  for (let index = 0; index < 4; index++) target[index] = a[index]! * left + b[index]! * right;
   normalizeQuaternion(target);
 }
 
@@ -159,7 +161,9 @@ export function sampleAnimationTrack(
     throw new AnimationDataError('Animation sample time must be finite and non-negative');
   }
   if (target.length < track.valueSize) {
-    throw new AnimationDataError(`Animation sample target must contain at least ${track.valueSize} values`);
+    throw new AnimationDataError(
+      `Animation sample target must contain at least ${track.valueSize} values`,
+    );
   }
 
   const { times, values, valueSize, interpolation, path } = track;
@@ -226,12 +230,19 @@ export function createAnimationClip(
   if (!Number.isSafeInteger(nodeCount) || nodeCount < 0) {
     throw new AnimationDataError('Animation node count must be a non-negative safe integer');
   }
-  if (channels.length === 0) throw new AnimationDataError('Animation clip must contain at least one channel');
+  if (channels.length === 0)
+    throw new AnimationDataError('Animation clip must contain at least one channel');
   const targets = new Set<string>();
   let duration = 0;
   for (const channel of channels) {
-    if (!Number.isSafeInteger(channel.nodeIndex) || channel.nodeIndex < 0 || channel.nodeIndex >= nodeCount) {
-      throw new AnimationDataError(`Animation channel references invalid node ${channel.nodeIndex}`);
+    if (
+      !Number.isSafeInteger(channel.nodeIndex) ||
+      channel.nodeIndex < 0 ||
+      channel.nodeIndex >= nodeCount
+    ) {
+      throw new AnimationDataError(
+        `Animation channel references invalid node ${channel.nodeIndex}`,
+      );
     }
     const key = `${channel.nodeIndex}:${channel.track.path}`;
     if (targets.has(key)) throw new AnimationDataError(`Duplicate animation target ${key}`);
@@ -253,9 +264,13 @@ export function createAnimationSkin(options: {
   if (!Number.isSafeInteger(nodeCount) || nodeCount < 0) {
     throw new AnimationDataError('Animation node count must be a non-negative safe integer');
   }
-  if (joints.length < 1) throw new AnimationDataError('Animation skin must contain at least one joint');
+  if (joints.length < 1)
+    throw new AnimationDataError('Animation skin must contain at least one joint');
   if (joints.length > 256) {
-    throw new AnimationDataError('Animation skin exceeds the default 256-joint limit', 'ANIMATION_RESOURCE_LIMIT');
+    throw new AnimationDataError(
+      'Animation skin exceeds the default 256-joint limit',
+      'ANIMATION_RESOURCE_LIMIT',
+    );
   }
   const seen = new Set<number>();
   for (let index = 0; index < joints.length; index++) {
@@ -263,7 +278,8 @@ export function createAnimationSkin(options: {
     if (!Number.isSafeInteger(joint) || joint < 0 || joint >= nodeCount) {
       throw new AnimationDataError(`Animation skin references invalid joint node ${joint}`);
     }
-    if (seen.has(joint)) throw new AnimationDataError(`Animation skin contains duplicate joint node ${joint}`);
+    if (seen.has(joint))
+      throw new AnimationDataError(`Animation skin contains duplicate joint node ${joint}`);
     seen.add(joint);
   }
   if (inverseBindMatrices.length !== joints.length * 16) {
@@ -271,9 +287,13 @@ export function createAnimationSkin(options: {
   }
   assertFiniteArray(inverseBindMatrices, 'Inverse bind matrices');
   const matrices = Float32Array.from(inverseBindMatrices);
-  if (!matrices.every(Number.isFinite)) throw new AnimationDataError('Inverse bind matrices exceed Float32 range');
+  if (!matrices.every(Number.isFinite))
+    throw new AnimationDataError('Inverse bind matrices exceed Float32 range');
   const skeletonRoot = options.skeletonRoot ?? null;
-  if (skeletonRoot !== null && (!Number.isSafeInteger(skeletonRoot) || skeletonRoot < 0 || skeletonRoot >= nodeCount)) {
+  if (
+    skeletonRoot !== null &&
+    (!Number.isSafeInteger(skeletonRoot) || skeletonRoot < 0 || skeletonRoot >= nodeCount)
+  ) {
     throw new AnimationDataError(`Animation skin references invalid skeleton root ${skeletonRoot}`);
   }
   return Object.freeze({
