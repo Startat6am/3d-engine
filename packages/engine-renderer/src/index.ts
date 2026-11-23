@@ -381,11 +381,11 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       }
       entry.skeleton?.dispose();
       entry.skinningGeometry?.dispose();
-      entry.skeleton = undefined;
-      entry.skinningGeometry = undefined;
-      entry.skinningGeometryBase = undefined;
-      entry.skinningJointIndices = undefined;
-      entry.skinningJointWeights = undefined;
+      delete entry.skeleton;
+      delete entry.skinningGeometry;
+      delete entry.skinningGeometryBase;
+      delete entry.skinningJointIndices;
+      delete entry.skinningJointWeights;
       return;
     }
 
