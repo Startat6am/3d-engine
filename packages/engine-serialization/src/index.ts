@@ -161,7 +161,13 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
       }
       const material = meshRenderer.material;
       if (isRecord(material)) {
-        for (const channel of ['baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive']) {
+        for (const channel of [
+          'baseColor',
+          'metallicRoughness',
+          'normal',
+          'occlusion',
+          'emissive',
+        ]) {
           const field = `${channel}TextureAssetId`;
           const textureAssetId = material[field];
           if (
@@ -209,7 +215,10 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
       const referenceDistance = audioSource.referenceDistance;
       const maxDistance = audioSource.maxDistance;
       if (typeof gain !== 'number' || !Number.isFinite(gain) || gain < 0 || gain > 1) {
-        throw new WorldSerializationError('AudioSource gain must be between zero and one', `${path}.gain`);
+        throw new WorldSerializationError(
+          'AudioSource gain must be between zero and one',
+          `${path}.gain`,
+        );
       }
       if (
         typeof referenceDistance !== 'number' ||
