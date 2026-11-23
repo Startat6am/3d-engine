@@ -9,6 +9,7 @@ import {
   createAudioSourceState,
   WebAudioBackend,
   type AudioClipHandle,
+  type AudioSourceState,
   type AudioVoice,
 } from '@engine/audio';
 import type { AssetRecord } from '@engine/assets';
@@ -47,7 +48,12 @@ import {
 import { resolveVoxelMaterialStyle } from './voxel-material.js';
 import { createPhysicsWorld, StaticMeshColliderSet, type PhysicsWorld } from '@engine/physics';
 import { createVoxelChunkColliderInputs } from './voxel-collision.js';
-import type { WorldDocument } from '@engine/serialization';
+import {
+  CURRENT_WORLD_SCHEMA_VERSION,
+  parseWorld,
+  serializeWorld,
+  type WorldDocument,
+} from '@engine/serialization';
 import {
   GlbImporter,
   type GlbAsset,
@@ -282,7 +288,21 @@ interface ActiveAnimationInstance {
   clipIndex: number;
 }
 
+interface PreparedAudioSource {
+  readonly assetId: string;
+  readonly mimeType: string;
+  readonly bytes: ArrayBuffer;
+  readonly playOnEnable: boolean;
+  state: AudioSourceState;
+}
+
+interface ActiveAudioSource extends PreparedAudioSource {
+  readonly entity: ReturnType<typeof runtime.world.createEntity>;
+  voice: AudioVoice | null;
+}
+
 const activeAnimations: ActiveAnimationInstance[] = [];
+const activeAudioSources: ActiveAudioSource[] = [];
 
 interface PreparedRenderable {
   position: readonly [number, number, number];
@@ -472,6 +492,7 @@ function encodeBase64(value: ArrayBuffer): string {
 async function prepareWorldEntities(document: WorldDocument) {
   const prepared: PreparedRenderable[] = [];
   const animations: ActiveAnimationInstance[] = [];
+  const audioSources: PreparedAudioSource[] = [];
   let unsupported = 0;
   const assetRecords = new Map<string, AssetRecord>();
   for (const value of document.assets) {
@@ -611,7 +632,8 @@ async function prepareWorldEntities(document: WorldDocument) {
     }
     const transform = rawEntity.components.Transform;
     const mesh = rawEntity.components.MeshRenderer;
-    if (!isRecord(transform) || !isRecord(mesh)) {
+    const audioSource = rawEntity.components.AudioSource;
+    if (!isRecord(transform)) {
       unsupported += 1;
       continue;
     }
@@ -620,6 +642,40 @@ async function prepareWorldEntities(document: WorldDocument) {
       rotation: readQuaternion(transform.rotation),
       scale: readVector(transform.scale, [1, 1, 1] as const),
     };
+    if (isRecord(audioSource)) {
+      const assetId = audioSource.assetId;
+      const record = typeof assetId === 'string' ? assetRecords.get(assetId) : undefined;
+      const payload = typeof assetId === 'string' ? payloads.get(assetId) : undefined;
+      if (
+        typeof assetId !== 'string' ||
+        !record ||
+        record.kind !== 'audio' ||
+        !payload ||
+        payload.encoding !== 'base64' ||
+        typeof payload.mimeType !== 'string'
+      ) {
+        unsupported += 1;
+      } else {
+        audioSources.push({
+          assetId,
+          mimeType: payload.mimeType,
+          bytes: decodeBase64(payload.data),
+          playOnEnable: audioSource.playOnEnable === true,
+          state: createAudioSourceState(rootTransform.position, {
+            gain: audioSource.gain as number,
+            loop: audioSource.loop as boolean,
+            spatialBlend: audioSource.spatial ? 1 : 0,
+            referenceDistance: audioSource.referenceDistance as number,
+            maxDistance: audioSource.maxDistance as number,
+            rolloff: 1,
+          }),
+        });
+      }
+    }
+    if (!isRecord(mesh)) {
+      if (!isRecord(audioSource)) unsupported += 1;
+      continue;
+    }
     const primitive = mesh.primitive;
     if (primitive === 'GLB') {
       await appendGlbEntity(mesh, rootTransform);
@@ -665,7 +721,7 @@ async function prepareWorldEntities(document: WorldDocument) {
       },
     });
   }
-  return { prepared, unsupported, animations };
+  return { prepared, unsupported, animations, audioSources };
 }
 
 type PlayerVoxelChunk = Awaited<ReturnType<typeof openVoxelWorldProject>>['chunks'][number];
