@@ -411,10 +411,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
 
     if (!(entry.mesh instanceof THREE.SkinnedMesh)) {
       const previous = entry.mesh;
-      const replacement = new THREE.SkinnedMesh(
-        entry.skinningGeometry!,
-        previous.material,
-      );
+      const replacement = new THREE.SkinnedMesh(entry.skinningGeometry!, previous.material);
       this.#copyMeshTransform(previous, replacement);
       this.#scene.remove(previous);
       this.#scene.add(replacement);
