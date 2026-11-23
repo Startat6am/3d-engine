@@ -156,8 +156,9 @@ describe('directory project asset store', () => {
     };
 
     const manifest = await saveDirectoryProject(store, withAudio);
-    expect((manifest.assets as AssetRecord[]).find((asset) => asset.id === audioAsset.id)?.uri)
-      .toMatch(/\\.wav$/);
+    expect(
+      (manifest.assets as AssetRecord[]).find((asset) => asset.id === audioAsset.id)?.uri,
+    ).toMatch(/\.wav$/);
     const restored = await loadDirectoryProject(store);
     expect(restored.schemaVersion).toBe(CURRENT_WORLD_SCHEMA_VERSION);
     expect(restored.world.entities).toEqual(withAudio.world.entities);
