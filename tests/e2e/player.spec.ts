@@ -1,5 +1,28 @@
 import { expect, test } from '@playwright/test';
 
+test('player renders and cross-fades the Khronos Fox skeletal animation fixture', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('http://127.0.0.1:5174/?fixture=fox');
+
+  const canvas = page.locator('#player');
+  const status = page.locator('#project-status');
+  await expect(canvas).toBeVisible();
+  await expect(status).toContainText('Fox animation fixture ready');
+  await expect(status).toContainText('1 animation instances');
+
+  const beforeCrossFade = await canvas.screenshot();
+  await page.keyboard.press(']');
+  await expect(status).toContainText('Cross-fading to Walk');
+  await page.waitForTimeout(700);
+  const afterCrossFade = await canvas.screenshot();
+
+  expect(afterCrossFade.equals(beforeCrossFade)).toBe(false);
+  expect(pageErrors).toEqual([]);
+});
+
 test('player renders the preloaded voxel test scene through WebGL2', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
