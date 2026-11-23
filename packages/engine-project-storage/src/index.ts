@@ -198,7 +198,8 @@ function mimeTypeForAsset(record: AssetRecord, path: string): string {
 function validateAssetMime(kind: AssetRecord['kind'], mimeType: string): void {
   if (
     (kind === 'texture' && !['image/png', 'image/jpeg', 'image/webp'].includes(mimeType)) ||
-    (kind === 'model' && mimeType !== 'model/gltf-binary')
+    (kind === 'model' && mimeType !== 'model/gltf-binary') ||
+    (kind === 'audio' && !['audio/mpeg', 'audio/wav'].includes(mimeType))
   ) {
     throw new ProjectAssetStoreError(
       `Asset kind ${kind} has invalid MIME type: ${mimeType}`,
