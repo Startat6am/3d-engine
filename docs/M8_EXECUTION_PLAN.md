@@ -56,8 +56,9 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Implemented: Three.js adapter creates isolated skinned geometry, uses detached bind matrices and a bone texture, applies engine palettes before draws, handles skinning changes and disposes skeleton/geometry resources. Skinned meshes disable frustum culling until animated bounds are maintained.
 - Implemented: Player reconstructs the imported GLB bind pose and node-parent graph, starts the first clip and updates all mesh-local palettes before rendering. Player declares the direct animation workspace dependency.
 - Unit tests cover geometry isolation, palette mapping/update, joint-count validation and weighted vertex deformation.
-- Pending: browser-rendered Khronos Fox acceptance, visible deformation, clip switching/cross-fade and browser resource-teardown coverage.
-- Exit: exact-head Chromium acceptance visibly verifies animated deformation and cross-fade without Editor imports; all workspace quality gates pass. Do not mark M8.3 complete before this gate.
+- Implemented: a `?fixture=fox` Player acceptance route loads the attributed Khronos Fox asset. Chromium verifies actual WebGL draw calls, visible pixels and Survey-to-Walk cross-fade via the `]` shortcut. The first fixture E2E run passed.
+- Pending: skinned-resource teardown E2E on the Fox fixture and a new exact-head CI run after that test.
+- Exit: exact-head Chromium acceptance verifies visible deformation, cross-fade and skeleton/bone-texture/geometry teardown without Editor imports; all workspace quality gates pass. Do not mark M8.3 complete before this gate.
 
 ### M8.4 — Audio contracts and Web Audio adapter
 
