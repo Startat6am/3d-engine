@@ -31,12 +31,14 @@ Putting animation clocks, skeleton state or audio backend objects in engine-core
 ## Consequences
 
 Positive:
+
 - Headless tests can validate animation and audio contracts without a browser or renderer.
 - Renderer and audio backends remain replaceable.
 - Resource ownership and lifecycle are independently testable.
 - Player can use the same runtime packages without importing Editor.
 
 Trade-offs:
+
 - A small shared data contract is needed between importer, animation and renderer.
 - Player must coordinate update order and shutdown explicitly.
 - Skeletal rendering requires a separate renderer integration slice after animation math is stable.
