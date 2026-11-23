@@ -69,7 +69,7 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 
 ### M8.5 — Player integration and project persistence
 
-- Compose animation/audio services in Player; synchronize after transforms and before rendering/audio submission.
+- Complete Player animation/audio service composition; synchronize after transforms and before rendering/audio submission.
 - Add stable, versioned component records only where needed; preserve world v1 compatibility or provide explicit migration fixtures.
 - Verify load/save/reopen of animated/audio-enabled scenes without serializing runtime handles.
 - Exit: Player loads an authored fixture project and tears down cleanly.
