@@ -1959,7 +1959,7 @@ export function EditorApp() {
       if (!mimeType) throw new Error('Only WAV and MP3 audio files are supported');
       const bytes = await file.arrayBuffer();
       const contentHash = await sha256(bytes);
-      const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\\.+/, '') || 'audio';
+      const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'audio';
       const stagedRegistry = mergeAssetRegistry(assetRegistryRef.current, []);
       const stagedPayloads = new Map(assetPayloadsRef.current);
       const record = stagedRegistry.register({
@@ -2025,8 +2025,9 @@ export function EditorApp() {
       entities.map((entity) => {
         if (entity.id !== selectedId) return entity;
         if (!patch) {
-          const { audioSource: _audioSource, ...rest } = entity;
-          return rest as SceneEntity;
+          const next = { ...entity };
+          delete next.audioSource;
+          return next;
         }
         return { ...entity, audioSource: { ...entity.audioSource!, ...patch } };
       }),
