@@ -20,3 +20,48 @@ describe('renderer-independent camera and material contracts', () => {
     expect(() => lookAtQuaternion([0, 0, 0], [0, 0, 0])).toThrow(RangeError);
   });
 });
+
+
+describe('renderer-independent skinning contracts', () => {
+  const geometry = {
+    positions: new Float32Array([0, 0, 0, 1, 0, 0]),
+  } as import('@engine/geometry').MeshData;
+  const validSkinning = () => ({
+    jointIndices: new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0]),
+    jointWeights: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0]),
+    jointMatrices: new Float32Array([
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
+    ]),
+  });
+
+  it('accepts four normalized influences and a finite mesh-local palette', async () => {
+    const { validateRenderSkinning } = await import('./contracts.js');
+    expect(() => validateRenderSkinning(geometry, validSkinning())).not.toThrow();
+  });
+
+  it('rejects mismatched influence counts, out-of-range joints and invalid weights', async () => {
+    const { validateRenderSkinning } = await import('./contracts.js');
+    const missing = validSkinning();
+    missing.jointIndices = new Uint16Array(4);
+    expect(() => validateRenderSkinning(geometry, missing)).toThrow(RangeError);
+    const badJoint = validSkinning();
+    badJoint.jointIndices[0] = 1;
+    expect(() => validateRenderSkinning(geometry, badJoint)).toThrow(/exceeds palette/);
+    const badWeight = validSkinning();
+    badWeight.jointWeights[0] = Number.NaN;
+    expect(() => validateRenderSkinning(geometry, badWeight)).toThrow(/finite and non-negative/);
+    const unnormalized = validSkinning();
+    unnormalized.jointWeights[0] = 0.5;
+    expect(() => validateRenderSkinning(geometry, unnormalized)).toThrow(/sum to one/);
+  });
+
+  it('bounds palettes and rejects non-finite matrices', async () => {
+    const { validateRenderSkinning } = await import('./contracts.js');
+    const oversized = validSkinning();
+    oversized.jointMatrices = new Float32Array(257 * 16);
+    expect(() => validateRenderSkinning(geometry, oversized)).toThrow(/1\.\.256/);
+    const nonFinite = validSkinning();
+    nonFinite.jointMatrices[0] = Number.POSITIVE_INFINITY;
+    expect(() => validateRenderSkinning(geometry, nonFinite)).toThrow(/non-finite/);
+  });
+});
