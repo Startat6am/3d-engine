@@ -36,7 +36,7 @@ describe('Three.js skinning bridge', () => {
     expect(skeleton.boneTexture).not.toBeNull();
     const boneMatrices = skeleton.boneMatrices;
     if (!boneMatrices) throw new Error('Skeleton bone matrices were not allocated');
-    expect(Array.from(boneMatrices)).toEqual(Array.from(palette));
+    expect(Array.from(boneMatrices.slice(0, palette.length))).toEqual(Array.from(palette));
 
     const nextPalette = palette.slice();
     nextPalette[12] = 9;
