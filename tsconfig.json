@@ -33,6 +33,9 @@
     },
     {
       "path": "packages/engine-animation"
+    },
+    {
+      "path": "packages/engine-audio"
     }
   ]
 }
