@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AssetRecord } from '@engine/assets';
 import voxelWorldV1Fixture from '../fixtures/voxel-world-v1.json' with { type: 'json' };
 import { createVoxelChunkSnapshot } from '@engine/voxel';
-import type { WorldDocument } from '@engine/serialization';
+import { CURRENT_WORLD_SCHEMA_VERSION, type WorldDocument } from '@engine/serialization';
 import {
   MemoryProjectFileStore,
   ProjectAssetStoreError,
