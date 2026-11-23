@@ -13,7 +13,7 @@ import {
 
 const document: WorldDocument = {
   format: 'universal-3d-world',
-  schemaVersion: '1.0.0',
+  schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
   engineVersion: '0.1.0',
   world: { id: 'world:voxel-test', name: 'Voxel Test', settings: {}, entities: [] },
   assets: [],
