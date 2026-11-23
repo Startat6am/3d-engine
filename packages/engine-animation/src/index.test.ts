@@ -35,7 +35,11 @@ describe('animation track validation', () => {
 
   it('rejects timestamps that collapse together when stored as Float32', () => {
     expect(() =>
-      createAnimationTrack({ path: 'translation', times: [1, 1 + 1e-8], values: [0, 0, 0, 1, 0, 0] }),
+      createAnimationTrack({
+        path: 'translation',
+        times: [1, 1 + 1e-8],
+        values: [0, 0, 0, 1, 0, 0],
+      }),
     ).toThrow(/strictly increasing in Float32/);
   });
 
@@ -100,10 +104,7 @@ describe('animation sampling', () => {
       path: 'translation',
       interpolation: 'CUBICSPLINE',
       times: [0, 2],
-      values: [
-        0, 0, 0, 0, 0, 0, 1, 0, 0,
-        1, 0, 0, 2, 0, 0, 0, 0, 0,
-      ],
+      values: [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0],
     });
     expect(sampleAnimationTrack(track, 1)[0]).toBeCloseTo(1);
   });
@@ -117,10 +118,23 @@ describe('animation sampling', () => {
 
 describe('animation clip and skin validation', () => {
   it('derives clip duration and rejects duplicate node/path channels', () => {
-    const track = createAnimationTrack({ path: 'translation', times: [0, 3], values: [0, 0, 0, 1, 0, 0] });
+    const track = createAnimationTrack({
+      path: 'translation',
+      times: [0, 3],
+      values: [0, 0, 0, 1, 0, 0],
+    });
     const clip = createAnimationClip('walk', [{ nodeIndex: 1, track }], 2);
     expect(clip.duration).toBe(3);
-    expect(() => createAnimationClip('bad', [{ nodeIndex: 1, track }, { nodeIndex: 1, track }], 2)).toThrow(/Duplicate/);
+    expect(() =>
+      createAnimationClip(
+        'bad',
+        [
+          { nodeIndex: 1, track },
+          { nodeIndex: 1, track },
+        ],
+        2,
+      ),
+    ).toThrow(/Duplicate/);
     expect(() => createAnimationClip('bad', [{ nodeIndex: 2, track }], 2)).toThrow(/invalid node/);
   });
 
