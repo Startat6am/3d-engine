@@ -18,17 +18,17 @@ Updated: 2026-11-23
 - M2–M5: complete.
 - M6 Physics/Input: functional scope closed; profiling limitations remain deferred.
 - M7 World & Voxels: complete and owner-accepted. See the M7 implementation notes below and exact merge/CI above.
-- M8 Animation & Audio: M8.0–M8.2 complete on `feat/m8-animation-audio-contracts`; M8.3 renderer skinning is active. `@engine/animation` exports validated track/clip/skin data, keyframe sampling, player controls, cross-fade, defensive local-pose snapshots, hierarchy-aware skinning matrices and ECS variable-update integration. GLB importer decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI [#45208613537](https://github.com/Startat6am/3d-engine/actions/runs/45208613537) passed on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Renderer skinning, audio and Player persistence remain open.
+- M8 Animation & Audio: M8.0–M8.2 complete; M8.3 renderer and Player integration are active on `feat/m8-animation-audio-contracts` (Draft PR #92). The Three.js adapter consumes `RenderSkinning` through isolated geometry, `SkinnedMesh`/`Skeleton`, a bone texture and per-frame mesh-local palette updates. Player rebuilds the GLB bind pose/hierarchy, starts the first imported clip and updates palettes before rendering. Unit coverage exists for geometry attributes, palette mapping, weighted deformation and palette limits; browser-rendered Fox acceptance and cross-fade/teardown E2E remain pending. `@engine/animation` exports validated track/clip/skin data, keyframe sampling, player controls, cross-fade, defensive local-pose snapshots, hierarchy-aware skinning matrices and ECS variable-update integration. GLB importer decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI [#45208613537](https://github.com/Startat6am/3d-engine/actions/runs/45208613537) passed on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Renderer skinning, audio and Player persistence remain open.
 - M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
 ## M8 audit findings at the main baseline
 
 - `@engine/core` provides `EngineHost` ordered service lifecycle and ECS `SystemScheduler` phases including `fixed-update`, `variable-update` and `transform-propagation`.
 - `@engine/gltf-importer` at the original M8 baseline exposed GLB meshes/materials/nodes only; the current M8 branch now adds bounded skin and animation decoding.
-- `@engine/renderer` render objects accept geometry/material and TRS or a world matrix; no skinning palette contract exists.
+- `@engine/renderer` render objects accept geometry/material, transforms and optional `RenderSkinning`; the Three.js adapter now creates and updates `SkinnedMesh` objects with bounded bone textures.
 - `@engine/animation` has been added on the M8 branch with validated track/clip/skin data and sampling. `@engine/audio` does not exist yet.
-- Player/Editor do not yet restore animation/audio components from project documents.
-- Next implementation: M8.3 renderer skinning. Define the backend-neutral palette/influence contract, add Three.js adapter support and render the Fox fixture in Chromium. Follow `M8_EXECUTION_PLAN.md`; keep animation state renderer-independent.
+- Player project loading now restores GLB skinning and starts the first imported animation clip. Editor-authored animation components, persisted playback state and audio components remain unimplemented.
+- Next implementation: finish M8.3 acceptance by rendering the Khronos Fox fixture in Chromium, asserting visible deformation and clip cross-fade, and verifying skeleton/geometry teardown. Follow `M8_EXECUTION_PLAN.md`; keep animation state renderer-independent.
 
 ## M6 implementation and accepted limitations
 
