@@ -1135,7 +1135,18 @@ export function EditorApp() {
         name: worldName,
         settings: { gravity: [0, -9.81, 0], environment: {} },
         entities: entities.map(
-          ({ id, name, primitive, assetId, position, rotation, scale, material, geometry, audioSource }) => ({
+          ({
+            id,
+            name,
+            primitive,
+            assetId,
+            position,
+            rotation,
+            scale,
+            material,
+            geometry,
+            audioSource,
+          }) => ({
             id,
             name,
             parent: null,
@@ -1389,8 +1400,14 @@ export function EditorApp() {
         if (storedAudioSource) {
           const audioRecord = restoredAssetRegistry.get(storedAudioSource.assetId);
           const audioPayload = restoredAssetPayloads.get(storedAudioSource.assetId);
-          if (audioRecord?.kind !== 'audio' || !audioPayload || audioPayload.encoding !== 'base64') {
-            throw new Error(`AudioSource on ${entity.name} references a missing audio asset payload`);
+          if (
+            audioRecord?.kind !== 'audio' ||
+            !audioPayload ||
+            audioPayload.encoding !== 'base64'
+          ) {
+            throw new Error(
+              `AudioSource on ${entity.name} references a missing audio asset payload`,
+            );
           }
           audioSource = storedAudioSource;
         }
@@ -3025,7 +3042,9 @@ export function EditorApp() {
                     <input
                       type="checkbox"
                       checked={selected.audioSource.loop}
-                      onChange={(event) => updateSelectedAudioSource({ loop: event.target.checked })}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ loop: event.target.checked })
+                      }
                     />
                     Loop
                   </label>
