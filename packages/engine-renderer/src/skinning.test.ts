@@ -8,8 +8,7 @@ import {
 
 describe('Three.js skinning bridge', () => {
   const palette = new Float32Array([
-    1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 3, 4, 1,
-    1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 7, 1,
+    1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 3, 4, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 5, 6, 7, 1,
   ]);
   const skinning = {
     jointIndices: new Uint16Array([0, 1, 0, 0]),
@@ -35,12 +34,16 @@ describe('Three.js skinning bridge', () => {
     const skeleton = createThreeSkinningSkeleton(skinning);
     expect(skeleton.bones).toHaveLength(2);
     expect(skeleton.boneTexture).not.toBeNull();
-    expect(Array.from(skeleton.boneMatrices)).toEqual(Array.from(palette));
+    const boneMatrices = skeleton.boneMatrices;
+    if (!boneMatrices) throw new Error('Skeleton bone matrices were not allocated');
+    expect(Array.from(boneMatrices)).toEqual(Array.from(palette));
 
     const nextPalette = palette.slice();
     nextPalette[12] = 9;
     updateThreeSkinningSkeleton(skeleton, { ...skinning, jointMatrices: nextPalette });
-    expect(skeleton.boneMatrices[12]).toBe(9);
+    const updatedBoneMatrices = skeleton.boneMatrices;
+    if (!updatedBoneMatrices) throw new Error('Skeleton bone matrices were not allocated');
+    expect(updatedBoneMatrices[12]).toBe(9);
     skeleton.dispose();
   });
 
