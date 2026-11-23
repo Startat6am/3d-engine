@@ -4,7 +4,8 @@
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
-**Architecture decision:** [ADR-0013](ADR/0013-animation-audio-package-boundaries.md).
+**Architecture decision:** [ADR-0013](ADR/0013-animation-audio-package-boundaries.md).  
+**Audio persistence proposal:** [ADR-0014](ADR/0014-persisted-audio-source-schema.md).
 
 ## 1. Entry gate
 
@@ -70,10 +71,10 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 
 ### M8.5 — Player integration and project persistence
 
-- Complete Player animation/audio service composition; synchronize after transforms and before rendering/audio submission.
-- Add stable, versioned component records only where needed; preserve world v1 compatibility or provide explicit migration fixtures.
-- Verify load/save/reopen of animated/audio-enabled scenes without serializing runtime handles.
-- Exit: Player loads an authored fixture project and tears down cleanly.
+- Implement the versioned `components.AudioSource` record and explicit world 1.0.0 → 1.1.0 migration; register it in the default parse path.
+- Validate audio asset references and spatial settings consistently in serialization, project storage, Editor and Player; allow audio-only transformed entities.
+- Verify save/load/reopen of audio-enabled scenes without serializing AudioContext nodes, decoded buffers, voice IDs or playback clocks.
+- Exit: authored audio sources round-trip through Editor and Player, remain gesture-gated, and tear down cleanly.
 
 ### M8.6 — Examples, benchmarks and owner acceptance
 
@@ -109,4 +110,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-M8.1 importer coverage includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 is complete: headless player, cross-fade, local-pose evaluation, hierarchy-aware skinning matrices and ECS variable-update integration passed the exact-head Node 22 and Chromium CI gate. M8.3 is active. The backend-neutral palette contract, Three.js `SkinnedMesh` bridge and Player GLB animation/palette path are implemented. Next: add a browser-rendered Khronos Fox fixture and Chromium assertions for visible deformation, clip switching/cross-fade and teardown. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
+M8.1 importer coverage includes rotation/scale channels, the attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 and M8.3 are complete: headless playback, cross-fade, hierarchy-aware skinning, Three.js `SkinnedMesh` rendering, Player GLB playback, visible Fox deformation and skinning GPU-resource teardown passed exact-head Node 22/Chromium CI. M8.4 is active: finish the gesture-gated spatial-audio E2E and record exact-head CI. Next is M8.5: implement the versioned `AudioSource` world-schema 1.1.0 migration and shared Editor/Player/project-storage validation under ADR-0014. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
