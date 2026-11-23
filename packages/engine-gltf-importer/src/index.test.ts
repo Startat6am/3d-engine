@@ -1,4 +1,5 @@
 import { MeshoptEncoder } from 'meshoptimizer';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { GlbImportError, GlbImporter } from './index.js';
 import { sampleAnimationTrack } from '@engine/animation';
@@ -197,7 +198,7 @@ function makeInterleavedGlb(): ArrayBuffer {
 type MutableGlbJson = {
   extensionsRequired?: string[];
   extensionsUsed?: string[];
-  accessors?: { count: number; byteOffset?: number; normalized?: boolean }[];
+  accessors?: { count: number; byteOffset?: number; normalized?: boolean; sparse?: unknown }[];
   bufferViews?: { byteOffset?: number; byteLength?: number; byteStride?: number }[];
   buffers?: { byteLength: number }[];
   materials?: {
@@ -443,6 +444,34 @@ async function makeMeshoptGlb(): Promise<ArrayBuffer> {
 }
 
 describe('GlbImporter', () => {
+  it('imports a representative external Fox GLB with skinning and multiple animation clips', async () => {
+    const fixture = await readFile(new URL('./fixtures/Fox.glb', import.meta.url));
+    const source = fixture.buffer.slice(
+      fixture.byteOffset,
+      fixture.byteOffset + fixture.byteLength,
+    );
+    const result = await new GlbImporter().import(source, {
+      ...context,
+      uri: 'fixtures/Fox.glb',
+    });
+
+    expect(result.data.skins).toHaveLength(1);
+    expect(result.data.skins[0]?.joints).toHaveLength(24);
+    expect(result.data.animations.map((clip) => clip.name)).toEqual(['Survey', 'Walk', 'Run']);
+    expect(
+      new Set(
+        result.data.animations.flatMap((clip) =>
+          clip.channels.map((channel) => channel.track.path),
+        ),
+      ),
+    ).toEqual(new Set(['translation', 'rotation']));
+    const skinnedPrimitive = result.data.meshes
+      .flatMap((mesh) => mesh.primitives)
+      .find((primitive) => primitive.skinning !== undefined);
+    expect(skinnedPrimitive?.skinning?.joints).toHaveLength(6912);
+    expect(skinnedPrimitive?.skinning?.weights).toHaveLength(6912);
+  });
+
   it('imports skin joint order, inverse bind matrices and animation channels', async () => {
     const result = await new GlbImporter().import(makeSkinnedAnimatedGlb(), context);
     expect(result.data.nodes[1]?.skin).toBeNull();
@@ -746,6 +775,20 @@ describe('GlbImporter', () => {
     });
     const result = await new GlbImporter().import(glb, context);
     expect(result.data.extensionsUsed).toContain('EXT_fixture_optional');
+  });
+
+  it('rejects sparse accessors explicitly instead of partially decoding them', async () => {
+    const sparse = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.sparse = {
+        count: 1,
+        indices: { bufferView: 0, componentType: 5121 },
+        values: { bufferView: 0 },
+      };
+    });
+    await expect(new GlbImporter().import(sparse, context)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FEATURE',
+      message: expect.stringContaining('Sparse accessors are not supported'),
+    });
   });
 
   it('rejects accessors whose declared element range exceeds the bufferView', async () => {

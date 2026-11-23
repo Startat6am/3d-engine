@@ -13,7 +13,7 @@ M7 World & Voxels was merged and owner-accepted on 2026-11-22. Exact-head workfl
 Audit findings from that baseline:
 
 - ECS `SystemScheduler` supports fixed and variable update phases; `EngineHost` owns ordered service startup/shutdown.
-- `@engine/gltf-importer` parses GLB meshes, materials, nodes and embedded image resources, but its `GlbAsset` has no skins or animation channels.
+- `@engine/gltf-importer` parses GLB meshes, materials, nodes and embedded image resources; M8.1 extends this baseline with skin and animation data.
 - `@engine/renderer` exposes backend-neutral render objects with geometry/material/TRS or world matrix; no skeletal palette is present.
 - `@engine/animation` and `@engine/audio` do not exist.
 - World v1 persists project data and assets, but no animation/audio built-in components are wired into Editor/Player.
@@ -34,7 +34,8 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Add readonly animation/skeleton data structures and validators to `@engine/animation`. (First slice implemented: validated track/clip/skin data and allocation-conscious STEP/LINEAR/CUBICSPLINE sampling.)
 - Extend GLB importer with skins, inverse bind matrices, animation samplers/channels, supported interpolation and bounded accessor validation. (Implemented: ordered joint references, default identity inverse-bind matrices, validated JOINTS_0/WEIGHTS_0 vertex influences, translation/rotation/scale channels, STEP/LINEAR/CUBICSPLINE decoding, malformed-reference checks and animation/skin budgets.)
 - Preserve node/joint indices and source asset identity; reject unsupported/malformed data with typed errors.
-- Tests: GLB fixtures for STEP/LINEAR/CUBICSPLINE, translation/rotation/scale, malformed accessors, invalid joint references and limits. (Importer fixtures currently exercise translation across all three interpolation modes.)
+- Tests: synthetic fixtures cover STEP/LINEAR/CUBICSPLINE, translation/rotation/scale, malformed accessors, invalid joint references and limits; the Khronos Fox GLB provides a real-world skinned asset with 24 joints and Survey/Walk/Run clips.
+- Sparse accessors are explicitly rejected with `UNSUPPORTED_FEATURE` until bounded sparse decoding is implemented; `JOINTS_1`/`WEIGHTS_1` are likewise unsupported (only the first influence set is imported).
 - Exit: deterministic importer output and package API tests; no rendering claim yet.
 
 ### M8.2 — Playback and skeletal pose evaluation
@@ -101,4 +102,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-Complete M8.1 importer coverage for rotation/scale channels, sparse accessor policy and vertex joint/weight attributes, then proceed to M8.2 playback and deterministic skeletal pose evaluation. Do not begin renderer skinning before the pose evaluation gate passes.
+M8.1 importer coverage now includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Remaining M8.1 limits are sparse decoding and additional influence sets; proceed to M8.2 playback and deterministic skeletal pose evaluation without expanding those limits. Do not begin renderer skinning before the pose evaluation gate passes.
