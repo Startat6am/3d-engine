@@ -1,3 +1,4 @@
+import { AnimationPlayer, createAnimationPose, evaluateSkinningMatrices, type AnimationSkin } from '@engine/animation';
 import type { AssetRecord } from '@engine/assets';
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
 import {
@@ -19,6 +20,7 @@ import {
   ThreeWebGLRendererAdapter,
   type MaterialDescriptor,
   type RenderObject,
+  type RenderSkinning,
   type TextureSource,
 } from '@engine/renderer';
 import { createVoxelChunkSnapshot, meshVoxelChunkAsync } from '@engine/voxel';
@@ -128,19 +130,26 @@ const physicsReady = createPhysicsWorld({ gravity: [0, -9.81, 0] }).then(
     return null;
   },
 );
-const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
-  'Renderable',
-);
+const Renderable = defineComponent<{
+  geometry: MeshData;
+  material: MaterialDescriptor;
+  skinning?: RenderSkinning;
+}>('Renderable');
 const addMeshRenderable = (
   position: readonly [number, number, number],
   geometry: MeshData,
   material: MaterialDescriptor,
   rotation: readonly [number, number, number, number] = [0, 0, 0, 1],
   scale: readonly [number, number, number] = [1, 1, 1],
+  skinning?: RenderSkinning,
 ) => {
   const entity = runtime.world.createEntity();
   runtime.world.add(entity, Transform, { position, rotation, scale, parent: null });
-  runtime.world.add(entity, Renderable, { geometry, material });
+  runtime.world.add(entity, Renderable, {
+    geometry,
+    material,
+    ...(skinning ? { skinning } : {}),
+  });
   return entity;
 };
 const addRenderable = (
@@ -159,12 +168,27 @@ const sampleEntities = [
 ];
 const activeProjectEntities: Array<ReturnType<typeof runtime.world.createEntity>> = [];
 
+interface ActiveAnimationBinding {
+  readonly skin: AnimationSkin;
+  readonly meshNodeIndex: number;
+  readonly palettes: readonly Float32Array[];
+}
+
+interface ActiveAnimationInstance {
+  readonly player: AnimationPlayer;
+  readonly parents: readonly (number | null)[];
+  readonly bindings: readonly ActiveAnimationBinding[];
+}
+
+const activeAnimations: ActiveAnimationInstance[] = [];
+
 interface PreparedRenderable {
   position: readonly [number, number, number];
   rotation: readonly [number, number, number, number];
   scale: readonly [number, number, number];
   geometry: MeshData;
   material: MaterialDescriptor;
+  skinning?: RenderSkinning;
 }
 
 interface TransformSnapshot {
@@ -337,6 +361,7 @@ function decodeBase64(value: string): ArrayBuffer {
 
 async function prepareWorldEntities(document: WorldDocument) {
   const prepared: PreparedRenderable[] = [];
+  const animations: ActiveAnimationInstance[] = [];
   let unsupported = 0;
   const assetRecords = new Map<string, AssetRecord>();
   for (const value of document.assets) {
@@ -385,6 +410,18 @@ async function prepareWorldEntities(document: WorldDocument) {
       const asset = await loadGlbAsset(assetId);
       const record = assetRecords.get(assetId);
       if (!record) throw new Error(`GLB asset record is missing: ${assetId}`);
+      const bindPose = createAnimationPose(asset.nodes.length);
+      const parents: Array<number | null> = Array.from({ length: asset.nodes.length }, () => null);
+      for (const [nodeIndex, node] of asset.nodes.entries()) {
+        bindPose[nodeIndex]!.translation.set(node.translation);
+        bindPose[nodeIndex]!.rotation.set(node.rotation);
+        bindPose[nodeIndex]!.scale.set(node.scale);
+        for (const child of node.children) parents[child] = nodeIndex;
+      }
+      const player =
+        asset.animations.length > 0 ? new AnimationPlayer(asset.animations, bindPose) : null;
+      if (player) player.play(asset.animations[0]!.name);
+      const animationBindings: ActiveAnimationBinding[] = [];
       const childIndices = new Set<number>();
       for (const node of asset.nodes) for (const child of node.children) childIndices.add(child);
       const roots = asset.nodes
@@ -403,25 +440,48 @@ async function prepareWorldEntities(document: WorldDocument) {
         });
         if (node.mesh !== null) {
           const mesh = asset.meshes[node.mesh];
+          const skin = node.skin === null ? undefined : asset.skins[node.skin];
+          const palettes: Float32Array[] = [];
           if (!mesh) {
             unsupported += 1;
           } else {
             for (const primitive of mesh.primitives) {
               const material =
                 primitive.material === null ? undefined : asset.materials[primitive.material];
+              const skinning =
+                skin && primitive.skinning
+                  ? {
+                      jointIndices: primitive.skinning.joints,
+                      jointWeights: primitive.skinning.weights,
+                      jointMatrices: evaluateSkinningMatrices(
+                        player?.pose ?? bindPose,
+                        parents,
+                        skin,
+                        nodeIndex,
+                      ),
+                    }
+                  : undefined;
+              if (skinning) palettes.push(skinning.jointMatrices);
               prepared.push({
                 position: worldTransform.position,
                 rotation: worldTransform.rotation,
                 scale: worldTransform.scale,
                 geometry: primitive.mesh,
                 material: materialFromGlb(asset, material, assetId, record.contentHash),
+                ...(skinning ? { skinning } : {}),
               });
             }
+          }
+          if (player && skin && palettes.length > 0) {
+            animationBindings.push({ skin, meshNodeIndex: nodeIndex, palettes });
           }
         }
         for (const child of node.children) visit(child, worldTransform);
       };
       for (const root of roots) visit(root, rootTransform);
+      if (player && animationBindings.length > 0) {
+        animations.push({ player, parents, bindings: animationBindings });
+      }
       if (roots.length === 0 && asset.nodes.length > 0) unsupported += 1;
     } catch {
       unsupported += 1;
@@ -489,7 +549,7 @@ async function prepareWorldEntities(document: WorldDocument) {
       },
     });
   }
-  return { prepared, unsupported };
+  return { prepared, unsupported, animations };
 }
 
 type PlayerVoxelChunk = Awaited<ReturnType<typeof openVoxelWorldProject>>['chunks'][number];
@@ -900,6 +960,7 @@ async function openProjectFolder(): Promise<void> {
     voxelStream = null;
     for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
     activeProjectEntities.length = 0;
+    activeAnimations.splice(0, activeAnimations.length, ...world.animations);
     for (const entity of world.prepared) {
       activeProjectEntities.push(
         addMeshRenderable(
@@ -908,6 +969,7 @@ async function openProjectFolder(): Promise<void> {
           entity.material,
           entity.rotation,
           entity.scale,
+          entity.skinning,
         ),
       );
     }
@@ -1054,6 +1116,19 @@ const renderFrame = (now: number) => {
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
   runtime.advance(delta);
+  for (const animation of activeAnimations) {
+    animation.player.update(delta);
+    const pose = animation.player.pose;
+    for (const binding of animation.bindings) {
+      const matrices = evaluateSkinningMatrices(
+        pose,
+        animation.parents,
+        binding.skin,
+        binding.meshNodeIndex,
+      );
+      for (const palette of binding.palettes) palette.set(matrices);
+    }
+  }
   if (streamAnchor && cameraPanKeys.size > 0 && delta > 0) {
     const distance = Math.min(delta, 0.1) * 24;
     const dx = (Number(cameraPanKeys.has('d')) - Number(cameraPanKeys.has('a'))) * distance;
@@ -1078,13 +1153,18 @@ const renderFrame = (now: number) => {
 
   const objects: RenderObject[] = [];
   runtime.world.query(Renderable).forEach((entity, renderableValue) => {
-    const renderable = renderableValue as { geometry: MeshData; material: MaterialDescriptor };
+    const renderable = renderableValue as {
+      geometry: MeshData;
+      material: MaterialDescriptor;
+      skinning?: RenderSkinning;
+    };
     const worldMatrix = runtime.hierarchy.getWorldMatrix(entity);
     if (!worldMatrix) return;
     objects.push({
       id: entity,
       geometry: renderable.geometry,
       material: renderable.material,
+      ...(renderable.skinning ? { skinning: renderable.skinning } : {}),
       worldMatrix,
     });
   });
@@ -1097,6 +1177,7 @@ const renderFrame = (now: number) => {
 const onPageHide = () => {
   window.cancelAnimationFrame(animationFrame);
   pageDisposed = true;
+  activeAnimations.length = 0;
   voxelStream?.dispose();
   voxelStream = null;
   voxelColliderSet?.dispose();
