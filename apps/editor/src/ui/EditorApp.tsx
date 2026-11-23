@@ -25,7 +25,12 @@ import { EditorHistory } from './EditorHistory.js';
 import { resolveVoxelBrushCell } from './voxelBrush.js';
 import { readPbrMaterialState } from './materialValidation.js';
 import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
-import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
+import {
+  CURRENT_WORLD_SCHEMA_VERSION,
+  parseWorld,
+  serializeWorld,
+  type WorldDocument,
+} from '@engine/serialization';
 import {
   createBoxGeometry,
   createCylinderGeometry,
@@ -1110,7 +1115,7 @@ export function EditorApp() {
   const createWorldDocument = (): WorldDocument => {
     const worldDocument: WorldDocument = {
       format: 'universal-3d-world',
-      schemaVersion: '1.0.0',
+      schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
       engineVersion: '0.1.0',
       world: {
         id: 'world:editor-session',
