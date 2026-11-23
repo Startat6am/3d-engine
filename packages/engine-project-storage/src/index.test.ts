@@ -161,7 +161,9 @@ describe('directory project asset store', () => {
     const restored = await loadDirectoryProject(store);
     expect(restored.schemaVersion).toBe(CURRENT_WORLD_SCHEMA_VERSION);
     expect(restored.world.entities).toEqual(withAudio.world.entities);
-    expect(restored.assetPayloads?.find((payload) => payload.assetId === audioAsset.id)).toMatchObject({
+    expect(
+      restored.assetPayloads?.find((payload) => payload.assetId === audioAsset.id),
+    ).toMatchObject({
       mimeType: 'audio/wav',
       data: base64(audioBytes),
     });
