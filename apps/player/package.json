@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@engine/animation": "workspace:*",
+    "@engine/audio": "workspace:*",
     "@engine/assets": "workspace:*",
     "@engine/core": "workspace:*",
     "@engine/geometry": "workspace:*",
