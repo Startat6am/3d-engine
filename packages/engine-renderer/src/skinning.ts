@@ -15,14 +15,8 @@ export function createThreeSkinningGeometry(
     throw new RangeError('Skinning attributes must contain four influences per geometry vertex');
   }
   const geometry = source.clone();
-  geometry.setAttribute(
-    'skinIndex',
-    new THREE.Uint16BufferAttribute(skinning.jointIndices, 4),
-  );
-  geometry.setAttribute(
-    'skinWeight',
-    new THREE.Float32BufferAttribute(skinning.jointWeights, 4),
-  );
+  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinning.jointIndices, 4));
+  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinning.jointWeights, 4));
   return geometry;
 }
 
