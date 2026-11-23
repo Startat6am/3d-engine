@@ -70,7 +70,7 @@ export function createAnimationTrack(options: {
 }): AnimationTrack {
   const { path, times, values } = options;
   const interpolation = options.interpolation ?? 'LINEAR';
-  if (!(path in COMPONENTS)) throw new AnimationDataError(`Unsupported animation path: ${path}`);
+  if (!Object.hasOwn(COMPONENTS, path)) throw new AnimationDataError(`Unsupported animation path: ${path}`);
   if (!['STEP', 'LINEAR', 'CUBICSPLINE'].includes(interpolation)) {
     throw new AnimationDataError(
       `Unsupported animation interpolation: ${interpolation}`,
@@ -100,6 +100,12 @@ export function createAnimationTrack(options: {
   const ownedValues = Float32Array.from(values);
   if (!ownedTimes.every(Number.isFinite) || !ownedValues.every(Number.isFinite)) {
     throw new AnimationDataError('Animation values exceed Float32 range');
+  }
+  // Float32 conversion can collapse distinct, closely spaced source timestamps.
+  for (let index = 1; index < ownedTimes.length; index++) {
+    if (ownedTimes[index]! <= ownedTimes[index - 1]!) {
+      throw new AnimationDataError('Animation key times must remain strictly increasing in Float32');
+    }
   }
   return Object.freeze({ path, interpolation, valueSize, times: ownedTimes, values: ownedValues });
 }
