@@ -1,6 +1,6 @@
 # Animation & Audio Specification
 
-**Status:** proposed M8 contract; implementation pending.
+**Status:** M8 contract baseline; M8.1 implementation in progress.
 **Version:** 0.1.0-draft
 **Milestone:** M8 (after M7 World & Voxels, before M9 Editor MVP)
 
@@ -9,6 +9,7 @@
 M8 adds reusable, renderer-independent animation and audio capabilities to Choreon. It must let the Player run an animated GLB character and spatial sound sources, with deterministic lifecycle behavior and no editor dependency.
 
 Planned packages:
+
 - `@engine/animation`: validated animation data, playback state, sampling, blending, skeletal pose evaluation and ECS-facing systems. It depends on `@engine/core`; it must not depend on Three.js, React, DOM or a particular renderer.
 - `@engine/audio`: audio source/listener contracts, playback state, spatial parameters and service lifecycle. It depends on `@engine/core`; browser Web Audio is an adapter, not the public contract.
 - `@engine/gltf-importer`: extends the existing GLB import result with validated skin, inverse-bind and animation channel data.
@@ -20,14 +21,16 @@ These packages do not own entity identity, canonical transforms, asset identity,
 ## 2. M8 scope
 
 ### Animation
+
 - Import core glTF 2.0 animation data from GLB: skins/joints, inverse bind matrices, animation samplers and channels targeting translation, rotation and scale.
-- Validate accessor component/type/count relationships, finite values, strictly nondecreasing key times, node and joint references, sampler interpolation and resource budgets before allocating expanded runtime structures.
+- Validate accessor component/type/count relationships, finite values, strictly increasing key times, node and joint references, sampler interpolation and resource budgets before allocating expanded runtime structures.
 - Support STEP, LINEAR and CUBICSPLINE interpolation as defined by glTF. Quaternion LINEAR interpolation uses shortest-path normalized slerp; CUBICSPLINE uses glTF Hermite semantics and normalizes sampled rotations.
 - Support clip duration, play/pause/stop, seek, speed, loop and once modes, deterministic time advancement, cross-fade between two clips, and multiple independent animation players.
 - Evaluate local joint pose and skinning palette from a stable skeleton definition. Parent hierarchy and inverse-bind matrices are explicit; joint order is preserved exactly as authored.
 - Expose evaluated pose to renderer without making renderer state canonical. No animation writes to ECS Transform by default; root motion is deferred until separately specified.
 
 ### Audio
+
 - Define audio clip identity/data ownership, listener, source, bus/category, gain, pitch, loop, playback state and spatial attenuation parameters.
 - Provide a backend-neutral AudioDevice/AudioBackend contract and a browser Web Audio adapter.
 - Support one active listener, mono positional sources, non-spatial stereo sources, play/pause/stop, seek where backend supports it, gain, pitch, looping, distance attenuation, panning and source/listener transform updates.
@@ -110,6 +113,7 @@ These examples communicate intent, not an approved ABI. Implementations must exp
 ## 8. Errors and limits
 
 Expected failures are typed and actionable:
+
 - `ANIMATION_INVALID_DATA`, `ANIMATION_UNSUPPORTED_FEATURE`, `ANIMATION_RESOURCE_LIMIT`, `ANIMATION_DISPOSED`, `ANIMATION_UNKNOWN_CLIP`.
 - `AUDIO_UNAVAILABLE`, `AUDIO_PERMISSION_REQUIRED`, `AUDIO_DECODE_FAILED`, `AUDIO_RESOURCE_LIMIT`, `AUDIO_DISPOSED`, `AUDIO_UNKNOWN_CLIP`.
 
@@ -118,6 +122,7 @@ Limits must cover source bytes, decoded audio bytes/duration, clip/channel/key c
 ## 9. Verification and acceptance
 
 Unit/contract tests:
+
 - interpolation boundaries, duplicate/descending/non-finite key times, quaternion normalization and CUBICSPLINE sampling;
 - hierarchy ordering, skin/joint index validation, inverse-bind count and deterministic pose evaluation;
 - playback state transitions, seek, loop wrapping, once clamping, large deltas and cross-fade endpoints;
@@ -125,6 +130,7 @@ Unit/contract tests:
 - audio option validation, attenuation math, listener selection, async decode cancellation, shared-buffer leases, autoplay permission, and stop/dispose races.
 
 Integration/acceptance:
+
 - Player loads a fixture GLB with a skinned character, plays at least two clips, cross-fades them and renders the resulting pose.
 - Player plays one positional mono sound and one non-spatial sound; moving the listener/source changes spatial output in a browser that supports Web Audio.
 - Removing entities, replacing assets, stopping Player and disposing EngineHost release animation/audio resources; repeated start/stop does not leak or duplicate backend nodes.
@@ -133,9 +139,10 @@ Integration/acceptance:
 
 ## 10. Known baseline gaps
 
-At the M8 planning baseline:
-- `@engine/animation` now exists with validated animation track/clip/skin data contracts and keyframe sampling; GLB import, playback system and renderer integration remain unimplemented. `@engine/audio` does not exist.
-- `GlbAsset` currently exposes meshes, materials, nodes, images, samplers and textures only; no skins or animation channels are imported.
+At the M8 implementation checkpoint:
+
+- `@engine/animation` exports validated track/clip/skin data contracts and STEP/LINEAR/CUBICSPLINE sampling. Playback, cross-fade, hierarchy pose evaluation and renderer integration remain unimplemented. `@engine/audio` does not exist.
+- `GlbAsset` now exposes validated skins, ordered joints, inverse-bind matrices, per-vertex JOINTS_0/WEIGHTS_0 influences and translation/rotation/scale animation channels with bounded accessor decoding. Playback and renderer skinning remain open; only the first JOINTS_0/WEIGHTS_0 influence set is currently supported.
 - The ECS scheduler exposes pre-update, fixed-update, variable-update, post-update and transform-propagation phases, suitable for the planned ordering but not yet integrated with animation/audio.
 - Renderer render objects currently carry geometry/material and transform data; no skinning palette contract exists.
 - Existing Player/Editor serialization restoration does not create animation or audio components.
