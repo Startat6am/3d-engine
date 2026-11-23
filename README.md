@@ -15,7 +15,7 @@ The format is an architectural direction, not yet a finalized or implemented pub
 - `packages/engine-core` — renderer-independent engine lifecycle and generation-safe entity handles.
 - `packages/engine-geometry` — CPU-side mesh contracts and primitive geometry.
 - `packages/engine-renderer` — Three.js WebGL2 implementation behind an engine-owned adapter.
-- `packages/engine-animation` — renderer-independent animation track/clip/skin contracts and keyframe sampling (M8 in progress).
+- `packages/engine-animation` — renderer-independent animation track/clip/skin contracts and keyframe sampling (M8 in progress); `packages/engine-gltf-importer` imports GLB skins, vertex influences and animation channels.
 - `apps/editor` — React authoring shell with hierarchy, inspector and live 3D viewport.
 - `apps/player` — minimal runtime host and Physics Playground sample; no React or editor dependency.
 
@@ -66,11 +66,11 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 
 ## Current milestone status
 
-M2–M5 are complete, M6 functional scope is closed, and M7 World & Voxels was merged and owner-accepted on 2026-11-22 (PR #90; exact-head CI #45022849198). M8 Animation & Audio is next; see the M8 execution plan and subsystem specification. M9 Editor MVP and M10 AI Authoring remain in sequence.
+M2–M5 are complete, M6 functional scope is closed, and M7 World & Voxels was merged and owner-accepted on 2026-11-22 (PR #90; exact-head CI #45022849198). M8 Animation & Audio is in progress; see the M8 execution plan and subsystem specification. M9 Editor MVP and M10 AI Authoring remain in sequence.
 
 ## Status
 
-M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements remain explicitly deferred. M7 World & Voxels is complete and owner-accepted (PR #90, merge `ea6a9f4`, exact-head CI #45022849198). M8 Animation & Audio is the next milestone and is currently at the contract/planning baseline; no animation/audio runtime implementation is claimed yet. See [M8 Execution Plan](docs/M8_EXECUTION_PLAN.md), [Animation & Audio Spec](docs/ANIMATION_AUDIO_SPEC.md), and [Project Handoff](docs/PROJECT_HANDOFF.md). The Editor remains an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10.
+M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements remain explicitly deferred. M7 World & Voxels is complete and owner-accepted (PR #90, merge `ea6a9f4`, exact-head CI #45022849198). M8 Animation & Audio is in progress: animation data contracts and initial GLB skin/animation import are implemented; playback, renderer skinning and audio runtime remain open. See [M8 Execution Plan](docs/M8_EXECUTION_PLAN.md), [Animation & Audio Spec](docs/ANIMATION_AUDIO_SPEC.md), and [Project Handoff](docs/PROJECT_HANDOFF.md). The Editor remains an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10.
 
 ## Deployment
 
