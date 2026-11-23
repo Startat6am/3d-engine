@@ -629,6 +629,8 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     readonly materialLease: AssetResourceLease<THREE.MeshStandardMaterial>;
     textureSources: Map<TextureChannel, TextureSource>;
     textureLeases: Map<TextureChannel, AssetResourceLease<THREE.Texture>>;
+    skeleton?: THREE.Skeleton;
+    skinningGeometry?: THREE.BufferGeometry;
     active: boolean;
   }): void {
     entry.active = false;
