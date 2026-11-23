@@ -1,4 +1,9 @@
-import { AnimationPlayer, createAnimationPose, evaluateSkinningMatrices, type AnimationSkin } from '@engine/animation';
+import {
+  AnimationPlayer,
+  createAnimationPose,
+  evaluateSkinningMatrices,
+  type AnimationSkin,
+} from '@engine/animation';
 import type { AssetRecord } from '@engine/assets';
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
 import {
