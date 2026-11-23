@@ -18,17 +18,17 @@ Updated: 2026-11-22
 - M2–M5: complete.
 - M6 Physics/Input: functional scope closed; profiling limitations remain deferred.
 - M7 World & Voxels: complete and owner-accepted. See the M7 implementation notes below and exact merge/CI above.
-- M8 Animation & Audio: M8.0 contract baseline established; M8.1 animation data/sampling foundation in progress on `feat/m8-animation-audio-contracts`. `@engine/animation` exports validated track/clip/skin data and keyframe sampling; GLB skin/animation import and playback/renderer integration remain open.
+- M8 Animation & Audio: M8.0 contract baseline established; M8.1 animation data/sampling foundation in progress on `feat/m8-animation-audio-contracts`. `@engine/animation` exports validated track/clip/skin data and keyframe sampling; GLB importer now decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. Playback and renderer integration remain open.
 - M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
 ## M8 audit findings at the main baseline
 
 - `@engine/core` provides `EngineHost` ordered service lifecycle and ECS `SystemScheduler` phases including `fixed-update`, `variable-update` and `transform-propagation`.
-- `@engine/gltf-importer` currently exposes GLB meshes, materials, nodes, images, samplers and textures; it does not import skins, inverse-bind matrices or animation channels.
+- `@engine/gltf-importer` at the original M8 baseline exposed GLB meshes/materials/nodes only; the current M8 branch now adds bounded skin and animation decoding.
 - `@engine/renderer` render objects accept geometry/material and TRS or a world matrix; no skinning palette contract exists.
 - `@engine/animation` has been added on the M8 branch with validated track/clip/skin data and sampling. `@engine/audio` does not exist yet.
 - Player/Editor do not yet restore animation/audio components from project documents.
-- Next implementation: extend `@engine/gltf-importer` with bounded GLB skin and animation import, then deterministic playback/pose evaluation. Follow `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
+- Next implementation: finish M8.1 sparse-accessor policy and representative external GLB fixtures, then implement deterministic playback/pose evaluation in M8.2. Follow `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
 
 ## M6 implementation and accepted limitations
 
