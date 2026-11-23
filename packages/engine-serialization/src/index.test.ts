@@ -26,9 +26,12 @@ describe('world serialization', () => {
   it('keeps the versioned asset world golden fixture byte-stable', () => {
     const fixture = JSON.stringify(goldenFixture, null, 2);
     const parsed = parseWorld(fixture);
+    expect(parsed.schemaVersion).toBe('1.1.0');
     expect(parsed.assets).toHaveLength(1);
     expect(parsed.assetPayloads?.[0]?.assetId).toBe('asset:model:triangle');
-    expect(serializeWorld(parsed)).toBe(fixture);
+    const migratedFixture = { ...goldenFixture, schemaVersion: CURRENT_WORLD_SCHEMA_VERSION };
+    expect(parsed).toEqual(migratedFixture);
+    expect(serializeWorld(parsed)).toBe(JSON.stringify(migratedFixture, null, 2));
   });
 
   it('round-trips a valid document with deterministic key ordering', () => {
@@ -103,9 +106,9 @@ describe('world serialization', () => {
   });
 
   it('ships the JSON Schema beside the compiled package entry point', async () => {
-    const schemaUrl = new URL('./schemas/world-v1.schema.json', import.meta.url);
+    const schemaUrl = new URL('./schemas/world-v1.1.schema.json', import.meta.url);
     const schema = await import(schemaUrl.href, { with: { type: 'json' } });
-    expect(schema.default.$id).toBe('https://choreon.dev/schemas/world-v1.schema.json');
+    expect(schema.default.$id).toBe('https://choreon.dev/schemas/world-v1.1.schema.json');
   });
 
   it('validates nested document structure against the published v1 JSON Schema', () => {
@@ -174,6 +177,145 @@ describe('world serialization', () => {
   it('reports malformed JSON and invalid envelopes', () => {
     expect(() => parseWorld('{')).toThrow(WorldSerializationError);
     expect(() => validateWorldDocument({ format: 'wrong' })).toThrow('Unsupported world format');
+  });
+
+  it('migrates world 1.0.0 by default without synthesizing components', () => {
+    const original = {
+      ...goldenFixture,
+      world: {
+        ...goldenFixture.world,
+        entities: [
+          {
+            id: 'entity:audio-ready',
+            components: {
+              Transform: { position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] },
+            },
+          },
+        ],
+      },
+    };
+    const migrated = parseWorld(JSON.stringify(original));
+    expect(migrated.schemaVersion).toBe('1.1.0');
+    expect(migrated.world.entities).toEqual(original.world.entities);
+    expect(migrated.assets).toEqual(original.assets);
+    expect(migrated.assetPayloads).toEqual(original.assetPayloads);
+    expect(migrated.extensions).toEqual(original.extensions);
+    expect((migrated.world.entities[0] as { components: Record<string, unknown> }).components)
+      .not.toHaveProperty('AudioSource');
+  });
+
+  it('accepts a transformed audio-only entity with a typed audio asset reference', () => {
+    const document: WorldDocument = {
+      ...world(),
+      assets: [{ id: 'asset:audio', kind: 'audio' }],
+      world: {
+        ...world().world,
+        entities: [
+          {
+            id: 'entity:audio-only',
+            components: {
+              Transform: { position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] },
+              AudioSource: {
+                assetId: 'asset:audio',
+                spatial: true,
+                loop: false,
+                gain: 0.7,
+                referenceDistance: 1,
+                maxDistance: 50,
+                playOnEnable: false,
+              },
+            },
+          },
+        ],
+      },
+    };
+    expect(parseWorld(serializeWorld(document))).toEqual(document);
+  });
+
+  it('rejects AudioSource references with missing assets, wrong kinds or no Transform', () => {
+    const entity = {
+      id: 'entity:audio',
+      components: {
+        Transform: {},
+        AudioSource: {
+          assetId: 'asset:audio',
+          spatial: true,
+          loop: false,
+          gain: 0.5,
+          referenceDistance: 1,
+          maxDistance: 10,
+          playOnEnable: false,
+        },
+      },
+    };
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        world: { ...world().world, entities: [entity] },
+      }),
+    ).toThrow('AudioSource references an unknown asset');
+
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        assets: [{ id: 'asset:audio', kind: 'model' }],
+        world: { ...world().world, entities: [entity] },
+      }),
+    ).toThrow('must resolve to an audio asset');
+
+    expect(() =>
+      validateWorldDocument({
+        ...world(),
+        assets: [{ id: 'asset:audio', kind: 'audio' }],
+        world: {
+          ...world().world,
+          entities: [{ ...entity, components: { AudioSource: entity.components.AudioSource } }],
+        },
+      }),
+    ).toThrow('requires a Transform component');
+  });
+
+  it('rejects invalid AudioSource gain and distance ranges', () => {
+    const source = {
+      assetId: 'asset:audio',
+      spatial: true,
+      loop: false,
+      gain: 1.5,
+      referenceDistance: 2,
+      maxDistance: 1,
+      playOnEnable: false,
+    };
+    const document = {
+      ...world(),
+      assets: [{ id: 'asset:audio', kind: 'audio' }],
+      world: {
+        ...world().world,
+        entities: [
+          {
+            id: 'entity:audio',
+            components: { Transform: {}, AudioSource: source },
+          },
+        ],
+      },
+    };
+    expect(() => validateWorldDocument(document)).toThrow('Schema validation failed');
+    expect(() =>
+      validateWorldDocument({
+        ...document,
+        world: {
+          ...document.world,
+          entities: [
+            {
+              id: 'entity:audio',
+              components: {
+                Transform: {},
+                AudioSource: { ...source, gain: 0.5, maxDistance: 1 },
+              },
+            },
+          ],
+        },
+      }),
+    ).toThrow('not less than referenceDistance');
   });
 
   it('runs explicit version migrations before validation', () => {
