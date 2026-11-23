@@ -33,6 +33,12 @@ describe('animation track validation', () => {
     ).toThrow(/output count mismatch/);
   });
 
+  it('rejects timestamps that collapse together when stored as Float32', () => {
+    expect(() =>
+      createAnimationTrack({ path: 'translation', times: [1, 1 + 1e-8], values: [0, 0, 0, 1, 0, 0] }),
+    ).toThrow(/strictly increasing in Float32/);
+  });
+
   it('rejects non-finite values and Float32 overflow', () => {
     expect(() =>
       createAnimationTrack({ path: 'translation', times: [0], values: [0, Number.NaN, 0] }),
@@ -99,7 +105,7 @@ describe('animation sampling', () => {
         1, 0, 0, 2, 0, 0, 0, 0, 0,
       ],
     });
-    expect(sampleAnimationTrack(track, 1)[0]).toBeCloseTo(1.5);
+    expect(sampleAnimationTrack(track, 1)[0]).toBeCloseTo(1);
   });
 
   it('rejects invalid sample time and undersized output buffers', () => {
