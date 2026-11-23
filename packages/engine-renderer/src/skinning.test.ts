@@ -47,6 +47,27 @@ describe('Three.js skinning bridge', () => {
     skeleton.dispose();
   });
 
+  it('deforms a vertex through Three.js weighted skinning', () => {
+    const source = new THREE.BufferGeometry();
+    source.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0], 3));
+    const geometry = createThreeSkinningGeometry(source, skinning);
+    const skeleton = createThreeSkinningSkeleton(skinning);
+    const material = new THREE.MeshBasicMaterial();
+    const mesh = new THREE.SkinnedMesh(geometry, material);
+    mesh.bindMode = THREE.DetachedBindMode;
+    mesh.bind(skeleton, new THREE.Matrix4());
+
+    const deformed = mesh.applyBoneTransform(0, new THREE.Vector3());
+    expect(deformed.x).toBeCloseTo(4.25);
+    expect(deformed.y).toBeCloseTo(5.25);
+    expect(deformed.z).toBeCloseTo(6.25);
+
+    material.dispose();
+    skeleton.dispose();
+    geometry.dispose();
+    source.dispose();
+  });
+
   it('rejects a palette whose joint count changes after allocation', () => {
     const skeleton = createThreeSkinningSkeleton(skinning);
     expect(() =>
