@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** M8.0–M8.4 complete; M8.5 AudioSource persistence and world-schema migration is next.
+**Status:** M8.0–M8.4 complete; M8.5 AudioSource persistence and world-schema integration in progress.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -70,9 +70,10 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 
 ### M8.5 — Player integration and project persistence
 
-- Implement the versioned `components.AudioSource` record and explicit world 1.0.0 → 1.1.0 migration; register it in the default parse path, following [ADR-0014](ADR/0014-persisted-audio-source-schema.md).
-- Validate audio asset references and spatial settings consistently in serialization, project storage, Editor and Player; allow audio-only transformed entities.
-- Verify save/load/reopen of audio-enabled scenes without serializing AudioContext nodes, decoded buffers, voice IDs or playback clocks.
+- Implemented: world schema 1.1.0, default 1.0.0 → 1.1.0 migration (version-only, data-preserving), typed `components.AudioSource`, semantic audio-asset reference checks, Transform requirement and gain/distance validation under [ADR-0014](ADR/0014-persisted-audio-source-schema.md).
+- Implemented: directory project storage accepts `audio/wav` and `audio/mpeg`; an audio-only AudioSource entity and audio payload round-trip in tests. Editor creates new worlds with `CURRENT_WORLD_SCHEMA_VERSION`.
+- Pending: Player restores audio-only entities, decodes project audio after explicit gesture activation, applies `playOnEnable` and updates source positions. Editor still needs audio asset import/selection and AudioSource authoring controls.
+- Pending acceptance: save/load/reopen audio-enabled projects without serializing AudioContext nodes, decoded buffers, voice IDs or playback clocks.
 - Exit: authored audio sources round-trip through Editor and Player, remain gesture-gated, and tear down cleanly.
 
 ### M8.6 — Examples, benchmarks and owner acceptance
@@ -109,4 +110,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-M8.1 importer coverage includes rotation/scale channels, the attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 and M8.3 are complete: headless playback, cross-fade, hierarchy-aware skinning, Three.js `SkinnedMesh` rendering, Player GLB playback, visible Fox deformation and skinning GPU-resource teardown passed exact-head Node 22/Chromium CI. M8.4 is complete: gesture-gated spatial playback and camera-follow listener passed exact-head CI [#45241932301] (335 unit tests, 32 Chromium E2E tests). Next is M8.5: implement the versioned `AudioSource` world-schema 1.1.0 migration and shared Editor/Player/project-storage validation under ADR-0014. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
+M8.1 importer coverage includes rotation/scale channels, the attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 and M8.3 are complete: headless playback, cross-fade, hierarchy-aware skinning, Three.js `SkinnedMesh` rendering, Player GLB playback, visible Fox deformation and skinning GPU-resource teardown passed exact-head Node 22/Chromium CI. M8.4 is complete: gesture-gated spatial playback and camera-follow listener passed exact-head CI [#45241932301] (335 unit tests, 32 Chromium E2E tests). Next in M8.5: wire audio-only entities and persisted AudioSource data into Player, then add Editor audio import/authoring and save-load-reopen acceptance. Schema 1.1.0 migration and project-storage validation are already implemented. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
