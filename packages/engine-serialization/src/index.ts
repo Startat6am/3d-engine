@@ -1,8 +1,8 @@
 import Ajv from 'ajv';
-import worldV1Schema from './schemas/world-v1.schema.json' with { type: 'json' };
+import worldV1_1Schema from './schemas/world-v1.1.schema.json' with { type: 'json' };
 
 export const WORLD_FORMAT = 'universal-3d-world' as const;
-export const CURRENT_WORLD_SCHEMA_VERSION = '1.0.0' as const;
+export const CURRENT_WORLD_SCHEMA_VERSION = '1.1.0' as const;
 
 export interface WorldAssetPayload {
   readonly assetId: string;
@@ -149,36 +149,87 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
   for (const [index, entity] of entities.entries()) {
     if (!isRecord(entity) || !isRecord(entity.components)) continue;
     const meshRenderer = entity.components.MeshRenderer;
-    if (!isRecord(meshRenderer)) continue;
-    if (
-      meshRenderer.assetId !== undefined &&
-      (typeof meshRenderer.assetId !== 'string' || !assetIds.has(meshRenderer.assetId))
-    ) {
-      throw new WorldSerializationError(
-        `Entity references an unknown asset: ${String(meshRenderer.assetId)}`,
-        `$.world.entities[${index}].components.MeshRenderer.assetId`,
-      );
+    if (isRecord(meshRenderer)) {
+      if (
+        meshRenderer.assetId !== undefined &&
+        (typeof meshRenderer.assetId !== 'string' || !assetIds.has(meshRenderer.assetId))
+      ) {
+        throw new WorldSerializationError(
+          `Entity references an unknown asset: ${String(meshRenderer.assetId)}`,
+          `$.world.entities[${index}].components.MeshRenderer.assetId`,
+        );
+      }
+      const material = meshRenderer.material;
+      if (isRecord(material)) {
+        for (const channel of ['baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive']) {
+          const field = `${channel}TextureAssetId`;
+          const textureAssetId = material[field];
+          if (
+            textureAssetId !== undefined &&
+            (typeof textureAssetId !== 'string' || !assetIds.has(textureAssetId))
+          ) {
+            throw new WorldSerializationError(
+              `Material references an unknown texture asset: ${String(textureAssetId)}`,
+              `$.world.entities[${index}].components.MeshRenderer.material.${field}`,
+            );
+          }
+          if (typeof textureAssetId === 'string' && assetKinds.get(textureAssetId) !== 'texture') {
+            throw new WorldSerializationError(
+              `Material reference must resolve to a texture asset: ${textureAssetId}`,
+              `$.world.entities[${index}].components.MeshRenderer.material.${field}`,
+            );
+          }
+        }
+      }
     }
-    const material = meshRenderer.material;
-    if (isRecord(material)) {
-      for (const channel of ['baseColor', 'metallicRoughness', 'normal', 'occlusion', 'emissive']) {
-        const field = `${channel}TextureAssetId`;
-        const textureAssetId = material[field];
-        if (
-          textureAssetId !== undefined &&
-          (typeof textureAssetId !== 'string' || !assetIds.has(textureAssetId))
-        ) {
-          throw new WorldSerializationError(
-            `Material references an unknown texture asset: ${String(textureAssetId)}`,
-            `$.world.entities[${index}].components.MeshRenderer.material.${field}`,
-          );
-        }
-        if (typeof textureAssetId === 'string' && assetKinds.get(textureAssetId) !== 'texture') {
-          throw new WorldSerializationError(
-            `Material reference must resolve to a texture asset: ${textureAssetId}`,
-            `$.world.entities[${index}].components.MeshRenderer.material.${field}`,
-          );
-        }
+
+    const audioSource = entity.components.AudioSource;
+    if (audioSource !== undefined) {
+      const path = `$.world.entities[${index}].components.AudioSource`;
+      if (!isRecord(audioSource)) {
+        throw new WorldSerializationError('AudioSource must be an object', path);
+      }
+      if (!isRecord(entity.components.Transform)) {
+        throw new WorldSerializationError('AudioSource requires a Transform component', path);
+      }
+      const audioAssetId = audioSource.assetId;
+      if (typeof audioAssetId !== 'string' || !assetIds.has(audioAssetId)) {
+        throw new WorldSerializationError(
+          `AudioSource references an unknown asset: ${String(audioAssetId)}`,
+          `${path}.assetId`,
+        );
+      }
+      if (assetKinds.get(audioAssetId) !== 'audio') {
+        throw new WorldSerializationError(
+          `AudioSource reference must resolve to an audio asset: ${audioAssetId}`,
+          `${path}.assetId`,
+        );
+      }
+      const gain = audioSource.gain;
+      const referenceDistance = audioSource.referenceDistance;
+      const maxDistance = audioSource.maxDistance;
+      if (typeof gain !== 'number' || !Number.isFinite(gain) || gain < 0 || gain > 1) {
+        throw new WorldSerializationError('AudioSource gain must be between zero and one', `${path}.gain`);
+      }
+      if (
+        typeof referenceDistance !== 'number' ||
+        !Number.isFinite(referenceDistance) ||
+        referenceDistance <= 0
+      ) {
+        throw new WorldSerializationError(
+          'AudioSource referenceDistance must be finite and positive',
+          `${path}.referenceDistance`,
+        );
+      }
+      if (
+        typeof maxDistance !== 'number' ||
+        !Number.isFinite(maxDistance) ||
+        maxDistance < referenceDistance
+      ) {
+        throw new WorldSerializationError(
+          'AudioSource maxDistance must be finite and not less than referenceDistance',
+          `${path}.maxDistance`,
+        );
       }
     }
   }
@@ -198,7 +249,7 @@ function validateWorldAssetReferences(document: Record<string, unknown>): void {
   }
 }
 
-const schemaValidator = new Ajv({ allErrors: true, strict: true }).compile(worldV1Schema);
+const schemaValidator = new Ajv({ allErrors: true, strict: true }).compile(worldV1_1Schema);
 
 /** Validates the stable document envelope while leaving component payloads extensible. */
 export function validateWorldDocument(value: unknown): asserts value is WorldDocument {
@@ -254,6 +305,16 @@ export function validateWorldDocument(value: unknown): asserts value is WorldDoc
   validateWorldAssetReferences(value);
 }
 
+/** Default 1.0.0 → 1.1.0 migration is intentionally additive: only the version changes. */
+export function createDefaultWorldMigrations(): WorldMigrationRegistry {
+  const migrations = new WorldMigrationRegistry();
+  migrations.register('1.0.0', (document) => ({
+    ...document,
+    schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
+  }));
+  return migrations;
+}
+
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (!isRecord(value)) return value;
@@ -271,7 +332,7 @@ export function serializeWorld(document: WorldDocument, space = 2): string {
 
 export function parseWorld(
   source: string,
-  migrations = new WorldMigrationRegistry(),
+  migrations = createDefaultWorldMigrations(),
 ): WorldDocument {
   let parsed: unknown;
   try {
