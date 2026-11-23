@@ -1,5 +1,201 @@
 import { expect, test } from '@playwright/test';
 
+test('player renders and cross-fades the Khronos Fox skeletal animation fixture', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__foxDrawCalls', { value: 0, writable: true });
+    const original = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (mode, count, type, offset) {
+      const target = window as unknown as { __foxDrawCalls: number };
+      target.__foxDrawCalls += 1;
+      return original.call(this, mode, count, type, offset);
+    };
+  });
+  await page.goto('http://127.0.0.1:5174/?fixture=fox');
+
+  const canvas = page.locator('#player');
+  const status = page.locator('#project-status');
+  await expect(canvas).toBeVisible();
+  await expect(status).toContainText('Fox animation fixture ready');
+  await expect(status).toContainText('1 animation instances');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __foxDrawCalls: number }).__foxDrawCalls),
+    )
+    .toBeGreaterThan(0);
+
+  const beforeCrossFade = await canvas.screenshot();
+  await page.keyboard.press(']');
+  await expect(status).toContainText('Cross-fading to Walk');
+  await page.waitForTimeout(700);
+  const afterCrossFade = await canvas.screenshot();
+  const litPixels = await canvas.evaluate((element) => {
+    if (!(element instanceof HTMLCanvasElement)) return 0;
+    const gl = element.getContext('webgl2');
+    if (!gl) return 0;
+    const pixels = new Uint8Array(element.width * element.height * 4);
+    gl.readPixels(0, 0, element.width, element.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let count = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if (pixels[index] !== 21 || pixels[index + 1] !== 26 || pixels[index + 2] !== 35) count += 1;
+    }
+    return count;
+  });
+
+  expect(litPixels).toBeGreaterThan(500);
+  expect(afterCrossFade.equals(beforeCrossFade)).toBe(false);
+  expect(pageErrors).toEqual([]);
+});
+
+test('player releases Fox skinning GPU resources on shutdown', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const state = window as unknown as {
+      __foxDeletedBuffers: number;
+      __foxDeletedTextures: number;
+      __foxDrawCalls: number;
+    };
+    state.__foxDeletedBuffers = 0;
+    state.__foxDeletedTextures = 0;
+    state.__foxDrawCalls = 0;
+
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__foxDeletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
+    const deleteTexture = WebGL2RenderingContext.prototype.deleteTexture;
+    WebGL2RenderingContext.prototype.deleteTexture = function (texture) {
+      state.__foxDeletedTextures += 1;
+      return deleteTexture.call(this, texture);
+    };
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (mode, count, type, offset) {
+      state.__foxDrawCalls += 1;
+      return drawElements.call(this, mode, count, type, offset);
+    };
+  });
+
+  await page.goto('http://127.0.0.1:5174/?fixture=fox');
+  await expect(page.locator('#project-status')).toContainText('Fox animation fixture ready');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __foxDrawCalls: number }).__foxDrawCalls),
+    )
+    .toBeGreaterThan(0);
+
+  const beforeDispose = await page.evaluate(() => {
+    const state = window as unknown as {
+      __foxDeletedBuffers: number;
+      __foxDeletedTextures: number;
+    };
+    return { ...state };
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __foxDeletedBuffers: number }).__foxDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__foxDeletedBuffers);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __foxDeletedTextures: number }).__foxDeletedTextures,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__foxDeletedTextures);
+  expect(pageErrors).toEqual([]);
+});
+
+test('Player activates Web Audio from a user gesture and starts a spatial voice', async ({
+  page,
+}) => {
+  await page.goto('http://127.0.0.1:5174');
+  await expect(page.locator('#audio-test')).toHaveText('Play spatial audio test');
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __playerAudioActive?: boolean }).__playerAudioActive,
+    ),
+  ).toBeUndefined();
+  await page.locator('#audio-test').click();
+  await expect(page.locator('#audio-test')).toHaveText('Spatial audio playing');
+  const audio = await page.evaluate(() => {
+    const state = window as Window & {
+      __playerAudioActive?: boolean;
+      __playerAudioVoices?: number;
+      __playerAudioSpatialization?: string;
+      __playerAudioContextState?: string;
+      __playerAudioListenerPosition?: readonly [number, number, number];
+    };
+    return {
+      active: state.__playerAudioActive,
+      voices: state.__playerAudioVoices,
+      spatialization: state.__playerAudioSpatialization,
+      contextState: state.__playerAudioContextState,
+      listenerPosition: state.__playerAudioListenerPosition,
+    };
+  });
+  expect(audio.active).toBe(true);
+  expect(audio.voices).toBe(1);
+  expect(['HRTF', 'equalpower']).toContain(audio.spatialization);
+  expect(audio.contextState).toBe('running');
+  expect(audio.listenerPosition).toHaveLength(3);
+  const initialListenerPosition = audio.listenerPosition;
+  await page.keyboard.down('w');
+  await page.waitForTimeout(180);
+  await page.keyboard.up('w');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerAudioListenerPosition?: readonly [number, number, number] })
+            .__playerAudioListenerPosition,
+      ),
+    )
+    .not.toEqual(initialListenerPosition);
+});
+
+test('player restores audio-only AudioSource after explicit gesture activation', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('http://127.0.0.1:5174/?fixture=audio');
+
+  const status = page.locator('#project-status');
+  const audioButton = page.locator('#audio-test');
+  await expect(status).toContainText('Audio fixture ready');
+  await expect(status).toContainText('1 audio-only source');
+  await expect(status).toContainText('no MeshRenderer');
+  await expect(audioButton).toHaveText('Enable project audio');
+
+  await audioButton.click();
+  await expect(audioButton).toHaveText('Project audio enabled');
+  await expect(status).toContainText('Enabled 1 project audio source');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerAudioVoices?: number }).__playerAudioVoices,
+      ),
+    )
+    .toBe(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerAudioContextState?: string }).__playerAudioContextState,
+      ),
+    )
+    .toBe('running');
+  expect(pageErrors).toEqual([]);
+});
+
 test('player renders the preloaded voxel test scene through WebGL2', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));

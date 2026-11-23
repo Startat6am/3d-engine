@@ -50,10 +50,64 @@ export interface MaterialDescriptor {
   readonly occlusionTexture?: TextureSource;
   readonly emissiveTexture?: TextureSource;
 }
+/** Maximum palette size supported by the initial CPU-authored/GPU-evaluated skinning path. */
+export const MAX_SKIN_JOINTS = 256;
+
+/** Backend-neutral glTF-style four-influence skinning input in mesh-local space. */
+export interface RenderSkinning {
+  /** Four palette-local joint indices per vertex. */
+  readonly jointIndices: Uint16Array;
+  /** Four non-negative, normalized weights per vertex. */
+  readonly jointWeights: Float32Array;
+  /** Column-major mesh-local joint matrices, exactly 16 floats per palette entry. */
+  readonly jointMatrices: Float32Array;
+}
+
+export function validateRenderSkinning(geometry: MeshData, skinning: RenderSkinning): void {
+  const vertexCount = geometry.positions.length / 3;
+  if (!Number.isSafeInteger(vertexCount) || vertexCount <= 0) {
+    throw new RangeError('Skinned geometry must contain at least one complete vertex');
+  }
+  if (
+    skinning.jointIndices.length !== vertexCount * 4 ||
+    skinning.jointWeights.length !== vertexCount * 4
+  ) {
+    throw new RangeError('Skinning attributes must contain four influences per vertex');
+  }
+  const jointCount = skinning.jointMatrices.length / 16;
+  if (!Number.isSafeInteger(jointCount) || jointCount < 1 || jointCount > MAX_SKIN_JOINTS) {
+    throw new RangeError(`Skinning palette must contain 1..${MAX_SKIN_JOINTS} joints`);
+  }
+  for (let joint = 0; joint < jointCount; joint++) {
+    for (let element = 0; element < 16; element++) {
+      if (!Number.isFinite(skinning.jointMatrices[joint * 16 + element])) {
+        throw new RangeError('Skinning palette contains a non-finite matrix element');
+      }
+    }
+  }
+  for (let vertex = 0; vertex < vertexCount; vertex++) {
+    let totalWeight = 0;
+    for (let influence = 0; influence < 4; influence++) {
+      const offset = vertex * 4 + influence;
+      const joint = skinning.jointIndices[offset]!;
+      const weight = skinning.jointWeights[offset]!;
+      if (joint >= jointCount) throw new RangeError('Skinning joint index exceeds palette size');
+      if (!Number.isFinite(weight) || weight < 0) {
+        throw new RangeError('Skinning weights must be finite and non-negative');
+      }
+      totalWeight += weight;
+    }
+    if (!Number.isFinite(totalWeight) || Math.abs(totalWeight - 1) > 1e-3) {
+      throw new RangeError('Skinning weights must sum to one per vertex');
+    }
+  }
+}
+
 interface RenderObjectBase {
   readonly id: string;
   readonly geometry: MeshData;
   readonly material: MaterialDescriptor;
+  readonly skinning?: RenderSkinning;
 }
 
 /** Backend-neutral render input: local TRS or a propagated column-major world matrix. */

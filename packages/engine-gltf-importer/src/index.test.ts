@@ -1,6 +1,13 @@
 import { MeshoptEncoder } from 'meshoptimizer';
+import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { GlbImportError, GlbImporter } from './index.js';
+import {
+  AnimationPlayer,
+  createAnimationPose,
+  evaluateSkinningMatrices,
+  sampleAnimationTrack,
+} from '@engine/animation';
 
 function makeGlb(
   options: {
@@ -196,7 +203,7 @@ function makeInterleavedGlb(): ArrayBuffer {
 type MutableGlbJson = {
   extensionsRequired?: string[];
   extensionsUsed?: string[];
-  accessors?: { count: number; byteOffset?: number; normalized?: boolean }[];
+  accessors?: { count: number; byteOffset?: number; normalized?: boolean; sparse?: unknown }[];
   bufferViews?: { byteOffset?: number; byteLength?: number; byteStride?: number }[];
   buffers?: { byteLength: number }[];
   materials?: {
@@ -258,6 +265,105 @@ function rewriteGlbJson(source: ArrayBuffer, update: (root: MutableGlbJson) => v
   header.setUint32(nextBinHeader, paddedBinLength, true);
   header.setUint32(nextBinHeader + 4, 0x004e4942, true);
   new Uint8Array(output, nextBinHeader + 8).set(binary);
+  return output;
+}
+
+function makeSkinnedAnimatedGlb(
+  interpolation: 'STEP' | 'LINEAR' | 'CUBICSPLINE' = 'LINEAR',
+): ArrayBuffer {
+  const cubic = interpolation === 'CUBICSPLINE';
+  const translation = cubic
+    ? [0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0]
+    : [0, 0, 0, 1, 0, 0];
+  const rotation = cubic
+    ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0]
+    : [0, 0, 0, 1, 0, 0, 1, 0];
+  const scale = cubic ? [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2, 2, 0, 0, 0] : [1, 1, 1, 2, 2, 2];
+  const animationValues = [0, 1, ...translation, ...rotation, ...scale];
+  const matrixOffset = animationValues.length * 4;
+  const positionOffset = matrixOffset + 128;
+  const jointOffset = positionOffset + 36;
+  const weightOffset = jointOffset + 12;
+  const binary = new Uint8Array(weightOffset + 48);
+  const binaryView = new DataView(binary.buffer);
+  const floatValues = [
+    ...animationValues,
+    ...Array.from({ length: 32 }, (_, i) => (i % 5 === 0 ? 1 : 0)),
+  ];
+  floatValues.forEach((value, index) => binaryView.setFloat32(index * 4, value, true));
+  [0, 0, 0, 1, 0, 0, 0, 1, 0].forEach((value, index) =>
+    binaryView.setFloat32(positionOffset + index * 4, value, true),
+  );
+  binary.set([0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0], jointOffset);
+  Array.from({ length: 12 }, (_, i) => (i % 4 === 0 ? 1 : 0)).forEach((value, index) =>
+    binaryView.setFloat32(weightOffset + index * 4, value, true),
+  );
+  const translationOffset = 8;
+  const rotationOffset = translationOffset + translation.length * 4;
+  const scaleOffset = rotationOffset + rotation.length * 4;
+  const root = {
+    asset: { version: '2.0', generator: 'animation-fixture' },
+    buffers: [{ byteLength: binary.byteLength }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: 8 },
+      { buffer: 0, byteOffset: translationOffset, byteLength: translation.length * 4 },
+      { buffer: 0, byteOffset: rotationOffset, byteLength: rotation.length * 4 },
+      { buffer: 0, byteOffset: scaleOffset, byteLength: scale.length * 4 },
+      { buffer: 0, byteOffset: matrixOffset, byteLength: 128 },
+      { buffer: 0, byteOffset: positionOffset, byteLength: 36 },
+      { buffer: 0, byteOffset: jointOffset, byteLength: 12 },
+      { buffer: 0, byteOffset: weightOffset, byteLength: 48 },
+    ],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 2, type: 'SCALAR' },
+      { bufferView: 1, componentType: 5126, count: translation.length / 3, type: 'VEC3' },
+      { bufferView: 2, componentType: 5126, count: rotation.length / 4, type: 'VEC4' },
+      { bufferView: 3, componentType: 5126, count: scale.length / 3, type: 'VEC3' },
+      { bufferView: 4, componentType: 5126, count: 2, type: 'MAT4' },
+      { bufferView: 5, componentType: 5126, count: 3, type: 'VEC3' },
+      { bufferView: 6, componentType: 5121, count: 3, type: 'VEC4' },
+      { bufferView: 7, componentType: 5126, count: 3, type: 'VEC4' },
+    ],
+    nodes: [
+      { name: 'Root', children: [1, 2] },
+      { name: 'Joint', translation: [0, 0, 0] },
+      { name: 'SkinnedMesh', mesh: 0, skin: 0 },
+    ],
+    meshes: [{ primitives: [{ attributes: { POSITION: 5, JOINTS_0: 6, WEIGHTS_0: 7 } }] }],
+    skins: [{ name: 'TwoJointSkin', joints: [1, 0], inverseBindMatrices: 4, skeleton: 0 }],
+    animations: [
+      {
+        name: 'Walk',
+        samplers: [
+          { input: 0, output: 1, interpolation },
+          { input: 0, output: 2, interpolation },
+          { input: 0, output: 3, interpolation },
+        ],
+        channels: [
+          { sampler: 0, target: { node: 1, path: 'translation' } },
+          { sampler: 1, target: { node: 1, path: 'rotation' } },
+          { sampler: 2, target: { node: 1, path: 'scale' } },
+        ],
+      },
+    ],
+  };
+  const json = new TextEncoder().encode(JSON.stringify(root));
+  const jsonLength = Math.ceil(json.length / 4) * 4;
+  const binLength = Math.ceil(binary.length / 4) * 4;
+  const total = 12 + 8 + jsonLength + 8 + binLength;
+  const output = new ArrayBuffer(total);
+  const header = new DataView(output);
+  header.setUint32(0, 0x46546c67, true);
+  header.setUint32(4, 2, true);
+  header.setUint32(8, total, true);
+  header.setUint32(12, jsonLength, true);
+  header.setUint32(16, 0x4e4f534a, true);
+  new Uint8Array(output, 20, json.length).set(json);
+  new Uint8Array(output, 20 + json.length, jsonLength - json.length).fill(0x20);
+  const binHeader = 20 + jsonLength;
+  header.setUint32(binHeader, binLength, true);
+  header.setUint32(binHeader + 4, 0x004e4942, true);
+  new Uint8Array(output, binHeader + 8, binary.length).set(binary);
   return output;
 }
 
@@ -343,6 +449,170 @@ async function makeMeshoptGlb(): Promise<ArrayBuffer> {
 }
 
 describe('GlbImporter', () => {
+  it('imports a representative external Fox GLB with skinning and multiple animation clips', async () => {
+    const fixture = await readFile(new URL('./fixtures/Fox.glb', import.meta.url));
+    const source = fixture.buffer.slice(
+      fixture.byteOffset,
+      fixture.byteOffset + fixture.byteLength,
+    );
+    const result = await new GlbImporter().import(source, {
+      ...context,
+      uri: 'fixtures/Fox.glb',
+    });
+
+    expect(result.data.skins).toHaveLength(1);
+    expect(result.data.skins[0]?.joints).toHaveLength(24);
+    expect(result.data.animations.map((clip) => clip.name)).toEqual(['Survey', 'Walk', 'Run']);
+    expect(
+      new Set(
+        result.data.animations.flatMap((clip) =>
+          clip.channels.map((channel) => channel.track.path),
+        ),
+      ),
+    ).toEqual(new Set(['translation', 'rotation']));
+    const skinnedPrimitive = result.data.meshes
+      .flatMap((mesh) => mesh.primitives)
+      .find((primitive) => primitive.skinning !== undefined);
+    expect(skinnedPrimitive?.skinning?.joints).toHaveLength(6912);
+    expect(skinnedPrimitive?.skinning?.weights).toHaveLength(6912);
+    const bindPose = createAnimationPose(result.data.nodes.length);
+    const parents: (number | null)[] = new Array(result.data.nodes.length).fill(null);
+    result.data.nodes.forEach((node, nodeIndex) => {
+      bindPose[nodeIndex]!.translation.set(node.translation);
+      bindPose[nodeIndex]!.rotation.set(node.rotation);
+      bindPose[nodeIndex]!.scale.set(node.scale);
+      for (const child of node.children) parents[child] = nodeIndex;
+    });
+    const meshNodeIndex = result.data.nodes.findIndex((node) => node.skin === 0);
+    expect(meshNodeIndex).toBeGreaterThanOrEqual(0);
+    const survey = result.data.animations.find((clip) => clip.name === 'Survey')!;
+    const firstPlayer = new AnimationPlayer(result.data.animations, bindPose);
+    const secondPlayer = new AnimationPlayer(result.data.animations, bindPose);
+    firstPlayer.play('Survey');
+    secondPlayer.play('Survey');
+    firstPlayer.update(0.25);
+    secondPlayer.update(0.25);
+    const firstPalette = evaluateSkinningMatrices(
+      firstPlayer.pose,
+      parents,
+      result.data.skins[0]!,
+      meshNodeIndex,
+    );
+    const secondPalette = evaluateSkinningMatrices(
+      secondPlayer.pose,
+      parents,
+      result.data.skins[0]!,
+      meshNodeIndex,
+    );
+    expect(firstPalette).toHaveLength(24 * 16);
+    expect([...firstPalette].every(Number.isFinite)).toBe(true);
+    expect(firstPalette).toEqual(secondPalette);
+    expect(survey.duration).toBeGreaterThan(0);
+  });
+
+  it('imports skin joint order, inverse bind matrices and animation channels', async () => {
+    const result = await new GlbImporter().import(makeSkinnedAnimatedGlb(), context);
+    expect(result.data.nodes[1]?.skin).toBeNull();
+    expect(result.data.skins[0]?.joints).toEqual(new Uint32Array([1, 0]));
+    expect(result.data.skins[0]?.skeletonRoot).toBe(0);
+    expect(result.data.skins[0]?.inverseBindMatrices).toHaveLength(32);
+    expect(result.data.animations[0]).toMatchObject({ name: 'Walk', duration: 1 });
+    expect(result.data.animations[0]?.channels.map((channel) => channel.track.path)).toEqual([
+      'translation',
+      'rotation',
+      'scale',
+    ]);
+    expect(result.data.nodes[2]?.skin).toBe(0);
+    expect(result.data.meshes[0]?.primitives[0]?.skinning?.joints).toEqual(
+      new Uint16Array([0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0]),
+    );
+    expect(result.data.meshes[0]?.primitives[0]?.skinning?.weights).toEqual(
+      new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]),
+    );
+    expect(result.data.animations[0]?.channels[0]?.nodeIndex).toBe(1);
+    expect([...result.data.animations[0]!.channels[0]!.track.times]).toEqual([0, 1]);
+    expect([...result.data.animations[0]!.channels[0]!.track.values]).toEqual([0, 0, 0, 1, 0, 0]);
+    expect(result.metadata).toMatchObject({
+      animationCount: 1,
+      skinCount: 1,
+      animationKeys: 6,
+      animationChannels: 3,
+      skinJointCount: 2,
+    });
+  });
+
+  it.each(['STEP', 'LINEAR', 'CUBICSPLINE'] as const)(
+    'decodes %s animation sampler interpolation',
+    async (interpolation) => {
+      const result = await new GlbImporter().import(makeSkinnedAnimatedGlb(interpolation), context);
+      const track = result.data.animations[0]!.channels[0]!.track;
+      expect(track.interpolation).toBe(interpolation);
+      expect(sampleAnimationTrack(track, 0.5)[0]).toBeCloseTo(interpolation === 'STEP' ? 0 : 0.5);
+    },
+  );
+
+  it('defaults omitted inverse bind matrices to identity and enforces animation budgets', async () => {
+    const noMatrices = rewriteGlbJson(makeSkinnedAnimatedGlb(), (root) => {
+      delete (root as unknown as { skins: { inverseBindMatrices?: number }[] }).skins[0]!
+        .inverseBindMatrices;
+    });
+    const result = await new GlbImporter().import(noMatrices, context);
+    expect(result.data.skins[0]?.inverseBindMatrices[0]).toBe(1);
+    expect(result.data.skins[0]?.inverseBindMatrices[5]).toBe(1);
+    await expect(
+      new GlbImporter().import(makeSkinnedAnimatedGlb(), {
+        ...context,
+        settings: { maxAnimationKeys: 1 },
+      }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+    await expect(
+      new GlbImporter().import(makeSkinnedAnimatedGlb(), {
+        ...context,
+        settings: { maxSkinJoints: 1 },
+      }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+    await expect(
+      new GlbImporter().import(makeSkinnedAnimatedGlb(), {
+        ...context,
+        settings: { maxAnimationChannels: 2 },
+      }),
+    ).rejects.toMatchObject({ code: 'RESOURCE_LIMIT' });
+  });
+
+  it('rejects invalid skin references and unsupported animation target paths', async () => {
+    const invalidSkin = rewriteGlbJson(makeSkinnedAnimatedGlb(), (root) => {
+      (root as unknown as { skins: { joints: number[] }[] }).skins[0]!.joints = [9, 0];
+    });
+    await expect(new GlbImporter().import(invalidSkin, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+    const weights = rewriteGlbJson(makeSkinnedAnimatedGlb(), (root) => {
+      (
+        root as unknown as { animations: { channels: { target: { path: string } }[] }[] }
+      ).animations[0]!.channels[0]!.target.path = 'weights';
+    });
+    await expect(new GlbImporter().import(weights, context)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FEATURE',
+    });
+    const floatingJoints = rewriteGlbJson(makeSkinnedAnimatedGlb(), (root) => {
+      (root as unknown as { accessors: { componentType: number }[] }).accessors[6]!.componentType =
+        5126;
+    });
+    await expect(new GlbImporter().import(floatingJoints, context)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FEATURE',
+    });
+    const signedWeights = rewriteGlbJson(makeSkinnedAnimatedGlb(), (root) => {
+      const accessor = (
+        root as unknown as { accessors: { componentType: number; normalized?: boolean }[] }
+      ).accessors[7]!;
+      accessor.componentType = 5122;
+      accessor.normalized = true;
+    });
+    await expect(new GlbImporter().import(signedWeights, context)).rejects.toMatchObject({
+      code: 'INVALID_ACCESSOR',
+    });
+  });
+
   it('decodes required EXT_meshopt_compression buffers', async () => {
     const result = await new GlbImporter().import(await makeMeshoptGlb(), context);
     expect(result.data.meshes[0]?.primitives[0]?.mesh.positions).toEqual(
@@ -543,6 +813,20 @@ describe('GlbImporter', () => {
     });
     const result = await new GlbImporter().import(glb, context);
     expect(result.data.extensionsUsed).toContain('EXT_fixture_optional');
+  });
+
+  it('rejects sparse accessors explicitly instead of partially decoding them', async () => {
+    const sparse = rewriteGlbJson(makeGlb(), (root) => {
+      root.accessors![0]!.sparse = {
+        count: 1,
+        indices: { bufferView: 0, componentType: 5121 },
+        values: { bufferView: 0 },
+      };
+    });
+    await expect(new GlbImporter().import(sparse, context)).rejects.toMatchObject({
+      code: 'UNSUPPORTED_FEATURE',
+      message: expect.stringContaining('Sparse accessors are not supported'),
+    });
   });
 
   it('rejects accessors whose declared element range exceeds the bufferView', async () => {

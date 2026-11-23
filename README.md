@@ -15,6 +15,7 @@ The format is an architectural direction, not yet a finalized or implemented pub
 - `packages/engine-core` — renderer-independent engine lifecycle and generation-safe entity handles.
 - `packages/engine-geometry` — CPU-side mesh contracts and primitive geometry.
 - `packages/engine-renderer` — Three.js WebGL2 implementation behind an engine-owned adapter.
+- `packages/engine-animation` — renderer-independent animation track/clip/skin contracts and keyframe sampling (M8 in progress); `packages/engine-gltf-importer` imports GLB skins, vertex influences and animation channels.
 - `apps/editor` — React authoring shell with hierarchy, inspector and live 3D viewport.
 - `apps/player` — minimal runtime host and Physics Playground sample; no React or editor dependency.
 
@@ -52,6 +53,10 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [Input](docs/INPUT_SPEC.md)                          | Device-independent input mapping and fixed-tick snapshots       |
 | [M6 acceptance](docs/acceptance/M6_PHYSICS_INPUT.md) | Physics, input, editor UX and CI exit gates                     |
 | [M7 execution plan](docs/M7_EXECUTION_PLAN.md)       | World and voxel milestone sequencing and acceptance             |
+| [M8 execution plan](docs/M8_EXECUTION_PLAN.md)       | Animation and audio milestone sequencing and acceptance         |
+| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle       |
+| [M8 execution plan](docs/M8_EXECUTION_PLAN.md)       | Animation and audio milestone sequencing and acceptance         |
+| [Animation & Audio](docs/ANIMATION_AUDIO_SPEC.md)    | Skeletal animation, playback, spatial audio and lifecycle       |
 | [World/voxel spec](docs/VOXEL_WORLD_SPEC.md)         | Chunk, voxel, meshing, streaming and generation contracts       |
 | [Editor](docs/EDITOR_SPEC.md)                        | Authoring application                                           |
 | [Runtime](docs/RUNTIME_SPEC.md)                      | Player lifecycle and frame scheduling                           |
@@ -59,9 +64,13 @@ Start with [Engine specification](docs/ENGINE_SPEC.md), [Architecture](docs/ARCH
 | [Testing](docs/TESTING_SPEC.md)                      | Quality gates and benchmark methodology                         |
 | [ADRs](docs/ADR/)                                    | Accepted and proposed architecture decisions                    |
 
+## Current milestone status
+
+M2–M5 are complete, M6 functional scope is closed, and M7 World & Voxels was merged and owner-accepted on 2026-11-22 (PR #90; exact-head CI #45022849198). M8 Animation & Audio is in progress; see the M8 execution plan and subsystem specification. M9 Editor MVP and M10 AI Authoring remain in sequence.
+
 ## Status
 
-M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements are explicitly deferred. M7 World & Voxels is active: `@engine/world` coordinates/settings and `@engine/voxel` immutable chunk storage, palette validation, deterministic CPU meshing, stale-result validation, and cooperative AbortSignal cancellation are implemented. The bounded chunk scheduler and deterministic seeded generator hooks are implemented; lifecycle stress tests, persistence, and runtime integration remain ahead. See the M7 execution plan, voxel/world specification, ADRs 0005–0011, and project handoff. The Editor is still an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10 and is not being accelerated.
+M2–M5 are complete. M6 functional scope is closed by owner direction; physical-device profiling and controlled WASM/GPU measurements remain explicitly deferred. M7 World & Voxels is complete and owner-accepted (PR #90, merge `ea6a9f4`, exact-head CI #45022849198). M8 Animation & Audio is in progress: animation data contracts and initial GLB skin/animation import are implemented; playback, renderer skinning and audio runtime remain open. See [M8 Execution Plan](docs/M8_EXECUTION_PLAN.md), [Animation & Audio Spec](docs/ANIMATION_AUDIO_SPEC.md), and [Project Handoff](docs/PROJECT_HANDOFF.md). The Editor remains an incremental authoring shell, not the full Editor MVP. AI authoring remains at M10.
 
 ## Deployment
 

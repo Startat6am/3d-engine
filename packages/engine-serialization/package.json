@@ -10,7 +10,8 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./schemas/world-v1.schema.json": "./dist/schemas/world-v1.schema.json"
+    "./schemas/world-v1.schema.json": "./dist/schemas/world-v1.schema.json",
+    "./schemas/world-v1.1.schema.json": "./dist/schemas/world-v1.1.schema.json"
   },
   "scripts": {
     "build": "tsc -b",

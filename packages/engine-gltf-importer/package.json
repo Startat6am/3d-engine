@@ -16,8 +16,12 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@engine/animation": "workspace:*",
     "@engine/assets": "workspace:*",
     "@engine/geometry": "workspace:*",
     "meshoptimizer": "1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
   }
 }

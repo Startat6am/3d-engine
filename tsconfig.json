@@ -30,6 +30,12 @@
     },
     {
       "path": "packages/engine-project-storage"
+    },
+    {
+      "path": "packages/engine-animation"
+    },
+    {
+      "path": "packages/engine-audio"
     }
   ]
 }

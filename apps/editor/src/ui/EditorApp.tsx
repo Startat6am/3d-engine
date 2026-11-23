@@ -25,7 +25,12 @@ import { EditorHistory } from './EditorHistory.js';
 import { resolveVoxelBrushCell } from './voxelBrush.js';
 import { readPbrMaterialState } from './materialValidation.js';
 import { WorkerGlbImporter } from '../workers/WorkerGlbImporter.js';
-import { parseWorld, serializeWorld, type WorldDocument } from '@engine/serialization';
+import {
+  CURRENT_WORLD_SCHEMA_VERSION,
+  parseWorld,
+  serializeWorld,
+  type WorldDocument,
+} from '@engine/serialization';
 import {
   createBoxGeometry,
   createCylinderGeometry,
@@ -101,6 +106,16 @@ function TransformNumberInput({ value, label, onCommit }: TransformNumberInputPr
 
 type Primitive = 'Box' | 'Sphere' | 'Plane' | 'Cylinder';
 
+type AudioSourceComponent = {
+  readonly assetId: AssetId;
+  readonly spatial: boolean;
+  readonly loop: boolean;
+  readonly gain: number;
+  readonly referenceDistance: number;
+  readonly maxDistance: number;
+  readonly playOnEnable: boolean;
+};
+
 interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: (options?: {
     readonly mode?: 'read' | 'readwrite';
@@ -120,6 +135,7 @@ type SceneEntity = Extract<RenderObject, { readonly position: Vec3 }> & {
   readonly primitive: Primitive | 'GLB';
   readonly assetId?: AssetId;
   readonly rotationEuler?: readonly [number, number, number];
+  readonly audioSource?: AudioSourceComponent;
 };
 const geometryFor: Record<Primitive, () => MeshData> = {
   Box: () => createBoxGeometry(),
@@ -429,6 +445,7 @@ export function EditorApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectDirectoryRef = useRef<DirectoryHandleLike | null>(null);
   const glbInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const assetRegistryRef = useRef(new AssetRegistry());
   const assetImportServiceRef = useRef(new AssetImportService());
   const glbImporterRegisteredRef = useRef(false);
@@ -459,6 +476,7 @@ export function EditorApp() {
   const pinchDistanceRef = useRef<number | null>(null);
   const multiTouchRef = useRef(false);
   const selected = entities.find((entity) => entity.id === selectedId) ?? null;
+  const audioAssets = assetRegistryRef.current.list('audio');
   const selectedVoxelChunk =
     voxelChunks.find(
       (chunk) =>
@@ -1110,14 +1128,25 @@ export function EditorApp() {
   const createWorldDocument = (): WorldDocument => {
     const worldDocument: WorldDocument = {
       format: 'universal-3d-world',
-      schemaVersion: '1.0.0',
+      schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
       engineVersion: '0.1.0',
       world: {
         id: 'world:editor-session',
         name: worldName,
         settings: { gravity: [0, -9.81, 0], environment: {} },
         entities: entities.map(
-          ({ id, name, primitive, assetId, position, rotation, scale, material, geometry }) => ({
+          ({
+            id,
+            name,
+            primitive,
+            assetId,
+            position,
+            rotation,
+            scale,
+            material,
+            geometry,
+            audioSource,
+          }) => ({
             id,
             name,
             parent: null,
@@ -1220,6 +1249,7 @@ export function EditorApp() {
                     }
                   : {}),
               },
+              ...(audioSource ? { AudioSource: audioSource } : {}),
             },
           }),
         ),
@@ -1322,10 +1352,12 @@ export function EditorApp() {
                 uvs?: number[];
               };
             };
+            AudioSource?: AudioSourceComponent;
           };
         };
         const transform = entity.components?.Transform;
         const mesh = entity.components?.MeshRenderer;
+        const storedAudioSource = entity.components?.AudioSource;
         const primitive = mesh?.primitive;
         let geometry: MeshData;
         if (primitive === 'GLB') {
@@ -1364,6 +1396,21 @@ export function EditorApp() {
             throw new Error(`Entity ${entity.name} has invalid transform values`);
           return value;
         };
+        let audioSource: AudioSourceComponent | undefined;
+        if (storedAudioSource) {
+          const audioRecord = restoredAssetRegistry.get(storedAudioSource.assetId);
+          const audioPayload = restoredAssetPayloads.get(storedAudioSource.assetId);
+          if (
+            audioRecord?.kind !== 'audio' ||
+            !audioPayload ||
+            audioPayload.encoding !== 'base64'
+          ) {
+            throw new Error(
+              `AudioSource on ${entity.name} references a missing audio asset payload`,
+            );
+          }
+          audioSource = storedAudioSource;
+        }
         const storedMaterialValue =
           mesh.material === undefined ? createDefaultMaterial() : mesh.material;
         const pbrMaterialState = readPbrMaterialState(
@@ -1452,6 +1499,7 @@ export function EditorApp() {
           position: vector(transform.position, 3, [0, 0, 0]) as [number, number, number],
           rotation: vector(transform.rotation, 4, [0, 0, 0, 1]) as [number, number, number, number],
           scale: vector(transform.scale, 3, [1, 1, 1]) as [number, number, number],
+          ...(audioSource ? { audioSource } : {}),
         };
       });
       if (new Set(parsed.map((item) => item.id)).size !== parsed.length)
@@ -1912,6 +1960,97 @@ export function EditorApp() {
     }
   };
 
+  const importAudio = async (file?: File) => {
+    if (!file) return;
+    try {
+      if (file.size <= 0 || file.size > 64 * 1024 * 1024) {
+        throw new Error('Audio files must be non-empty and no larger than 64 MiB');
+      }
+      const lowerName = file.name.toLowerCase();
+      const mimeType =
+        file.type === 'audio/mpeg' || lowerName.endsWith('.mp3')
+          ? 'audio/mpeg'
+          : file.type === 'audio/wav' || file.type === 'audio/x-wav' || lowerName.endsWith('.wav')
+            ? 'audio/wav'
+            : '';
+      if (!mimeType) throw new Error('Only WAV and MP3 audio files are supported');
+      const bytes = await file.arrayBuffer();
+      const contentHash = await sha256(bytes);
+      const safeFileName = file.name.replace(/[\\/]/g, '_').replace(/^\.+/, '') || 'audio';
+      const stagedRegistry = mergeAssetRegistry(assetRegistryRef.current, []);
+      const stagedPayloads = new Map(assetPayloadsRef.current);
+      const record = stagedRegistry.register({
+        name: file.name || safeFileName,
+        kind: 'audio',
+        uri: `imports/${safeFileName}`,
+        contentHash,
+        importer: { id: 'engine.audio.file', version: '1.0.0', settings: {} },
+        dependencies: [],
+        metadata: { mimeType, fileSize: file.size },
+      });
+      stagedPayloads.set(record.id, {
+        assetId: record.id,
+        mimeType,
+        encoding: 'base64',
+        data: encodeBase64(bytes),
+      });
+      assetRegistryRef.current = stagedRegistry;
+      assetPayloadsRef.current = stagedPayloads;
+      setIsDirty(true);
+      pushDiagnostic({
+        level: 'info',
+        source: 'Audio Importer',
+        message: `Imported ${file.name}`,
+        details: `${mimeType} · ${file.size} bytes · ${record.id}`,
+      });
+    } catch (error) {
+      pushDiagnostic({
+        level: 'error',
+        source: 'Audio Importer',
+        message: 'Could not import audio file',
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  const attachAudioSource = () => {
+    if (!selected || audioAssets.length === 0) return;
+    const assetId = audioAssets[0]!.id;
+    commitEntities(
+      entities.map((entity) =>
+        entity.id === selectedId
+          ? {
+              ...entity,
+              audioSource: {
+                assetId,
+                spatial: true,
+                loop: false,
+                gain: 1,
+                referenceDistance: 1,
+                maxDistance: 100,
+                playOnEnable: true,
+              },
+            }
+          : entity,
+      ),
+    );
+  };
+
+  const updateSelectedAudioSource = (patch: Partial<AudioSourceComponent> | null) => {
+    if (!selected) return;
+    commitEntities(
+      entities.map((entity) => {
+        if (entity.id !== selectedId) return entity;
+        if (!patch) {
+          const next = { ...entity };
+          delete next.audioSource;
+          return next;
+        }
+        return { ...entity, audioSource: { ...entity.audioSource!, ...patch } };
+      }),
+    );
+  };
+
   const resetCamera = () => setCamera(createDefaultCamera());
 
   const removeSelected = () => {
@@ -2164,6 +2303,13 @@ export function EditorApp() {
             <button
               className="toolbar-button"
               style={{ display: 'block', width: '100%', textAlign: 'left' }}
+              onClick={() => audioInputRef.current?.click()}
+            >
+              Import Audio…
+            </button>
+            <button
+              className="toolbar-button"
+              style={{ display: 'block', width: '100%', textAlign: 'left' }}
               onClick={() => fileInputRef.current?.click()}
             >
               Open World…
@@ -2236,6 +2382,16 @@ export function EditorApp() {
           accept=".glb,model/gltf-binary"
           onChange={(event) => {
             void importGlb(event.target.files?.[0]);
+            event.currentTarget.value = '';
+          }}
+        />
+        <input
+          ref={audioInputRef}
+          hidden
+          type="file"
+          accept="audio/wav,audio/mpeg,.wav,.mp3"
+          onChange={(event) => {
+            void importAudio(event.target.files?.[0]);
             event.currentTarget.value = '';
           }}
         />
@@ -2853,6 +3009,108 @@ export function EditorApp() {
                   <small>Generated geometry</small>
                 )}
               </div>
+              <label>AUDIO SOURCE</label>
+              {selected.audioSource ? (
+                <div className="audio-source-inspector">
+                  <label>
+                    Audio asset
+                    <select
+                      aria-label="Audio source asset"
+                      value={selected.audioSource.assetId}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ assetId: event.target.value as AssetId })
+                      }
+                    >
+                      {audioAssets.map((asset) => (
+                        <option key={asset.id} value={asset.id}>
+                          {asset.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected.audioSource.spatial}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ spatial: event.target.checked })
+                      }
+                    />
+                    Spatial audio
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected.audioSource.loop}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ loop: event.target.checked })
+                      }
+                    />
+                    Loop
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected.audioSource.playOnEnable}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ playOnEnable: event.target.checked })
+                      }
+                    />
+                    Play after audio is enabled
+                  </label>
+                  <label>
+                    Gain
+                    <input
+                      aria-label="Audio source gain"
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={selected.audioSource.gain}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ gain: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Reference distance
+                    <input
+                      aria-label="Audio source reference distance"
+                      type="number"
+                      min="0.01"
+                      step="0.1"
+                      value={selected.audioSource.referenceDistance}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ referenceDistance: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Maximum distance
+                    <input
+                      aria-label="Audio source maximum distance"
+                      type="number"
+                      min={selected.audioSource.referenceDistance}
+                      step="1"
+                      value={selected.audioSource.maxDistance}
+                      onChange={(event) =>
+                        updateSelectedAudioSource({ maxDistance: Number(event.target.value) })
+                      }
+                    />
+                  </label>
+                  <button type="button" onClick={() => updateSelectedAudioSource(null)}>
+                    Remove AudioSource
+                  </button>
+                </div>
+              ) : audioAssets.length > 0 ? (
+                <button type="button" onClick={attachAudioSource}>
+                  Add AudioSource
+                </button>
+              ) : (
+                <button type="button" onClick={() => audioInputRef.current?.click()}>
+                  Import audio to add AudioSource
+                </button>
+              )}
             </>
           ) : (
             <div className="empty-inspector">

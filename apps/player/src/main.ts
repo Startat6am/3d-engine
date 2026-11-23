@@ -1,3 +1,17 @@
+import {
+  AnimationPlayer,
+  createAnimationPose,
+  evaluateSkinningMatrices,
+  type AnimationSkin,
+} from '@engine/animation';
+import {
+  AudioRuntime,
+  createAudioSourceState,
+  WebAudioBackend,
+  type AudioClipHandle,
+  type AudioSourceState,
+  type AudioVoice,
+} from '@engine/audio';
 import type { AssetRecord } from '@engine/assets';
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
 import {
@@ -19,6 +33,7 @@ import {
   ThreeWebGLRendererAdapter,
   type MaterialDescriptor,
   type RenderObject,
+  type RenderSkinning,
   type TextureSource,
 } from '@engine/renderer';
 import { createVoxelChunkSnapshot, meshVoxelChunkAsync } from '@engine/voxel';
@@ -33,7 +48,12 @@ import {
 import { resolveVoxelMaterialStyle } from './voxel-material.js';
 import { createPhysicsWorld, StaticMeshColliderSet, type PhysicsWorld } from '@engine/physics';
 import { createVoxelChunkColliderInputs } from './voxel-collision.js';
-import type { WorldDocument } from '@engine/serialization';
+import {
+  CURRENT_WORLD_SCHEMA_VERSION,
+  parseWorld,
+  serializeWorld,
+  type WorldDocument,
+} from '@engine/serialization';
 import {
   GlbImporter,
   type GlbAsset,
@@ -41,6 +61,7 @@ import {
   type GltfTextureTransform,
 } from '@engine/gltf-importer';
 import { attachFpsCounter } from './fps-counter.js';
+import foxFixtureUrl from '../../../packages/engine-gltf-importer/src/fixtures/Fox.glb?url';
 
 interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: (options?: { readonly mode?: 'read' }) => Promise<DirectoryHandleLike>;
@@ -67,6 +88,11 @@ const canvas = document.querySelector<HTMLCanvasElement>('#player');
 if (!canvas) throw new Error('Player canvas was not found');
 const loadButton = document.querySelector<HTMLButtonElement>('#load-project');
 const projectStatus = document.querySelector<HTMLOutputElement>('#project-status');
+const audioTestButton = document.querySelector<HTMLButtonElement>('#audio-test');
+const audioBackend = new WebAudioBackend();
+const audioRuntime = new AudioRuntime(audioBackend);
+let audioTestClip: AudioClipHandle | null = null;
+let audioTestVoice: AudioVoice | null = null;
 const projectProgress = document.createElement('section');
 projectProgress.setAttribute('role', 'status');
 projectProgress.setAttribute('aria-live', 'polite');
@@ -92,6 +118,94 @@ const setProjectStatus = (message: string, isError = false) => {
   projectStatus.value = message;
   projectStatus.style.color = isError ? '#fca5a5' : '#d9e7fa';
 };
+
+function createSpatialTestTone(): ArrayBuffer {
+  const sampleRate = 22_050;
+  const sampleCount = sampleRate;
+  const bytes = new ArrayBuffer(44 + sampleCount * 2);
+  const view = new DataView(bytes);
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index++)
+      view.setUint8(offset + index, value.charCodeAt(index));
+  };
+  writeText(0, 'RIFF');
+  view.setUint32(4, bytes.byteLength - 8, true);
+  writeText(8, 'WAVE');
+  writeText(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, 'data');
+  view.setUint32(40, sampleCount * 2, true);
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const envelope = Math.min(1, sample / 300, (sampleCount - sample) / 300);
+    const value = Math.sin((2 * Math.PI * 440 * sample) / sampleRate) * 0.22 * envelope;
+    view.setInt16(44 + sample * 2, Math.round(value * 32767), true);
+  }
+  return bytes;
+}
+
+if (audioTestButton) {
+  audioTestButton.addEventListener('click', async () => {
+    audioTestButton.disabled = true;
+    try {
+      await audioRuntime.activateFromUserGesture();
+      if (activeAudioSources.length > 0) {
+        await activateProjectAudioSources();
+        audioTestButton.textContent = 'Project audio enabled';
+        setProjectStatus(`Enabled ${activeAudioSources.length} project audio source(s)`);
+      } else {
+        if (!audioTestClip) {
+          audioTestClip = await audioRuntime.loadClip({
+            id: 'builtin:spatial-audio-test-tone',
+            mimeType: 'audio/wav',
+            bytes: createSpatialTestTone(),
+          });
+        }
+        audioTestVoice?.dispose();
+        const sourcePosition: [number, number, number] = [
+          camera.position[0],
+          camera.position[1],
+          camera.position[2] - 5,
+        ];
+        audioTestVoice = audioRuntime.createVoice(
+          audioTestClip.id,
+          createAudioSourceState(sourcePosition, {
+            gain: 0.5,
+            loop: true,
+            spatialBlend: 1,
+            referenceDistance: 1,
+            maxDistance: 30,
+            rolloff: 1,
+          }),
+        );
+        audioTestVoice.play();
+        audioTestButton.textContent = 'Spatial audio playing';
+      }
+      if (import.meta.env.DEV) {
+        const debugWindow = window as Window & {
+          __playerAudioActive?: boolean;
+          __playerAudioVoices?: number;
+          __playerAudioSpatialization?: string;
+          __playerAudioContextState?: string;
+        };
+        debugWindow.__playerAudioActive = audioRuntime.active;
+        debugWindow.__playerAudioVoices = audioRuntime.voiceCount;
+        debugWindow.__playerAudioSpatialization = audioRuntime.capabilities.spatialization;
+        debugWindow.__playerAudioContextState = audioBackend.contextState;
+      }
+    } catch (error) {
+      audioTestButton.textContent = 'Audio test failed';
+      setProjectStatus(error instanceof Error ? error.message : 'Audio test failed', true);
+    } finally {
+      audioTestButton.disabled = false;
+    }
+  });
+}
 
 const engine = new EngineHost({
   rendererBackends: ['webgl2'],
@@ -128,19 +242,26 @@ const physicsReady = createPhysicsWorld({ gravity: [0, -9.81, 0] }).then(
     return null;
   },
 );
-const Renderable = defineComponent<{ geometry: MeshData; material: MaterialDescriptor }>(
-  'Renderable',
-);
+const Renderable = defineComponent<{
+  geometry: MeshData;
+  material: MaterialDescriptor;
+  skinning?: RenderSkinning;
+}>('Renderable');
 const addMeshRenderable = (
   position: readonly [number, number, number],
   geometry: MeshData,
   material: MaterialDescriptor,
   rotation: readonly [number, number, number, number] = [0, 0, 0, 1],
   scale: readonly [number, number, number] = [1, 1, 1],
+  skinning?: RenderSkinning,
 ) => {
   const entity = runtime.world.createEntity();
   runtime.world.add(entity, Transform, { position, rotation, scale, parent: null });
-  runtime.world.add(entity, Renderable, { geometry, material });
+  runtime.world.add(entity, Renderable, {
+    geometry,
+    material,
+    ...(skinning ? { skinning } : {}),
+  });
   return entity;
 };
 const addRenderable = (
@@ -159,12 +280,68 @@ const sampleEntities = [
 ];
 const activeProjectEntities: Array<ReturnType<typeof runtime.world.createEntity>> = [];
 
+interface ActiveAnimationBinding {
+  readonly skin: AnimationSkin;
+  readonly meshNodeIndex: number;
+  readonly palettes: readonly Float32Array[];
+}
+
+interface ActiveAnimationInstance {
+  readonly player: AnimationPlayer;
+  readonly parents: readonly (number | null)[];
+  readonly bindings: readonly ActiveAnimationBinding[];
+  readonly clipNames: readonly string[];
+  clipIndex: number;
+}
+
+interface PreparedAudioSource {
+  readonly assetId: string;
+  readonly mimeType: string;
+  readonly bytes: ArrayBuffer;
+  readonly playOnEnable: boolean;
+  state: AudioSourceState;
+}
+
+interface ActiveAudioSource extends PreparedAudioSource {
+  readonly entity: ReturnType<typeof runtime.world.createEntity>;
+  voice: AudioVoice | null;
+}
+
+const activeAnimations: ActiveAnimationInstance[] = [];
+const activeAudioSources: ActiveAudioSource[] = [];
+
+function addAudioSourceRuntimeEntity(source: PreparedAudioSource): ActiveAudioSource {
+  const entity = runtime.world.createEntity();
+  runtime.world.add(entity, Transform, {
+    position: source.state.position,
+    rotation: source.state.orientation,
+    scale: [1, 1, 1],
+    parent: null,
+  });
+  activeProjectEntities.push(entity);
+  return { ...source, entity, voice: null };
+}
+
+async function activateProjectAudioSources(): Promise<void> {
+  for (const source of activeAudioSources) {
+    const clip = await audioRuntime.loadClip({
+      id: source.assetId,
+      mimeType: source.mimeType,
+      bytes: source.bytes,
+    });
+    source.voice?.dispose();
+    source.voice = audioRuntime.createVoice(clip.id, source.state);
+    if (source.playOnEnable) source.voice.play();
+  }
+}
+
 interface PreparedRenderable {
   position: readonly [number, number, number];
   rotation: readonly [number, number, number, number];
   scale: readonly [number, number, number];
   geometry: MeshData;
   material: MaterialDescriptor;
+  skinning?: RenderSkinning;
 }
 
 interface TransformSnapshot {
@@ -335,8 +512,18 @@ function decodeBase64(value: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function encodeBase64(value: ArrayBuffer): string {
+  const bytes = new Uint8Array(value);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 1)
+    binary += String.fromCharCode(bytes[index]!);
+  return btoa(binary);
+}
+
 async function prepareWorldEntities(document: WorldDocument) {
   const prepared: PreparedRenderable[] = [];
+  const animations: ActiveAnimationInstance[] = [];
+  const audioSources: PreparedAudioSource[] = [];
   let unsupported = 0;
   const assetRecords = new Map<string, AssetRecord>();
   for (const value of document.assets) {
@@ -385,6 +572,18 @@ async function prepareWorldEntities(document: WorldDocument) {
       const asset = await loadGlbAsset(assetId);
       const record = assetRecords.get(assetId);
       if (!record) throw new Error(`GLB asset record is missing: ${assetId}`);
+      const bindPose = createAnimationPose(asset.nodes.length);
+      const parents: Array<number | null> = Array.from({ length: asset.nodes.length }, () => null);
+      for (const [nodeIndex, node] of asset.nodes.entries()) {
+        bindPose[nodeIndex]!.translation.set(node.translation);
+        bindPose[nodeIndex]!.rotation.set(node.rotation);
+        bindPose[nodeIndex]!.scale.set(node.scale);
+        for (const child of node.children) parents[child] = nodeIndex;
+      }
+      const player =
+        asset.animations.length > 0 ? new AnimationPlayer(asset.animations, bindPose) : null;
+      if (player) player.play(asset.animations[0]!.name);
+      const animationBindings: ActiveAnimationBinding[] = [];
       const childIndices = new Set<number>();
       for (const node of asset.nodes) for (const child of node.children) childIndices.add(child);
       const roots = asset.nodes
@@ -403,25 +602,54 @@ async function prepareWorldEntities(document: WorldDocument) {
         });
         if (node.mesh !== null) {
           const mesh = asset.meshes[node.mesh];
+          const skin = node.skin === null ? undefined : asset.skins[node.skin];
+          const palettes: Float32Array[] = [];
           if (!mesh) {
             unsupported += 1;
           } else {
             for (const primitive of mesh.primitives) {
               const material =
                 primitive.material === null ? undefined : asset.materials[primitive.material];
+              const skinning =
+                skin && primitive.skinning
+                  ? {
+                      jointIndices: primitive.skinning.joints,
+                      jointWeights: primitive.skinning.weights,
+                      jointMatrices: evaluateSkinningMatrices(
+                        player?.pose ?? bindPose,
+                        parents,
+                        skin,
+                        nodeIndex,
+                      ),
+                    }
+                  : undefined;
+              if (skinning) palettes.push(skinning.jointMatrices);
               prepared.push({
                 position: worldTransform.position,
                 rotation: worldTransform.rotation,
                 scale: worldTransform.scale,
                 geometry: primitive.mesh,
                 material: materialFromGlb(asset, material, assetId, record.contentHash),
+                ...(skinning ? { skinning } : {}),
               });
             }
+          }
+          if (player && skin && palettes.length > 0) {
+            animationBindings.push({ skin, meshNodeIndex: nodeIndex, palettes });
           }
         }
         for (const child of node.children) visit(child, worldTransform);
       };
       for (const root of roots) visit(root, rootTransform);
+      if (player && animationBindings.length > 0) {
+        animations.push({
+          player,
+          parents,
+          bindings: animationBindings,
+          clipNames: asset.animations.map((clip) => clip.name),
+          clipIndex: 0,
+        });
+      }
       if (roots.length === 0 && asset.nodes.length > 0) unsupported += 1;
     } catch {
       unsupported += 1;
@@ -435,7 +663,8 @@ async function prepareWorldEntities(document: WorldDocument) {
     }
     const transform = rawEntity.components.Transform;
     const mesh = rawEntity.components.MeshRenderer;
-    if (!isRecord(transform) || !isRecord(mesh)) {
+    const audioSource = rawEntity.components.AudioSource;
+    if (!isRecord(transform)) {
       unsupported += 1;
       continue;
     }
@@ -444,6 +673,40 @@ async function prepareWorldEntities(document: WorldDocument) {
       rotation: readQuaternion(transform.rotation),
       scale: readVector(transform.scale, [1, 1, 1] as const),
     };
+    if (isRecord(audioSource)) {
+      const assetId = audioSource.assetId;
+      const record = typeof assetId === 'string' ? assetRecords.get(assetId) : undefined;
+      const payload = typeof assetId === 'string' ? payloads.get(assetId) : undefined;
+      if (
+        typeof assetId !== 'string' ||
+        !record ||
+        record.kind !== 'audio' ||
+        !payload ||
+        payload.encoding !== 'base64' ||
+        typeof payload.mimeType !== 'string'
+      ) {
+        unsupported += 1;
+      } else {
+        audioSources.push({
+          assetId,
+          mimeType: payload.mimeType,
+          bytes: decodeBase64(payload.data),
+          playOnEnable: audioSource.playOnEnable === true,
+          state: createAudioSourceState(rootTransform.position, {
+            gain: audioSource.gain as number,
+            loop: audioSource.loop as boolean,
+            spatialBlend: audioSource.spatial ? 1 : 0,
+            referenceDistance: audioSource.referenceDistance as number,
+            maxDistance: audioSource.maxDistance as number,
+            rolloff: 1,
+          }),
+        });
+      }
+    }
+    if (!isRecord(mesh)) {
+      if (!isRecord(audioSource)) unsupported += 1;
+      continue;
+    }
     const primitive = mesh.primitive;
     if (primitive === 'GLB') {
       await appendGlbEntity(mesh, rootTransform);
@@ -489,7 +752,7 @@ async function prepareWorldEntities(document: WorldDocument) {
       },
     });
   }
-  return { prepared, unsupported };
+  return { prepared, unsupported, animations, audioSources };
 }
 
 type PlayerVoxelChunk = Awaited<ReturnType<typeof openVoxelWorldProject>>['chunks'][number];
@@ -900,6 +1163,19 @@ async function openProjectFolder(): Promise<void> {
     voxelStream = null;
     for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
     activeProjectEntities.length = 0;
+    activeAnimations.splice(0, activeAnimations.length, ...world.animations);
+    for (const source of activeAudioSources) source.voice?.dispose();
+    activeAudioSources.length = 0;
+    for (const source of world.audioSources) {
+      activeAudioSources.push(addAudioSourceRuntimeEntity(source));
+    }
+    if (audioTestButton) {
+      audioTestButton.textContent =
+        activeAudioSources.length > 0 ? 'Enable project audio' : 'Play spatial audio test';
+    }
+    if (audioRuntime.active && activeAudioSources.length > 0) {
+      void activateProjectAudioSources();
+    }
     for (const entity of world.prepared) {
       activeProjectEntities.push(
         addMeshRenderable(
@@ -908,6 +1184,7 @@ async function openProjectFolder(): Promise<void> {
           entity.material,
           entity.rotation,
           entity.scale,
+          entity.skinning,
         ),
       );
     }
@@ -926,7 +1203,11 @@ async function openProjectFolder(): Promise<void> {
         ] as [number, number, number],
       ];
     });
-    const bounds = [...world.prepared.map((entity) => entity.position), ...chunkBounds];
+    const bounds = [
+      ...world.prepared.map((entity) => entity.position),
+      ...world.audioSources.map((source) => source.state.position),
+      ...chunkBounds,
+    ];
     if (bounds.length > 0) {
       const min = [0, 1, 2].map((axis) => Math.min(...bounds.map((point) => point[axis]!)));
       const max = [0, 1, 2].map((axis) => Math.max(...bounds.map((point) => point[axis]!)));
@@ -991,6 +1272,170 @@ let streamAnchor: readonly [number, number, number] | null = null;
 
 async function preloadSampleVoxelScene(): Promise<void> {
   try {
+    if (new URLSearchParams(window.location.search).get('fixture') === 'audio') {
+      setProjectProgress(8, 'Preparing persisted AudioSource fixture');
+      await yieldToBrowser();
+      const audioBytes = createSpatialTestTone();
+      const fixtureDocument = {
+        format: 'universal-3d-world',
+        schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
+        engineVersion: '0.1.0',
+        world: {
+          id: 'world:audio-fixture',
+          name: 'AudioSource Persistence Fixture',
+          settings: {},
+          entities: [
+            {
+              id: 'entity:audio-only',
+              components: {
+                Transform: {
+                  position: [0, 0, 0],
+                  rotation: [0, 0, 0, 1],
+                  scale: [1, 1, 1],
+                },
+                AudioSource: {
+                  assetId: 'asset:fixture:audio',
+                  spatial: true,
+                  loop: true,
+                  gain: 0.5,
+                  referenceDistance: 1,
+                  maxDistance: 30,
+                  playOnEnable: true,
+                },
+              },
+            },
+          ],
+        },
+        assets: [
+          {
+            id: 'asset:fixture:audio',
+            name: 'Persisted spatial test tone',
+            kind: 'audio',
+            uri: 'audio/fixture.wav',
+            contentHash: `sha256:${'0'.repeat(64)}`,
+            importer: { id: 'fixture.audio', version: '1.0.0', settings: {} },
+            dependencies: [],
+            metadata: { mimeType: 'audio/wav' },
+          },
+        ],
+        assetPayloads: [
+          {
+            assetId: 'asset:fixture:audio',
+            mimeType: 'audio/wav',
+            encoding: 'base64',
+            data: encodeBase64(audioBytes),
+          },
+        ],
+        extensions: {},
+      } as unknown as WorldDocument;
+      const document = parseWorld(serializeWorld(fixtureDocument));
+      const world = await prepareWorldEntities(document);
+      if (pageDisposed || projectDirectorySelected) return;
+      for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+      voxelStream?.dispose();
+      voxelStream = null;
+      for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
+      activeProjectEntities.length = 0;
+      activeAnimations.splice(0, activeAnimations.length);
+      for (const source of activeAudioSources) source.voice?.dispose();
+      activeAudioSources.length = 0;
+      for (const source of world.audioSources) {
+        activeAudioSources.push(addAudioSourceRuntimeEntity(source));
+      }
+      if (audioTestButton) audioTestButton.textContent = 'Enable project audio';
+      setProjectProgress(100, 'AudioSource fixture ready');
+      setProjectStatus(
+        `Audio fixture ready · ${activeAudioSources.length} audio-only source · no MeshRenderer`,
+      );
+      return;
+    }
+    if (new URLSearchParams(window.location.search).get('fixture') === 'fox') {
+      setProjectProgress(8, 'Loading Khronos Fox animation fixture');
+      await yieldToBrowser();
+      const response = await fetch(foxFixtureUrl);
+      if (!response.ok) throw new Error(`Fox fixture request failed: ${response.status}`);
+      const fixtureDocument = {
+        assets: [
+          {
+            id: 'fox-fixture',
+            name: 'Khronos Fox',
+            kind: 'model',
+            uri: 'fixtures/Fox.glb',
+            contentHash: '0'.repeat(64),
+            importer: { id: glbImporter.id, version: '0.1.0', settings: {} },
+            dependencies: [],
+            metadata: {},
+          },
+        ],
+        assetPayloads: [
+          {
+            assetId: 'fox-fixture',
+            encoding: 'base64',
+            data: encodeBase64(await response.arrayBuffer()),
+          },
+        ],
+        world: {
+          name: 'Khronos Fox Animation Fixture',
+          entities: [
+            {
+              id: 'fox-fixture',
+              components: {
+                Transform: {
+                  position: [0, 0, 0],
+                  rotation: [0, 0, 0, 1],
+                  scale: [1, 1, 1],
+                },
+                MeshRenderer: { primitive: 'GLB', assetId: 'fox-fixture' },
+              },
+            },
+          ],
+        },
+      } as unknown as WorldDocument;
+      const world = await prepareWorldEntities(fixtureDocument);
+      if (pageDisposed || projectDirectorySelected) return;
+      for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+      voxelStream?.dispose();
+      voxelStream = null;
+      for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
+      activeProjectEntities.length = 0;
+      activeAnimations.splice(0, activeAnimations.length, ...world.animations);
+      for (const source of activeAudioSources) source.voice?.dispose();
+      activeAudioSources.length = 0;
+      for (const source of world.audioSources) {
+        activeAudioSources.push(addAudioSourceRuntimeEntity(source));
+      }
+      if (audioTestButton) {
+        audioTestButton.textContent =
+          activeAudioSources.length > 0 ? 'Enable project audio' : 'Play spatial audio test';
+      }
+      if (audioRuntime.active && activeAudioSources.length > 0) {
+        void activateProjectAudioSources();
+      }
+      for (const entity of world.prepared) {
+        activeProjectEntities.push(
+          addMeshRenderable(
+            entity.position,
+            entity.geometry,
+            entity.material,
+            entity.rotation,
+            entity.scale,
+            entity.skinning,
+          ),
+        );
+      }
+      const target: readonly [number, number, number] = [0, 0.8, 0];
+      const position: readonly [number, number, number] = [3, 2, 3];
+      camera = {
+        ...createDefaultCamera(),
+        position,
+        rotation: lookAtQuaternion(position, target),
+      };
+      setProjectProgress(100, 'Fox fixture ready');
+      setProjectStatus(
+        `Fox animation fixture ready · ${world.prepared.length} mesh parts · ${world.animations.length} animation instances · press [ or ] to cross-fade clips`,
+      );
+      return;
+    }
     setProjectProgress(8, 'Preparing built-in voxel test scene');
     await yieldToBrowser();
     const sample = createSampleVoxelScene();
@@ -1043,6 +1488,24 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => cameraPanKeys.delete(event.key.toLowerCase()));
 window.addEventListener('blur', () => cameraPanKeys.clear());
+window.addEventListener('keydown', (event) => {
+  if (event.key !== '[' && event.key !== ']') return;
+  const activeClipNames: string[] = [];
+  for (const animation of activeAnimations) {
+    if (animation.clipNames.length < 2) continue;
+    const direction = event.key === ']' ? 1 : -1;
+    animation.clipIndex =
+      (animation.clipIndex + direction + animation.clipNames.length) % animation.clipNames.length;
+    const clipName = animation.clipNames[animation.clipIndex]!;
+    animation.player.crossFadeTo(clipName, 0.35);
+    activeClipNames.push(clipName);
+  }
+  if (activeClipNames.length > 0) {
+    setProjectStatus(
+      `Cross-fading to ${activeClipNames.join(', ')} · press [ or ] to switch clips`,
+    );
+  }
+});
 const updateFps = attachFpsCounter(canvas);
 let previousFrame = 0;
 let animationFrame = 0;
@@ -1054,6 +1517,28 @@ const renderFrame = (now: number) => {
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
   runtime.advance(delta);
+  for (const source of activeAudioSources) {
+    const worldMatrix = runtime.hierarchy.getWorldMatrix(source.entity);
+    if (!worldMatrix) continue;
+    source.state = {
+      ...source.state,
+      position: [worldMatrix[12]!, worldMatrix[13]!, worldMatrix[14]!],
+    };
+    source.voice?.update(source.state);
+  }
+  for (const animation of activeAnimations) {
+    animation.player.update(delta);
+    const pose = animation.player.pose;
+    for (const binding of animation.bindings) {
+      const matrices = evaluateSkinningMatrices(
+        pose,
+        animation.parents,
+        binding.skin,
+        binding.meshNodeIndex,
+      );
+      for (const palette of binding.palettes) palette.set(matrices);
+    }
+  }
   if (streamAnchor && cameraPanKeys.size > 0 && delta > 0) {
     const distance = Math.min(delta, 0.1) * 24;
     const dx = (Number(cameraPanKeys.has('d')) - Number(cameraPanKeys.has('a'))) * distance;
@@ -1069,6 +1554,15 @@ const renderFrame = (now: number) => {
     }
   }
 
+  // Keep the audio listener synchronized after camera input has been applied.
+  audioRuntime.setListener({ position: camera.position, orientation: camera.rotation });
+  if (import.meta.env.DEV) {
+    const debugWindow = window as Window & {
+      __playerAudioListenerPosition?: readonly [number, number, number];
+    };
+    debugWindow.__playerAudioListenerPosition = [...camera.position];
+  }
+
   // Keep Rapier on a bounded fixed timestep; large tab-resume deltas are clamped.
   physicsAccumulator += Math.min(delta, maxPhysicsFrameDelta);
   while (physicsAccumulator >= physicsFixedStep) {
@@ -1078,13 +1572,18 @@ const renderFrame = (now: number) => {
 
   const objects: RenderObject[] = [];
   runtime.world.query(Renderable).forEach((entity, renderableValue) => {
-    const renderable = renderableValue as { geometry: MeshData; material: MaterialDescriptor };
+    const renderable = renderableValue as {
+      geometry: MeshData;
+      material: MaterialDescriptor;
+      skinning?: RenderSkinning;
+    };
     const worldMatrix = runtime.hierarchy.getWorldMatrix(entity);
     if (!worldMatrix) return;
     objects.push({
       id: entity,
       geometry: renderable.geometry,
       material: renderable.material,
+      ...(renderable.skinning ? { skinning: renderable.skinning } : {}),
       worldMatrix,
     });
   });
@@ -1097,6 +1596,11 @@ const renderFrame = (now: number) => {
 const onPageHide = () => {
   window.cancelAnimationFrame(animationFrame);
   pageDisposed = true;
+  activeAnimations.length = 0;
+  for (const source of activeAudioSources) source.voice?.dispose();
+  activeAudioSources.length = 0;
+  audioTestVoice?.dispose();
+  audioRuntime.dispose();
   voxelStream?.dispose();
   voxelStream = null;
   voxelColliderSet?.dispose();

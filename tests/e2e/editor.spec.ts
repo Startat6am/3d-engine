@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { Buffer } from 'node:buffer';
+import { readFile } from 'node:fs/promises';
 
 test('editor shell loads with a 3D viewport and hierarchy', async ({ page }) => {
   await page.goto('/');
@@ -342,4 +344,75 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await expect(page.getByText('Chunk (2, 1, 0)')).toBeVisible();
   await expect(page.getByText('Revision 7 · 1 materials')).toBeVisible();
   await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
+});
+
+function createWavFixture(): Buffer {
+  const sampleRate = 8_000;
+  const sampleCount = 80;
+  const bytes = Buffer.alloc(44 + sampleCount * 2);
+  bytes.write('RIFF', 0, 'ascii');
+  bytes.writeUInt32LE(bytes.length - 8, 4);
+  bytes.write('WAVE', 8, 'ascii');
+  bytes.write('fmt ', 12, 'ascii');
+  bytes.writeUInt32LE(16, 16);
+  bytes.writeUInt16LE(1, 20);
+  bytes.writeUInt16LE(1, 22);
+  bytes.writeUInt32LE(sampleRate, 24);
+  bytes.writeUInt32LE(sampleRate * 2, 28);
+  bytes.writeUInt16LE(2, 32);
+  bytes.writeUInt16LE(16, 34);
+  bytes.write('data', 36, 'ascii');
+  bytes.writeUInt32LE(sampleCount * 2, 40);
+  return bytes;
+}
+
+test('editor imports audio, authors AudioSource and round-trips it through a world file', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Add object' }).click();
+  await page.locator('#hierarchy-add-menu').getByRole('button', { name: /^Box/ }).click();
+
+  await page.locator('details.file-menu > summary').click();
+  await page.getByRole('button', { name: 'Import Audio…' }).click();
+  await page.locator('input[accept="audio/wav,audio/mpeg,.wav,.mp3"]').setInputFiles({
+    name: 'test-tone.wav',
+    mimeType: 'audio/wav',
+    buffer: createWavFixture(),
+  });
+  await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
+  await page.getByRole('button', { name: 'Add AudioSource' }).click();
+  await expect(page.getByLabel('Audio source asset')).toHaveValue(/.+/);
+  await page.getByLabel('Spatial audio').check();
+  await page.getByLabel('Loop').check();
+  await page.getByLabel('Audio source gain').fill('0.65');
+  await page.getByLabel('Audio source maximum distance').fill('45');
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Save World…' }).click();
+  const download = await downloadPromise;
+  const downloadPath = await download.path();
+  expect(downloadPath).not.toBeNull();
+  const savedWorld = JSON.parse(await readFile(downloadPath!, 'utf8')) as {
+    world: { entities: { components: { AudioSource?: Record<string, unknown> } }[] };
+    assets: { kind: string }[];
+    assetPayloads: { mimeType: string; encoding: string }[];
+  };
+  expect(savedWorld.world.entities[0]?.components.AudioSource).toMatchObject({
+    spatial: true,
+    loop: true,
+    gain: 0.65,
+    maxDistance: 45,
+    playOnEnable: true,
+  });
+  expect(savedWorld.assets.some((asset) => asset.kind === 'audio')).toBe(true);
+  expect(savedWorld.assetPayloads[0]).toMatchObject({
+    mimeType: 'audio/wav',
+    encoding: 'base64',
+  });
+
+  await page.locator('input[accept=".world,application/json"]').setInputFiles(downloadPath!);
+  await expect(page.getByLabel('Audio source gain')).toHaveValue('0.65');
+  await expect(page.getByLabel('Audio source maximum distance')).toHaveValue('45');
+  await expect(page.getByLabel('Loop')).toBeChecked();
 });
