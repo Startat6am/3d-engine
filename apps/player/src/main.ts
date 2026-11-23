@@ -4,6 +4,13 @@ import {
   evaluateSkinningMatrices,
   type AnimationSkin,
 } from '@engine/animation';
+import {
+  AudioRuntime,
+  createAudioSourceState,
+  WebAudioBackend,
+  type AudioClipHandle,
+  type AudioVoice,
+} from '@engine/audio';
 import type { AssetRecord } from '@engine/assets';
 import { EngineHost, EngineRuntime, Transform, defineComponent } from '@engine/core';
 import {
@@ -75,6 +82,11 @@ const canvas = document.querySelector<HTMLCanvasElement>('#player');
 if (!canvas) throw new Error('Player canvas was not found');
 const loadButton = document.querySelector<HTMLButtonElement>('#load-project');
 const projectStatus = document.querySelector<HTMLOutputElement>('#project-status');
+const audioTestButton = document.querySelector<HTMLButtonElement>('#audio-test');
+const audioBackend = new WebAudioBackend();
+const audioRuntime = new AudioRuntime(audioBackend);
+let audioTestClip: AudioClipHandle | null = null;
+let audioTestVoice: AudioVoice | null = null;
 const projectProgress = document.createElement('section');
 projectProgress.setAttribute('role', 'status');
 projectProgress.setAttribute('aria-live', 'polite');
@@ -100,6 +112,88 @@ const setProjectStatus = (message: string, isError = false) => {
   projectStatus.value = message;
   projectStatus.style.color = isError ? '#fca5a5' : '#d9e7fa';
 };
+
+function createSpatialTestTone(): ArrayBuffer {
+  const sampleRate = 22_050;
+  const sampleCount = sampleRate;
+  const bytes = new ArrayBuffer(44 + sampleCount * 2);
+  const view = new DataView(bytes);
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index++)
+      view.setUint8(offset + index, value.charCodeAt(index));
+  };
+  writeText(0, 'RIFF');
+  view.setUint32(4, bytes.byteLength - 8, true);
+  writeText(8, 'WAVE');
+  writeText(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, 'data');
+  view.setUint32(40, sampleCount * 2, true);
+  for (let sample = 0; sample < sampleCount; sample++) {
+    const envelope = Math.min(1, sample / 300, (sampleCount - sample) / 300);
+    const value = Math.sin((2 * Math.PI * 440 * sample) / sampleRate) * 0.22 * envelope;
+    view.setInt16(44 + sample * 2, Math.round(value * 32767), true);
+  }
+  return bytes;
+}
+
+if (audioTestButton) {
+  audioTestButton.addEventListener('click', async () => {
+    audioTestButton.disabled = true;
+    try {
+      await audioRuntime.activateFromUserGesture();
+      if (!audioTestClip) {
+        audioTestClip = await audioRuntime.loadClip({
+          id: 'builtin:spatial-audio-test-tone',
+          mimeType: 'audio/wav',
+          bytes: createSpatialTestTone(),
+        });
+      }
+      audioTestVoice?.dispose();
+      const sourcePosition: [number, number, number] = [
+        camera.position[0],
+        camera.position[1],
+        camera.position[2] - 5,
+      ];
+      audioTestVoice = audioRuntime.createVoice(
+        audioTestClip.id,
+        createAudioSourceState(sourcePosition, {
+          gain: 0.5,
+          loop: true,
+          spatialBlend: 1,
+          referenceDistance: 1,
+          maxDistance: 30,
+          rolloff: 1,
+        }),
+      );
+      audioTestVoice.play();
+      audioTestButton.textContent = 'Spatial audio playing';
+      if (import.meta.env.DEV) {
+        const debugWindow = window as Window & {
+          __playerAudioActive?: boolean;
+          __playerAudioVoices?: number;
+          __playerAudioSpatialization?: string;
+          __playerAudioContextState?: string;
+        };
+        debugWindow.__playerAudioActive = audioRuntime.active;
+        debugWindow.__playerAudioVoices = audioRuntime.voiceCount;
+        debugWindow.__playerAudioSpatialization = audioRuntime.capabilities.spatialization;
+        debugWindow.__playerAudioContextState = audioBackend.contextState;
+      }
+    } catch (error) {
+      audioTestButton.textContent = 'Audio test failed';
+      setProjectStatus(error instanceof Error ? error.message : 'Audio test failed', true);
+    } finally {
+      audioTestButton.disabled = false;
+    }
+  });
+}
 
 const engine = new EngineHost({
   rendererBackends: ['webgl2'],
@@ -1259,6 +1353,15 @@ const renderFrame = (now: number) => {
     }
   }
 
+  // Keep the audio listener synchronized after camera input has been applied.
+  audioRuntime.setListener({ position: camera.position, orientation: camera.rotation });
+  if (import.meta.env.DEV) {
+    const debugWindow = window as Window & {
+      __playerAudioListenerPosition?: readonly [number, number, number];
+    };
+    debugWindow.__playerAudioListenerPosition = [...camera.position];
+  }
+
   // Keep Rapier on a bounded fixed timestep; large tab-resume deltas are clamped.
   physicsAccumulator += Math.min(delta, maxPhysicsFrameDelta);
   while (physicsAccumulator >= physicsFixedStep) {
@@ -1293,6 +1396,8 @@ const onPageHide = () => {
   window.cancelAnimationFrame(animationFrame);
   pageDisposed = true;
   activeAnimations.length = 0;
+  audioTestVoice?.dispose();
+  audioRuntime.dispose();
   voxelStream?.dispose();
   voxelStream = null;
   voxelColliderSet?.dispose();
