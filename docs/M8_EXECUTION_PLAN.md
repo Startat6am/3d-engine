@@ -74,7 +74,9 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Implemented: directory project storage accepts `audio/wav` and `audio/mpeg`; an audio-only AudioSource entity and audio payload round-trip in tests. Editor creates new worlds with `CURRENT_WORLD_SCHEMA_VERSION`.
 - Implemented: Player restores audio-only entities and persisted AudioSource settings from world documents, resolves the referenced audio asset payload, and creates runtime source entities without requiring a MeshRenderer. Audio decoding and voice creation happen only after explicit gesture activation; `playOnEnable` controls whether the voice starts, and source positions follow the entity world transform each frame.
 - Verified in the Player fixture: an audio-only entity with a base64 WAV payload is parsed, restored, and activated by the explicit project-audio button. This is a synthetic fixture, not yet a directory-project reopen acceptance test.
-- Pending: Editor audio asset import/selection and AudioSource authoring controls; end-to-end save/load/reopen acceptance using an Editor-authored project. Runtime AudioContext nodes, decoded buffers, voice IDs and playback clocks remain transient.
+- Implemented: Editor imports WAV/MP3 audio files (64 MiB cap), stores content-addressed audio assets and base64 payloads, attaches `AudioSource` to the selected renderable scene object, and exposes asset, spatial, loop, gain, distance and `playOnEnable` controls. The component is included in `.world` serialization and restored by the Editor loader.
+- Added Playwright acceptance for audio import, AudioSource authoring, `.world` save and reopen. The test is awaiting exact-head CI verification.
+- Pending: Editor hierarchy/model still cannot create a standalone audio-only entity; full directory-project save/load/reopen and Player playback of an Editor-authored project remain to be verified. Runtime AudioContext nodes, decoded buffers, voice IDs and playback clocks remain transient.
 - Exit: authored audio sources round-trip through Editor and Player, remain gesture-gated, and tear down cleanly.
 
 ### M8.6 — Examples, benchmarks and owner acceptance
