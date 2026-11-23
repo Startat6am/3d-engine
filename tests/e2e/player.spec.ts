@@ -114,6 +114,54 @@ test('player releases Fox skinning GPU resources on shutdown', async ({ page }) 
   expect(pageErrors).toEqual([]);
 });
 
+test('Player activates Web Audio from a user gesture and starts a spatial voice', async ({
+  page,
+}) => {
+  await page.goto('http://127.0.0.1:5174');
+  await expect(page.locator('#audio-test')).toHaveText('Play spatial audio test');
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __playerAudioActive?: boolean }).__playerAudioActive,
+    ),
+  ).toBeUndefined();
+  await page.locator('#audio-test').click();
+  await expect(page.locator('#audio-test')).toHaveText('Spatial audio playing');
+  const audio = await page.evaluate(() => {
+    const state = window as Window & {
+      __playerAudioActive?: boolean;
+      __playerAudioVoices?: number;
+      __playerAudioSpatialization?: string;
+      __playerAudioContextState?: string;
+      __playerAudioListenerPosition?: readonly [number, number, number];
+    };
+    return {
+      active: state.__playerAudioActive,
+      voices: state.__playerAudioVoices,
+      spatialization: state.__playerAudioSpatialization,
+      contextState: state.__playerAudioContextState,
+      listenerPosition: state.__playerAudioListenerPosition,
+    };
+  });
+  expect(audio.active).toBe(true);
+  expect(audio.voices).toBe(1);
+  expect(['HRTF', 'equalpower']).toContain(audio.spatialization);
+  expect(audio.contextState).toBe('running');
+  expect(audio.listenerPosition).toHaveLength(3);
+  const initialListenerPosition = audio.listenerPosition;
+  await page.keyboard.down('w');
+  await page.waitForTimeout(180);
+  await page.keyboard.up('w');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as Window & { __playerAudioListenerPosition?: readonly [number, number, number] })
+            .__playerAudioListenerPosition,
+      ),
+    )
+    .not.toEqual(initialListenerPosition);
+});
+
 test('player renders the preloaded voxel test scene through WebGL2', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
