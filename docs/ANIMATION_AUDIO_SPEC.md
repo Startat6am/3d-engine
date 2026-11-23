@@ -1,6 +1,6 @@
 # Animation & Audio Specification
 
-**Status:** M8.1–M8.2 implemented; M8.3 renderer and Player integration in progress; browser visual acceptance pending.
+**Status:** M8.1–M8.2 implemented; M8.3 renderer and Player integration in progress; Fox visual/cross-fade acceptance passes, skinned-resource teardown coverage pending.
 **Version:** 0.1.0-draft
 **Milestone:** M8 (after M7 World & Voxels, before M9 Editor MVP)
 
@@ -146,6 +146,6 @@ At the M8 implementation checkpoint:
 - Sparse accessors and `JOINTS_1`/`WEIGHTS_1` are rejected as unsupported rather than partially decoded. The importer regression suite includes the attributed Khronos Fox sample (162,852 bytes; 24 joints; Survey/Walk/Run clips); see [fixture attribution](../packages/engine-gltf-importer/src/fixtures/README.md).
 - `AnimationPlayerSystem` advances animation components in ECS `variable-update`; it publishes pose snapshots and does not mutate physics-owned entity transforms. Audio remains unintegrated.
 - `RenderObject` now optionally carries `RenderSkinning`. The Three.js adapter creates isolated skinned geometry, maps the engine-owned mesh-local palette through `SkinnedMesh`/`Skeleton`, uses a bone texture for the 256-joint limit, updates palettes before draws and disposes per-object skinning resources. Frustum culling is disabled for skinned meshes until animated bounds are computed.
-- Player project loading now plays imported GLB clips and renders their skinning palettes. Editor-authored animation components, serialized playback state and audio persistence remain unimplemented. Player currently auto-plays the first imported clip; clip-selection/cross-fade browser acceptance remains pending.
+- Player project loading now plays imported GLB clips and renders their skinning palettes. The built-in `?fixture=fox` acceptance route auto-plays the first clip; `[` and `]` cross-fade between imported clips over 350 ms. Chromium verifies visible Fox rendering and Survey-to-Walk cross-fade. Editor-authored animation components, serialized playback state and audio persistence remain unimplemented; Fox-specific GPU teardown coverage is pending.
 
 Do not mark any capability implemented until code, tests, examples and the relevant acceptance gate agree.
