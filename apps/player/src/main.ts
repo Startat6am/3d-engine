@@ -154,32 +154,38 @@ if (audioTestButton) {
     audioTestButton.disabled = true;
     try {
       await audioRuntime.activateFromUserGesture();
-      if (!audioTestClip) {
-        audioTestClip = await audioRuntime.loadClip({
-          id: 'builtin:spatial-audio-test-tone',
-          mimeType: 'audio/wav',
-          bytes: createSpatialTestTone(),
-        });
+      if (activeAudioSources.length > 0) {
+        await activateProjectAudioSources();
+        audioTestButton.textContent = 'Project audio enabled';
+        setProjectStatus(`Enabled ${activeAudioSources.length} project audio source(s)`);
+      } else {
+        if (!audioTestClip) {
+          audioTestClip = await audioRuntime.loadClip({
+            id: 'builtin:spatial-audio-test-tone',
+            mimeType: 'audio/wav',
+            bytes: createSpatialTestTone(),
+          });
+        }
+        audioTestVoice?.dispose();
+        const sourcePosition: [number, number, number] = [
+          camera.position[0],
+          camera.position[1],
+          camera.position[2] - 5,
+        ];
+        audioTestVoice = audioRuntime.createVoice(
+          audioTestClip.id,
+          createAudioSourceState(sourcePosition, {
+            gain: 0.5,
+            loop: true,
+            spatialBlend: 1,
+            referenceDistance: 1,
+            maxDistance: 30,
+            rolloff: 1,
+          }),
+        );
+        audioTestVoice.play();
+        audioTestButton.textContent = 'Spatial audio playing';
       }
-      audioTestVoice?.dispose();
-      const sourcePosition: [number, number, number] = [
-        camera.position[0],
-        camera.position[1],
-        camera.position[2] - 5,
-      ];
-      audioTestVoice = audioRuntime.createVoice(
-        audioTestClip.id,
-        createAudioSourceState(sourcePosition, {
-          gain: 0.5,
-          loop: true,
-          spatialBlend: 1,
-          referenceDistance: 1,
-          maxDistance: 30,
-          rolloff: 1,
-        }),
-      );
-      audioTestVoice.play();
-      audioTestButton.textContent = 'Spatial audio playing';
       if (import.meta.env.DEV) {
         const debugWindow = window as Window & {
           __playerAudioActive?: boolean;
@@ -303,6 +309,31 @@ interface ActiveAudioSource extends PreparedAudioSource {
 
 const activeAnimations: ActiveAnimationInstance[] = [];
 const activeAudioSources: ActiveAudioSource[] = [];
+
+function addAudioSourceRuntimeEntity(source: PreparedAudioSource): ActiveAudioSource {
+  const entity = runtime.world.createEntity();
+  runtime.world.add(entity, Transform, {
+    position: source.state.position,
+    rotation: source.state.orientation,
+    scale: [1, 1, 1],
+    parent: null,
+  });
+  activeProjectEntities.push(entity);
+  return { ...source, entity, voice: null };
+}
+
+async function activateProjectAudioSources(): Promise<void> {
+  for (const source of activeAudioSources) {
+    const clip = await audioRuntime.loadClip({
+      id: source.assetId,
+      mimeType: source.mimeType,
+      bytes: source.bytes,
+    });
+    source.voice?.dispose();
+    source.voice = audioRuntime.createVoice(clip.id, source.state);
+    if (source.playOnEnable) source.voice.play();
+  }
+}
 
 interface PreparedRenderable {
   position: readonly [number, number, number];
