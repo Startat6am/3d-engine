@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { AssetRecord } from '@engine/assets';
-import { serializeWorld, type WorldDocument } from '@engine/serialization';
+import {
+  CURRENT_WORLD_SCHEMA_VERSION,
+  serializeWorld,
+  type WorldDocument,
+} from '@engine/serialization';
 import {
   MemoryProjectFileStore,
   ProjectAssetStoreError,
@@ -33,7 +37,7 @@ async function fixture(): Promise<WorldDocument> {
   });
   return {
     format: 'universal-3d-world',
-    schemaVersion: '1.0.0',
+    schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
     engineVersion: '0.1.0',
     world: { id: 'world:test', name: 'Test Project', settings: {}, entities: [] },
     assets: [record('asset:texture-a', 'texture-a'), record('asset:texture-b', 'texture-b')],
@@ -100,6 +104,67 @@ describe('directory project asset store', () => {
       base64(bytes),
       base64(bytes),
     ]);
+  });
+
+  it('round-trips audio assets and AudioSource references through project storage', async () => {
+    const store = new MemoryProjectFileStore();
+    const document = await fixture();
+    const audioBytes = new Uint8Array([82, 73, 70, 70, 0, 0, 0, 0]);
+    const audioHash = await contentHash(audioBytes);
+    const audioAsset: AssetRecord = {
+      id: 'asset:audio:test' as AssetRecord['id'],
+      name: 'Spatial test tone',
+      kind: 'audio',
+      uri: 'audio/test.wav',
+      contentHash: audioHash,
+      importer: { id: 'test.audio', version: '1.0.0', settings: {} },
+      dependencies: [],
+      metadata: { mimeType: 'audio/wav' },
+    };
+    const withAudio: WorldDocument = {
+      ...document,
+      assets: [...(document.assets as AssetRecord[]), audioAsset],
+      assetPayloads: [
+        ...document.assetPayloads!,
+        {
+          assetId: audioAsset.id,
+          mimeType: 'audio/wav',
+          encoding: 'base64',
+          data: base64(audioBytes),
+        },
+      ],
+      world: {
+        ...document.world,
+        entities: [
+          {
+            id: 'entity:audio-only',
+            components: {
+              Transform: { position: [0, 0, 0], rotation: [0, 0, 0, 1], scale: [1, 1, 1] },
+              AudioSource: {
+                assetId: audioAsset.id,
+                spatial: true,
+                loop: true,
+                gain: 0.6,
+                referenceDistance: 1,
+                maxDistance: 40,
+                playOnEnable: false,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    const manifest = await saveDirectoryProject(store, withAudio);
+    expect((manifest.assets as AssetRecord[]).find((asset) => asset.id === audioAsset.id)?.uri)
+      .toMatch(/\\.wav$/);
+    const restored = await loadDirectoryProject(store);
+    expect(restored.schemaVersion).toBe(CURRENT_WORLD_SCHEMA_VERSION);
+    expect(restored.world.entities).toEqual(withAudio.world.entities);
+    expect(restored.assetPayloads?.find((payload) => payload.assetId === audioAsset.id)).toMatchObject({
+      mimeType: 'audio/wav',
+      data: base64(audioBytes),
+    });
   });
 
   it('rejects texture MIME types that the Editor renderer cannot decode', async () => {
