@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --pretty false"
   },
   "dependencies": {
+    "@engine/animation": "workspace:*",
     "@engine/assets": "workspace:*",
     "@engine/core": "workspace:*",
     "@engine/geometry": "workspace:*",
