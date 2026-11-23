@@ -28,6 +28,8 @@ export function createThreeSkinningSkeleton(skinning: RenderSkinning): THREE.Ske
   }
   const bones = Array.from({ length: jointCount }, () => new THREE.Bone());
   const skeleton = new THREE.Skeleton(bones, bones.map(() => new THREE.Matrix4()));
+  // A bone texture keeps the full 256-joint contract independent of uniform limits.
+  skeleton.computeBoneTexture();
   updateThreeSkinningSkeleton(skeleton, skinning);
   return skeleton;
 }
