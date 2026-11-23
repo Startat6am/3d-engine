@@ -1,6 +1,6 @@
 # Animation & Audio Specification
 
-**Status:** M8.1–M8.4 implemented and verified; M8.5 world schema 1.1.0 and AudioSource validation implemented, Player/Editor persistence integration in progress under ADR-0014.
+**Status:** M8.1–M8.4 implemented and verified; M8.5 world schema 1.1.0, AudioSource validation and Player runtime restoration implemented. Editor authoring and persisted-project save/load/reopen acceptance remain in progress under ADR-0014.
 **Version:** 0.1.0-draft
 **Milestone:** M8 (after M7 World & Voxels, before M9 Editor MVP)
 

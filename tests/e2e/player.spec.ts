@@ -181,7 +181,9 @@ test('player restores audio-only AudioSource after explicit gesture activation',
   await expect(status).toContainText('Enabled 1 project audio source');
   await expect
     .poll(() =>
-      page.evaluate(() => (window as Window & { __playerAudioVoices?: number }).__playerAudioVoices),
+      page.evaluate(
+        () => (window as Window & { __playerAudioVoices?: number }).__playerAudioVoices,
+      ),
     )
     .toBe(1);
   await expect

@@ -1,6 +1,6 @@
 # ADR 0014: Versioned persisted audio-source component
 
-- **Status:** Proposed for implementation; persistence is not enabled by this ADR alone
+- **Status:** Implementation in progress; schema validation and Player runtime restoration are implemented, while Editor authoring and full project persistence acceptance remain pending
 - **Date:** 2026-11-22
 - **Decision owners:** Project owner / engine architecture
 

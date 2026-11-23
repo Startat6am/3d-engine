@@ -72,8 +72,9 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 
 - Implemented: world schema 1.1.0, default 1.0.0 → 1.1.0 migration (version-only, data-preserving), typed `components.AudioSource`, semantic audio-asset reference checks, Transform requirement and gain/distance validation under [ADR-0014](ADR/0014-persisted-audio-source-schema.md).
 - Implemented: directory project storage accepts `audio/wav` and `audio/mpeg`; an audio-only AudioSource entity and audio payload round-trip in tests. Editor creates new worlds with `CURRENT_WORLD_SCHEMA_VERSION`.
-- Pending: Player restores audio-only entities, decodes project audio after explicit gesture activation, applies `playOnEnable` and updates source positions. Editor still needs audio asset import/selection and AudioSource authoring controls.
-- Pending acceptance: save/load/reopen audio-enabled projects without serializing AudioContext nodes, decoded buffers, voice IDs or playback clocks.
+- Implemented: Player restores audio-only entities and persisted AudioSource settings from world documents, resolves the referenced audio asset payload, and creates runtime source entities without requiring a MeshRenderer. Audio decoding and voice creation happen only after explicit gesture activation; `playOnEnable` controls whether the voice starts, and source positions follow the entity world transform each frame.
+- Verified in the Player fixture: an audio-only entity with a base64 WAV payload is parsed, restored, and activated by the explicit project-audio button. This is a synthetic fixture, not yet a directory-project reopen acceptance test.
+- Pending: Editor audio asset import/selection and AudioSource authoring controls; end-to-end save/load/reopen acceptance using an Editor-authored project. Runtime AudioContext nodes, decoded buffers, voice IDs and playback clocks remain transient.
 - Exit: authored audio sources round-trip through Editor and Player, remain gesture-gated, and tear down cleanly.
 
 ### M8.6 — Examples, benchmarks and owner acceptance
