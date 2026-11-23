@@ -7,13 +7,22 @@ export function createThreeSkinningGeometry(
   skinning: RenderSkinning,
 ): THREE.BufferGeometry {
   const position = source.getAttribute('position');
-  if (!position || skinning.jointIndices.length !== position.count * 4 ||
-      skinning.jointWeights.length !== position.count * 4) {
+  if (
+    !position ||
+    skinning.jointIndices.length !== position.count * 4 ||
+    skinning.jointWeights.length !== position.count * 4
+  ) {
     throw new RangeError('Skinning attributes must contain four influences per geometry vertex');
   }
   const geometry = source.clone();
-  geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinning.jointIndices, 4));
-  geometry.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinning.jointWeights, 4));
+  geometry.setAttribute(
+    'skinIndex',
+    new THREE.Uint16BufferAttribute(skinning.jointIndices, 4),
+  );
+  geometry.setAttribute(
+    'skinWeight',
+    new THREE.Float32BufferAttribute(skinning.jointWeights, 4),
+  );
   return geometry;
 }
 
@@ -42,7 +51,9 @@ export function updateThreeSkinningSkeleton(
     const offset = joint * 16;
     for (let element = 0; element < 16; element += 1) {
       const value = skinning.jointMatrices[offset + element]!;
-      if (!Number.isFinite(value)) throw new RangeError('Skinning palette contains non-finite data');
+      if (!Number.isFinite(value)) {
+        throw new RangeError('Skinning palette contains non-finite data');
+      }
     }
     bone.matrixWorld.fromArray(skinning.jointMatrices, offset);
     bone.matrixWorldNeedsUpdate = false;
