@@ -1,6 +1,6 @@
 # Project Handoff — Choreon 3D Engine
 
-Updated: 2026-11-23
+Updated: 2026-11-24
 
 ## Current authoritative snapshot
 
