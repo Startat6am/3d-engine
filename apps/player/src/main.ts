@@ -1203,7 +1203,11 @@ async function openProjectFolder(): Promise<void> {
         ] as [number, number, number],
       ];
     });
-    const bounds = [...world.prepared.map((entity) => entity.position), ...chunkBounds];
+    const bounds = [
+      ...world.prepared.map((entity) => entity.position),
+      ...world.audioSources.map((source) => source.state.position),
+      ...chunkBounds,
+    ];
     if (bounds.length > 0) {
       const min = [0, 1, 2].map((axis) => Math.min(...bounds.map((point) => point[axis]!)));
       const max = [0, 1, 2].map((axis) => Math.max(...bounds.map((point) => point[axis]!)));
@@ -1436,6 +1440,14 @@ const renderFrame = (now: number) => {
   const delta = previousFrame === 0 ? 0 : Math.max(0, (now - previousFrame) / 1000);
   previousFrame = now;
   runtime.advance(delta);
+  for (const source of activeAudioSources) {
+    const worldMatrix = runtime.hierarchy.getWorldMatrix(source.entity);
+    source.state = {
+      ...source.state,
+      position: [worldMatrix[12]!, worldMatrix[13]!, worldMatrix[14]!],
+    };
+    source.voice?.update(source.state);
+  }
   for (const animation of activeAnimations) {
     animation.player.update(delta);
     const pose = animation.player.pose;
@@ -1507,6 +1519,8 @@ const onPageHide = () => {
   window.cancelAnimationFrame(animationFrame);
   pageDisposed = true;
   activeAnimations.length = 0;
+  for (const source of activeAudioSources) source.voice?.dispose();
+  activeAudioSources.length = 0;
   audioTestVoice?.dispose();
   audioRuntime.dispose();
   voxelStream?.dispose();
