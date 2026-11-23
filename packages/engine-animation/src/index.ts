@@ -1,4 +1,3 @@
-packages/engine-animation/src/index.ts 91ms (unchanged)
 export type AnimationPath = 'translation' | 'rotation' | 'scale';
 export type AnimationInterpolation = 'STEP' | 'LINEAR' | 'CUBICSPLINE';
 export type AnimationValueSize = 3 | 4;
