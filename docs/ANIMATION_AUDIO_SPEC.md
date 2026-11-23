@@ -1,6 +1,6 @@
 # Animation & Audio Specification
 
-**Status:** M8.1–M8.3 implemented and verified; M8.4 audio runtime/Web Audio integration in progress; AudioSource persistence is proposed separately in ADR-0014.
+**Status:** M8.1–M8.4 implemented and verified; M8.5 AudioSource persistence and world-schema migration remain planned under ADR-0014.
 **Version:** 0.1.0-draft
 **Milestone:** M8 (after M7 World & Voxels, before M9 Editor MVP)
 
