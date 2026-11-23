@@ -370,7 +370,8 @@ function decodeBase64(value: string): ArrayBuffer {
 function encodeBase64(value: ArrayBuffer): string {
   const bytes = new Uint8Array(value);
   let binary = '';
-  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]!);
+  for (let index = 0; index < bytes.length; index += 1)
+    binary += String.fromCharCode(bytes[index]!);
   return btoa(binary);
 }
 
@@ -1214,7 +1215,9 @@ window.addEventListener('keydown', (event) => {
     activeClipNames.push(clipName);
   }
   if (activeClipNames.length > 0) {
-    setProjectStatus(`Cross-fading to ${activeClipNames.join(', ')} · press [ or ] to switch clips`);
+    setProjectStatus(
+      `Cross-fading to ${activeClipNames.join(', ')} · press [ or ] to switch clips`,
+    );
   }
 });
 const updateFps = attachFpsCounter(canvas);
