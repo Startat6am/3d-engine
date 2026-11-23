@@ -11,6 +11,7 @@ import type {
   TextureSource,
   RenderSkinning,
 } from './contracts.js';
+import { validateRenderSkinning } from './contracts.js';
 import { RendererError } from './contracts.js';
 import { applyMaterialState } from './material-state.js';
 import {
@@ -395,6 +396,11 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       entry.skinningJointIndices !== skinning.jointIndices ||
       entry.skinningJointWeights !== skinning.jointWeights;
     if (needsGeometry) {
+      validateRenderSkinning(
+        // The renderer contract validates against the engine-owned source geometry.
+        (entry as { geometrySource: MeshData }).geometrySource,
+        skinning,
+      );
       const nextGeometry = createThreeSkinningGeometry(baseGeometry, skinning);
       entry.skinningGeometry?.dispose();
       entry.skinningGeometry = nextGeometry;
