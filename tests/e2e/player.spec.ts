@@ -50,6 +50,70 @@ test('player renders and cross-fades the Khronos Fox skeletal animation fixture'
   expect(pageErrors).toEqual([]);
 });
 
+test('player releases Fox skinning GPU resources on shutdown', async ({ page }) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    const state = window as unknown as {
+      __foxDeletedBuffers: number;
+      __foxDeletedTextures: number;
+      __foxDrawCalls: number;
+    };
+    state.__foxDeletedBuffers = 0;
+    state.__foxDeletedTextures = 0;
+    state.__foxDrawCalls = 0;
+
+    const deleteBuffer = WebGL2RenderingContext.prototype.deleteBuffer;
+    WebGL2RenderingContext.prototype.deleteBuffer = function (buffer) {
+      state.__foxDeletedBuffers += 1;
+      return deleteBuffer.call(this, buffer);
+    };
+    const deleteTexture = WebGL2RenderingContext.prototype.deleteTexture;
+    WebGL2RenderingContext.prototype.deleteTexture = function (texture) {
+      state.__foxDeletedTextures += 1;
+      return deleteTexture.call(this, texture);
+    };
+    const drawElements = WebGL2RenderingContext.prototype.drawElements;
+    WebGL2RenderingContext.prototype.drawElements = function (mode, count, type, offset) {
+      state.__foxDrawCalls += 1;
+      return drawElements.call(this, mode, count, type, offset);
+    };
+  });
+
+  await page.goto('http://127.0.0.1:5174/?fixture=fox');
+  await expect(page.locator('#project-status')).toContainText('Fox animation fixture ready');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as unknown as { __foxDrawCalls: number }).__foxDrawCalls),
+    )
+    .toBeGreaterThan(0);
+
+  const beforeDispose = await page.evaluate(() => {
+    const state = window as unknown as {
+      __foxDeletedBuffers: number;
+      __foxDeletedTextures: number;
+    };
+    return { ...state };
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __foxDeletedBuffers: number }).__foxDeletedBuffers,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__foxDeletedBuffers);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as unknown as { __foxDeletedTextures: number }).__foxDeletedTextures,
+      ),
+    )
+    .toBeGreaterThan(beforeDispose.__foxDeletedTextures);
+  expect(pageErrors).toEqual([]);
+});
+
 test('player renders the preloaded voxel test scene through WebGL2', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
