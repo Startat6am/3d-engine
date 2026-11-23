@@ -162,6 +162,38 @@ test('Player activates Web Audio from a user gesture and starts a spatial voice'
     .not.toEqual(initialListenerPosition);
 });
 
+test('player restores audio-only AudioSource after explicit gesture activation', async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('http://127.0.0.1:5174/?fixture=audio');
+
+  const status = page.locator('#project-status');
+  const audioButton = page.locator('#audio-test');
+  await expect(status).toContainText('Audio fixture ready');
+  await expect(status).toContainText('1 audio-only source');
+  await expect(status).toContainText('no MeshRenderer');
+  await expect(audioButton).toHaveText('Enable project audio');
+
+  await audioButton.click();
+  await expect(audioButton).toHaveText('Project audio enabled');
+  await expect(status).toContainText('Enabled 1 project audio source');
+  await expect
+    .poll(() =>
+      page.evaluate(() => (window as Window & { __playerAudioVoices?: number }).__playerAudioVoices),
+    )
+    .toBe(1);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => (window as Window & { __playerAudioContextState?: string }).__playerAudioContextState,
+      ),
+    )
+    .toBe('running');
+  expect(pageErrors).toEqual([]);
+});
+
 test('player renders the preloaded voxel test scene through WebGL2', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
