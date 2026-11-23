@@ -9,9 +9,15 @@ import type {
   RenderObject,
   RendererPickHit,
   TextureSource,
+  RenderSkinning,
 } from './contracts.js';
 import { RendererError } from './contracts.js';
 import { applyMaterialState } from './material-state.js';
+import {
+  createThreeSkinningGeometry,
+  createThreeSkinningSkeleton,
+  updateThreeSkinningSkeleton,
+} from './skinning.js';
 export * from './contracts.js';
 
 type TextureChannel = 'baseColor' | 'metallicRoughness' | 'normal' | 'occlusion' | 'emissive';
@@ -25,7 +31,12 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
   readonly #objects = new Map<
     string,
     {
-      readonly mesh: THREE.Mesh;
+      mesh: THREE.Mesh;
+      skinningGeometry?: THREE.BufferGeometry;
+      skinningGeometryBase?: THREE.BufferGeometry;
+      skinningJointIndices?: Uint16Array;
+      skinningJointWeights?: Float32Array;
+      skeleton?: THREE.Skeleton;
       geometrySource: object;
       materialSource: object;
       geometryLease: AssetResourceLease<THREE.BufferGeometry>;
@@ -116,6 +127,11 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     if (scene.objects !== this.#lastObjects) {
       this.#syncObjects(scene.objects);
       this.#lastObjects = scene.objects;
+    }
+    // Palettes may be updated in place while the render-object array remains stable.
+    for (const item of scene.objects) {
+      const entry = this.#objects.get(item.id);
+      if (entry) this.#syncSkinning(entry, item.skinning);
     }
     this.#scene.background = new THREE.Color(scene.background);
     const camera = this.#applyCamera(scene.camera);
@@ -338,6 +354,95 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     }
   }
 
+  #syncSkinning(
+    entry: {
+      mesh: THREE.Mesh;
+      skinningGeometry?: THREE.BufferGeometry;
+      skinningGeometryBase?: THREE.BufferGeometry;
+      skinningJointIndices?: Uint16Array;
+      skinningJointWeights?: Float32Array;
+      skeleton?: THREE.Skeleton;
+      geometryLease: AssetResourceLease<THREE.BufferGeometry>;
+    },
+    skinning: RenderSkinning | undefined,
+  ): void {
+    const baseGeometry = entry.geometryLease.resource;
+    if (!skinning) {
+      if (entry.mesh instanceof THREE.SkinnedMesh) {
+        const previous = entry.mesh;
+        const replacement = new THREE.Mesh(baseGeometry, previous.material);
+        this.#copyMeshTransform(previous, replacement);
+        this.#scene.remove(previous);
+        this.#scene.add(replacement);
+        entry.mesh = replacement;
+      } else {
+        entry.mesh.geometry = baseGeometry;
+      }
+      entry.skeleton?.dispose();
+      entry.skinningGeometry?.dispose();
+      entry.skeleton = undefined;
+      entry.skinningGeometry = undefined;
+      entry.skinningGeometryBase = undefined;
+      entry.skinningJointIndices = undefined;
+      entry.skinningJointWeights = undefined;
+      return;
+    }
+
+    const jointCount = skinning.jointMatrices.length / 16;
+    const needsGeometry =
+      !entry.skinningGeometry ||
+      entry.skinningGeometryBase !== baseGeometry ||
+      entry.skinningJointIndices !== skinning.jointIndices ||
+      entry.skinningJointWeights !== skinning.jointWeights;
+    if (needsGeometry) {
+      const nextGeometry = createThreeSkinningGeometry(baseGeometry, skinning);
+      entry.skinningGeometry?.dispose();
+      entry.skinningGeometry = nextGeometry;
+      entry.skinningGeometryBase = baseGeometry;
+      entry.skinningJointIndices = skinning.jointIndices;
+      entry.skinningJointWeights = skinning.jointWeights;
+    }
+
+    if (!(entry.mesh instanceof THREE.SkinnedMesh)) {
+      const previous = entry.mesh;
+      const replacement = new THREE.SkinnedMesh(
+        entry.skinningGeometry!,
+        previous.material,
+      );
+      this.#copyMeshTransform(previous, replacement);
+      this.#scene.remove(previous);
+      this.#scene.add(replacement);
+      entry.mesh = replacement;
+    } else {
+      entry.mesh.geometry = entry.skinningGeometry!;
+    }
+
+    if (!entry.skeleton || entry.skeleton.bones.length !== jointCount) {
+      entry.skeleton?.dispose();
+      entry.skeleton = createThreeSkinningSkeleton(skinning);
+      const mesh = entry.mesh as THREE.SkinnedMesh;
+      mesh.bindMode = THREE.DetachedBindMode;
+      mesh.bind(entry.skeleton, new THREE.Matrix4());
+    }
+    updateThreeSkinningSkeleton(entry.skeleton, skinning);
+  }
+
+  #copyMeshTransform(source: THREE.Mesh, target: THREE.Mesh): void {
+    target.position.copy(source.position);
+    target.quaternion.copy(source.quaternion);
+    target.scale.copy(source.scale);
+    target.matrix.copy(source.matrix);
+    target.matrixAutoUpdate = source.matrixAutoUpdate;
+    target.matrixWorld.copy(source.matrixWorld);
+    target.matrixWorldNeedsUpdate = true;
+    target.userData = { ...source.userData };
+    target.visible = source.visible;
+    target.castShadow = source.castShadow;
+    target.receiveShadow = source.receiveShadow;
+    target.frustumCulled = source.frustumCulled;
+    target.renderOrder = source.renderOrder;
+  }
+
   #syncTexture(
     entry: {
       readonly mesh: THREE.Mesh;
@@ -525,6 +630,8 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
     for (const lease of entry.textureLeases.values()) lease.release();
     entry.textureLeases.clear();
     entry.textureSources.clear();
+    entry.skeleton?.dispose();
+    entry.skinningGeometry?.dispose();
     entry.geometryLease.release();
     entry.materialLease.release();
   }
