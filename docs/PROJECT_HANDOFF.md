@@ -1,6 +1,6 @@
 # Project Handoff — Choreon 3D Engine
 
-Updated: 2026-11-22
+Updated: 2026-11-23
 
 ## Current authoritative snapshot
 
@@ -18,7 +18,7 @@ Updated: 2026-11-22
 - M2–M5: complete.
 - M6 Physics/Input: functional scope closed; profiling limitations remain deferred.
 - M7 World & Voxels: complete and owner-accepted. See the M7 implementation notes below and exact merge/CI above.
-- M8 Animation & Audio: M8.0 established; M8.1 animation data/import foundation complete; M8.2 playback and skeletal pose evaluation in progress on `feat/m8-animation-audio-contracts`. `@engine/animation` exports validated track/clip/skin data and keyframe sampling; GLB importer now decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. M8.2 adds play/pause/seek/loop/speed, cross-fade, defensive local-pose snapshots, hierarchy-aware skinning matrices and ECS variable-update integration; renderer integration remains open. The Fox fixture now runs through Survey playback and verifies deterministic 24-joint palette output; a local 24-joint benchmark baseline is recorded in `M8_EXECUTION_PLAN.md`.
+- M8 Animation & Audio: M8.0–M8.2 complete on `feat/m8-animation-audio-contracts`; M8.3 renderer skinning is active. `@engine/animation` exports validated track/clip/skin data, keyframe sampling, player controls, cross-fade, defensive local-pose snapshots, hierarchy-aware skinning matrices and ECS variable-update integration. GLB importer decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI [#45208613537](https://github.com/Startat6am/3d-engine/actions/runs/45208613537) passed on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Renderer skinning, audio and Player persistence remain open.
 - M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
 ## M8 audit findings at the main baseline
@@ -28,7 +28,7 @@ Updated: 2026-11-22
 - `@engine/renderer` render objects accept geometry/material and TRS or a world matrix; no skinning palette contract exists.
 - `@engine/animation` has been added on the M8 branch with validated track/clip/skin data and sampling. `@engine/audio` does not exist yet.
 - Player/Editor do not yet restore animation/audio components from project documents.
-- Next implementation: exercise the Khronos Fox fixture through M8.2 playback and verify deterministic pose/palette outputs, then benchmark pose evaluation before M8.3 renderer skinning. Follow `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
+- Next implementation: M8.3 renderer skinning. Define the backend-neutral palette/influence contract, add Three.js adapter support and render the Fox fixture in Chromium. Follow `M8_EXECUTION_PLAN.md`; keep animation state renderer-independent.
 
 ## M6 implementation and accepted limitations
 

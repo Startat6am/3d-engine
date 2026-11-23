@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** M8.0 established; M8.1 importer foundation complete; M8.2 playback and skeletal pose evaluation in progress.
+**Status:** M8.0–M8.2 complete; M8.3 renderer skinning in progress.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -46,8 +46,9 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 - Added `AnimationPlayerSystem` in ECS `variable-update`; it does not write physics-owned entity transforms.
 - Tests cover state transitions, interpolation, quaternion blending, large deltas, hierarchy cycles, invalid parents, singular mesh transforms and ECS scheduling.
 - Khronos Fox end-to-end fixture now drives Survey through two independent players and verifies identical finite 24-joint palettes.
-- Baseline benchmark (`pnpm --filter @engine/animation bench:pose`): 10,000 evaluations, 24 joints / 48 channels, five rounds; median 904.95 ms (11,050 evaluations/s) on Node v25.9.0 in the dev box. This is a local baseline, not a CI threshold or a supported-Node performance claim.
-- Remaining: review pose allocations and benchmark on the project's supported Node 22 runtime before M8.2 exit.
+- Benchmark (`pnpm --filter @engine/animation bench:pose`): 10,000 evaluations, 24 joints / 48 channels, five rounds; exact-head CI on Node v22.23.5 recorded median 768.16 ms (13,018 evaluations/s). This is an informational runner-specific baseline, not a CI threshold or a hardware performance guarantee.
+- Allocation review: internal playback reuses pose buffers; the benchmark intentionally includes defensive public pose snapshots and skinning palette evaluation. Snapshot copies remain deliberate API isolation, not a hidden mutable view.
+- Exit: exact-head GitHub Actions run [#45208613537](https://github.com/Startat6am/3d-engine/actions/runs/45208613537) passed format, lint, typecheck, tests, build, Node 22 pose benchmark, GLB/voxel stress checks and Chromium Playwright E2E.
 
 ### M8.3 — Renderer skinning path
 
@@ -105,4 +106,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-M8.1 importer coverage includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 now has a headless player, cross-fade, local-pose evaluation, hierarchy-aware skinning matrices and ECS variable-update integration. Next: drive the Fox fixture through the player, verify deterministic pose/palette outputs and benchmark before considering M8.3. Do not begin renderer skinning before the pose evaluation gate passes.
+M8.1 importer coverage includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 is complete: headless player, cross-fade, local-pose evaluation, hierarchy-aware skinning matrices and ECS variable-update integration passed the exact-head Node 22 and Chromium CI gate. M8.3 is now the active slice: define the backend-neutral skinning palette and per-vertex influence contract, then add the Three.js adapter path and a browser-rendered Fox acceptance fixture. Keep renderer implementation isolated from animation clocks and canonical pose ownership.
