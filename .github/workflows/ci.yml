@@ -18,10 +18,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Temporary inspect of Player formatter output
-        run: |
-          pnpm exec prettier --write apps/player/src/main.ts
-          git diff -- apps/player/src/main.ts
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
