@@ -1,6 +1,6 @@
 # Animation & Audio Specification
 
-**Status:** M8 contract baseline; M8.1 and M8.2 implemented; M8.3 renderer integration in progress.
+**Status:** M8.1–M8.2 implemented; M8.3 renderer and Player integration in progress; browser visual acceptance pending.
 **Version:** 0.1.0-draft
 **Milestone:** M8 (after M7 World & Voxels, before M9 Editor MVP)
 
@@ -141,11 +141,11 @@ Integration/acceptance:
 
 At the M8 implementation checkpoint:
 
-- `@engine/animation` exports validated track/clip/skin data, STEP/LINEAR/CUBICSPLINE sampling, play/pause/stop/seek/loop/once/positive-speed controls, two-clip cross-fade, local TRS pose evaluation, defensive pose snapshots, hierarchy-aware mesh-local skinning matrices and an ECS variable-update system. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI #45208613537 passes on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Renderer integration is the active M8.3 task. `@engine/audio` does not exist.
-- `GlbAsset` now exposes validated skins, ordered joints, inverse-bind matrices, per-vertex JOINTS_0/WEIGHTS_0 influences and translation/rotation/scale animation channels with bounded accessor decoding. Playback and renderer skinning remain open; only the first JOINTS_0/WEIGHTS_0 influence set is currently supported.
+- `@engine/animation` exports validated track/clip/skin data, STEP/LINEAR/CUBICSPLINE sampling, play/pause/stop/seek/loop/once/positive-speed controls, two-clip cross-fade, local TRS pose evaluation, defensive pose snapshots, hierarchy-aware mesh-local skinning matrices and an ECS variable-update system. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI #45208613537 passes on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Three.js renderer and Player palette integration are implemented but still need browser-rendered Fox acceptance. `@engine/audio` does not exist.
+- `GlbAsset` exposes validated skins, ordered joints, inverse-bind matrices, per-vertex JOINTS_0/WEIGHTS_0 influences and translation/rotation/scale animation channels with bounded accessor decoding. Player now creates a bind pose and hierarchy from imported nodes, starts the first clip and updates mesh-local palettes each frame. Only the first JOINTS_0/WEIGHTS_0 influence set is supported.
 - Sparse accessors and `JOINTS_1`/`WEIGHTS_1` are rejected as unsupported rather than partially decoded. The importer regression suite includes the attributed Khronos Fox sample (162,852 bytes; 24 joints; Survey/Walk/Run clips); see [fixture attribution](../packages/engine-gltf-importer/src/fixtures/README.md).
 - `AnimationPlayerSystem` advances animation components in ECS `variable-update`; it publishes pose snapshots and does not mutate physics-owned entity transforms. Audio remains unintegrated.
-- Renderer render objects currently carry geometry/material and transform data; no skinning palette contract exists.
-- Existing Player/Editor serialization restoration does not create animation or audio components.
+- `RenderObject` now optionally carries `RenderSkinning`. The Three.js adapter creates isolated skinned geometry, maps the engine-owned mesh-local palette through `SkinnedMesh`/`Skeleton`, uses a bone texture for the 256-joint limit, updates palettes before draws and disposes per-object skinning resources. Frustum culling is disabled for skinned meshes until animated bounds are computed.
+- Player project loading now plays imported GLB clips and renders their skinning palettes. Editor-authored animation components, serialized playback state and audio persistence remain unimplemented. Player currently auto-plays the first imported clip; clip-selection/cross-fade browser acceptance remains pending.
 
 Do not mark any capability implemented until code, tests, examples and the relevant acceptance gate agree.
