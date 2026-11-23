@@ -63,10 +63,7 @@ export interface RenderSkinning {
   readonly jointMatrices: Float32Array;
 }
 
-export function validateRenderSkinning(
-  geometry: MeshData,
-  skinning: RenderSkinning,
-): void {
+export function validateRenderSkinning(geometry: MeshData, skinning: RenderSkinning): void {
   const vertexCount = geometry.positions.length / 3;
   if (!Number.isSafeInteger(vertexCount) || vertexCount <= 0) {
     throw new RangeError('Skinned geometry must contain at least one complete vertex');

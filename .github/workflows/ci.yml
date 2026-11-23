@@ -18,11 +18,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Format renderer skinning contracts and verify workspace
-        run: |
-          pnpm exec prettier --write packages/engine-renderer/src/contracts.ts packages/engine-renderer/src/contracts.test.ts
-          git diff -- packages/engine-renderer/src/contracts.ts packages/engine-renderer/src/contracts.test.ts
-          pnpm format:check
+      - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
