@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createDefaultCamera, createDefaultMaterial, lookAtQuaternion } from './contracts.js';
+import {
+  createDefaultCamera,
+  createDefaultMaterial,
+  lookAtQuaternion,
+  validateRenderSkinning,
+} from './contracts.js';
 
 describe('renderer-independent camera and material contracts', () => {
   it('provides a valid perspective camera and material defaults', () => {
@@ -25,7 +30,9 @@ describe('renderer-independent camera and material contracts', () => {
 describe('renderer-independent skinning contracts', () => {
   const geometry = {
     positions: new Float32Array([0, 0, 0, 1, 0, 0]),
-  } as import('@engine/geometry').MeshData;
+    normals: new Float32Array([0, 1, 0, 0, 1, 0]),
+    indices: new Uint32Array([0, 1, 0]),
+  };
   const validSkinning = () => ({
     jointIndices: new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0]),
     jointWeights: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0]),
@@ -34,13 +41,11 @@ describe('renderer-independent skinning contracts', () => {
     ]),
   });
 
-  it('accepts four normalized influences and a finite mesh-local palette', async () => {
-    const { validateRenderSkinning } = await import('./contracts.js');
+  it('accepts four normalized influences and a finite mesh-local palette', () => {
     expect(() => validateRenderSkinning(geometry, validSkinning())).not.toThrow();
   });
 
-  it('rejects mismatched influence counts, out-of-range joints and invalid weights', async () => {
-    const { validateRenderSkinning } = await import('./contracts.js');
+  it('rejects mismatched influence counts, out-of-range joints and invalid weights', () => {
     const missing = validSkinning();
     missing.jointIndices = new Uint16Array(4);
     expect(() => validateRenderSkinning(geometry, missing)).toThrow(RangeError);
@@ -55,8 +60,7 @@ describe('renderer-independent skinning contracts', () => {
     expect(() => validateRenderSkinning(geometry, unnormalized)).toThrow(/sum to one/);
   });
 
-  it('bounds palettes and rejects non-finite matrices', async () => {
-    const { validateRenderSkinning } = await import('./contracts.js');
+  it('bounds palettes and rejects non-finite matrices', () => {
     const oversized = validSkinning();
     oversized.jointMatrices = new Float32Array(257 * 16);
     expect(() => validateRenderSkinning(geometry, oversized)).toThrow(/1\.\.256/);
