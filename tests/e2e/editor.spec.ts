@@ -346,7 +346,6 @@ test('editor can author and render a voxel chunk beside conventional mesh entiti
   await expect(page.getByText('UNSAVED CHANGES')).toBeVisible();
 });
 
-
 function createWavFixture(): Buffer {
   const sampleRate = 8_000;
   const sampleCount = 80;
