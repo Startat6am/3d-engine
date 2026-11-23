@@ -1272,6 +1272,83 @@ let streamAnchor: readonly [number, number, number] | null = null;
 
 async function preloadSampleVoxelScene(): Promise<void> {
   try {
+    if (new URLSearchParams(window.location.search).get('fixture') === 'audio') {
+      setProjectProgress(8, 'Preparing persisted AudioSource fixture');
+      await yieldToBrowser();
+      const audioBytes = createSpatialTestTone();
+      const fixtureDocument = {
+        format: 'universal-3d-world',
+        schemaVersion: CURRENT_WORLD_SCHEMA_VERSION,
+        engineVersion: '0.1.0',
+        world: {
+          id: 'world:audio-fixture',
+          name: 'AudioSource Persistence Fixture',
+          settings: {},
+          entities: [
+            {
+              id: 'entity:audio-only',
+              components: {
+                Transform: {
+                  position: [0, 0, 0],
+                  rotation: [0, 0, 0, 1],
+                  scale: [1, 1, 1],
+                },
+                AudioSource: {
+                  assetId: 'asset:fixture:audio',
+                  spatial: true,
+                  loop: true,
+                  gain: 0.5,
+                  referenceDistance: 1,
+                  maxDistance: 30,
+                  playOnEnable: true,
+                },
+              },
+            },
+          ],
+        },
+        assets: [
+          {
+            id: 'asset:fixture:audio',
+            name: 'Persisted spatial test tone',
+            kind: 'audio',
+            uri: 'audio/fixture.wav',
+            contentHash: `sha256:${'0'.repeat(64)}`,
+            importer: { id: 'fixture.audio', version: '1.0.0', settings: {} },
+            dependencies: [],
+            metadata: { mimeType: 'audio/wav' },
+          },
+        ],
+        assetPayloads: [
+          {
+            assetId: 'asset:fixture:audio',
+            mimeType: 'audio/wav',
+            encoding: 'base64',
+            data: encodeBase64(audioBytes),
+          },
+        ],
+        extensions: {},
+      } as unknown as WorldDocument;
+      const document = parseWorld(serializeWorld(fixtureDocument));
+      const world = await prepareWorldEntities(document);
+      if (pageDisposed || projectDirectorySelected) return;
+      for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+      voxelStream?.dispose();
+      voxelStream = null;
+      for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
+      activeProjectEntities.length = 0;
+      activeAnimations.splice(0, activeAnimations.length);
+      for (const source of activeAudioSources) source.voice?.dispose();
+      activeAudioSources.length = 0;
+      for (const source of world.audioSources) {
+        activeAudioSources.push(addAudioSourceRuntimeEntity(source));
+      }
+      if (audioTestButton) audioTestButton.textContent = 'Enable project audio';
+      setProjectProgress(100, 'AudioSource fixture ready');
+      setProjectStatus(
+        `Audio fixture ready · ${activeAudioSources.length} audio-only source · no MeshRenderer`,
+      );
+      return;
+    }
     if (new URLSearchParams(window.location.search).get('fixture') === 'fox') {
       setProjectProgress(8, 'Loading Khronos Fox animation fixture');
       await yieldToBrowser();
