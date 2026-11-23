@@ -1,6 +1,6 @@
 # M8 Execution Plan — Animation & Audio
 
-**Status:** M8.0 contract baseline established; M8.1 animation data, sampling and GLB import foundation in progress.
+**Status:** M8.0 established; M8.1 importer foundation complete; M8.2 playback and skeletal pose evaluation in progress.
 **Baseline:** `main` at M7 merge `ea6a9f40ac73c6aec5ed0cdff68e15930df6ccd2`.
 **Branch:** `feat/m8-animation-audio-contracts`.
 **Normative contract:** [Animation & Audio Specification](ANIMATION_AUDIO_SPEC.md).
@@ -41,10 +41,13 @@ Each slice is a separate reviewable PR or a clearly isolated commit series. Do n
 ### M8.2 — Playback and skeletal pose evaluation
 
 - Implement clip player state machine, time advancement, seek, loop/once, speed and two-clip cross-fade.
-- Evaluate local joint transforms and skinning matrices from skeleton hierarchy and inverse bind matrices.
-- Integrate with ECS variable-update phase and expose immutable pose snapshots.
-- Tests: sampling math, quaternion handling, hierarchy, state transitions, large deltas, repeatability and disposal.
-- Exit: headless pose fixtures pass; animation cannot mutate physics-owned entity transforms.
+- Implemented clip playback controls (play/pause/resume/stop/seek, loop/once, positive speed), bounded large-delta time advancement and two-clip cross-fade.
+- Implemented local TRS pose evaluation, defensive pose snapshots, hierarchy validation and mesh-local skinning matrices (`inverse(meshWorld) * jointWorld * inverseBindMatrix`).
+- Added `AnimationPlayerSystem` in ECS `variable-update`; it does not write physics-owned entity transforms.
+- Tests cover state transitions, interpolation, quaternion blending, large deltas, hierarchy cycles, invalid parents, singular mesh transforms and ECS scheduling.
+- Khronos Fox end-to-end fixture now drives Survey through two independent players and verifies identical finite 24-joint palettes.
+- Baseline benchmark (`pnpm --filter @engine/animation bench:pose`): 10,000 evaluations, 24 joints / 48 channels, five rounds; median 904.95 ms (11,050 evaluations/s) on Node v25.9.0 in the dev box. This is a local baseline, not a CI threshold or a supported-Node performance claim.
+- Remaining: review pose allocations and benchmark on the project's supported Node 22 runtime before M8.2 exit.
 
 ### M8.3 — Renderer skinning path
 
@@ -102,4 +105,4 @@ Every implementation slice updates this plan, [ANIMATION_AUDIO_SPEC.md](ANIMATIO
 
 ## 5. Current next action
 
-M8.1 importer coverage now includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Remaining M8.1 limits are sparse decoding and additional influence sets; proceed to M8.2 playback and deterministic skeletal pose evaluation without expanding those limits. Do not begin renderer skinning before the pose evaluation gate passes.
+M8.1 importer coverage includes rotation/scale channels, an attributed Khronos Fox GLB fixture, explicit sparse-accessor rejection and vertex joint/weight attributes. Sparse decoding and additional influence sets remain explicitly unsupported. M8.2 now has a headless player, cross-fade, local-pose evaluation, hierarchy-aware skinning matrices and ECS variable-update integration. Next: drive the Fox fixture through the player, verify deterministic pose/palette outputs and benchmark before considering M8.3. Do not begin renderer skinning before the pose evaluation gate passes.

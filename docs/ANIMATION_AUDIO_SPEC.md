@@ -141,10 +141,10 @@ Integration/acceptance:
 
 At the M8 implementation checkpoint:
 
-- `@engine/animation` exports validated track/clip/skin data contracts and STEP/LINEAR/CUBICSPLINE sampling. Playback, cross-fade, hierarchy pose evaluation and renderer integration remain unimplemented. `@engine/audio` does not exist.
+- `@engine/animation` exports validated track/clip/skin data, STEP/LINEAR/CUBICSPLINE sampling, play/pause/stop/seek/loop/once/positive-speed controls, two-clip cross-fade, local TRS pose evaluation, defensive pose snapshots, hierarchy-aware mesh-local skinning matrices and an ECS variable-update system. The Khronos Fox fixture verifies deterministic 24-joint palette output. Renderer integration remains open. `@engine/audio` does not exist.
 - `GlbAsset` now exposes validated skins, ordered joints, inverse-bind matrices, per-vertex JOINTS_0/WEIGHTS_0 influences and translation/rotation/scale animation channels with bounded accessor decoding. Playback and renderer skinning remain open; only the first JOINTS_0/WEIGHTS_0 influence set is currently supported.
 - Sparse accessors and `JOINTS_1`/`WEIGHTS_1` are rejected as unsupported rather than partially decoded. The importer regression suite includes the attributed Khronos Fox sample (162,852 bytes; 24 joints; Survey/Walk/Run clips); see [fixture attribution](../packages/engine-gltf-importer/src/fixtures/README.md).
-- The ECS scheduler exposes pre-update, fixed-update, variable-update, post-update and transform-propagation phases, suitable for the planned ordering but not yet integrated with animation/audio.
+- `AnimationPlayerSystem` advances animation components in ECS `variable-update`; it publishes pose snapshots and does not mutate physics-owned entity transforms. Audio remains unintegrated.
 - Renderer render objects currently carry geometry/material and transform data; no skinning palette contract exists.
 - Existing Player/Editor serialization restoration does not create animation or audio components.
 

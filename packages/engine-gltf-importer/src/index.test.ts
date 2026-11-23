@@ -2,7 +2,12 @@ import { MeshoptEncoder } from 'meshoptimizer';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { GlbImportError, GlbImporter } from './index.js';
-import { sampleAnimationTrack } from '@engine/animation';
+import {
+  AnimationPlayer,
+  createAnimationPose,
+  evaluateSkinningMatrices,
+  sampleAnimationTrack,
+} from '@engine/animation';
 
 function makeGlb(
   options: {
@@ -470,6 +475,39 @@ describe('GlbImporter', () => {
       .find((primitive) => primitive.skinning !== undefined);
     expect(skinnedPrimitive?.skinning?.joints).toHaveLength(6912);
     expect(skinnedPrimitive?.skinning?.weights).toHaveLength(6912);
+    const bindPose = createAnimationPose(result.data.nodes.length);
+    const parents: (number | null)[] = new Array(result.data.nodes.length).fill(null);
+    result.data.nodes.forEach((node, nodeIndex) => {
+      bindPose[nodeIndex]!.translation.set(node.translation);
+      bindPose[nodeIndex]!.rotation.set(node.rotation);
+      bindPose[nodeIndex]!.scale.set(node.scale);
+      for (const child of node.children) parents[child] = nodeIndex;
+    });
+    const meshNodeIndex = result.data.nodes.findIndex((node) => node.skin === 0);
+    expect(meshNodeIndex).toBeGreaterThanOrEqual(0);
+    const survey = result.data.animations.find((clip) => clip.name === 'Survey')!;
+    const firstPlayer = new AnimationPlayer(result.data.animations, bindPose);
+    const secondPlayer = new AnimationPlayer(result.data.animations, bindPose);
+    firstPlayer.play('Survey');
+    secondPlayer.play('Survey');
+    firstPlayer.update(0.25);
+    secondPlayer.update(0.25);
+    const firstPalette = evaluateSkinningMatrices(
+      firstPlayer.pose,
+      parents,
+      result.data.skins[0]!,
+      meshNodeIndex,
+    );
+    const secondPalette = evaluateSkinningMatrices(
+      secondPlayer.pose,
+      parents,
+      result.data.skins[0]!,
+      meshNodeIndex,
+    );
+    expect(firstPalette).toHaveLength(24 * 16);
+    expect([...firstPalette].every(Number.isFinite)).toBe(true);
+    expect(firstPalette).toEqual(secondPalette);
+    expect(survey.duration).toBeGreaterThan(0);
   });
 
   it('imports skin joint order, inverse bind matrices and animation channels', async () => {

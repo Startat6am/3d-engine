@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { SystemScheduler, World } from '@engine/core';
 import {
   AnimationDataError,
+  AnimationPlayer,
+  AnimationPlayerComponent,
+  AnimationPlayerSystem,
+  createAnimationPose,
+  evaluateAnimationClip,
+  evaluateSkinningMatrices,
   createAnimationClip,
   createAnimationSkin,
   createAnimationTrack,
@@ -162,5 +169,147 @@ describe('animation clip and skin validation', () => {
         nodeCount: 2,
       }),
     ).toThrow(/invalid joint/);
+  });
+});
+
+describe('animation playback and pose evaluation', () => {
+  const makeClip = (name: string, endX: number, endRotation = [0, 0, 0, 1] as number[]) =>
+    createAnimationClip(
+      name,
+      [
+        {
+          nodeIndex: 0,
+          track: createAnimationTrack({
+            path: 'translation',
+            times: [0, 2],
+            values: [0, 0, 0, endX, 0, 0],
+          }),
+        },
+        {
+          nodeIndex: 0,
+          track: createAnimationTrack({
+            path: 'rotation',
+            times: [0, 2],
+            values: [0, 0, 0, 1, ...endRotation],
+          }),
+        },
+      ],
+      1,
+    );
+
+  it('evaluates animated channels while retaining untouched bind-pose values', () => {
+    const bind = createAnimationPose(1);
+    bind[0]!.scale.set([2, 3, 4]);
+    const clip = makeClip('move', 4);
+    const pose = evaluateAnimationClip(clip, 1, bind);
+    expect([...pose[0]!.translation]).toEqual([2, 0, 0]);
+    expect([...pose[0]!.scale]).toEqual([2, 3, 4]);
+  });
+
+  it('supports play, pause, resume, seek, speed and stop', () => {
+    const player = new AnimationPlayer([makeClip('move', 4)], createAnimationPose(1));
+    player.play('move', { loop: false, speed: 2 });
+    player.update(0.5);
+    expect(player.time).toBe(1);
+    expect(player.pose[0]!.translation[0]).toBeCloseTo(2);
+    player.pause();
+    player.update(0.5);
+    expect(player.time).toBe(1);
+    player.resume();
+    player.seek(0.5);
+    expect(player.pose[0]!.translation[0]).toBeCloseTo(1);
+    player.stop();
+    expect(player.time).toBe(0);
+    expect(player.playing).toBe(false);
+    expect([...player.pose[0]!.translation]).toEqual([0, 0, 0]);
+  });
+
+  it('wraps positive playback time deterministically across large deltas', () => {
+    const player = new AnimationPlayer([makeClip('move', 4)], createAnimationPose(1));
+    player.play('move');
+    player.update(2.5);
+    expect(player.time).toBeCloseTo(0.5);
+    player.update(1);
+    expect(player.time).toBeCloseTo(1.5);
+  });
+
+  it('cross-fades local translation and rotation and completes at the requested duration', () => {
+    const player = new AnimationPlayer(
+      [makeClip('from', 2), makeClip('to', 6, [0, 0, 1, 0])],
+      createAnimationPose(1),
+    );
+    player.play('from');
+    player.crossFadeTo('to', 1);
+    player.update(0.5);
+    expect(player.transitioning).toBe(true);
+    expect(player.pose[0]!.translation[0]).toBeCloseTo(1);
+    expect(Math.hypot(...player.pose[0]!.rotation)).toBeCloseTo(1);
+    player.update(0.5);
+    expect(player.transitioning).toBe(false);
+    expect(player.currentClip).toBe('to');
+    expect(player.pose[0]!.translation[0]).toBeCloseTo(3);
+  });
+
+  it('returns defensive pose snapshots that cannot mutate playback state', () => {
+    const player = new AnimationPlayer([makeClip('move', 4)], createAnimationPose(1));
+    player.play('move');
+    player.update(0.5);
+    const snapshot = player.getPoseSnapshot();
+    snapshot[0]!.translation[0] = 999;
+    expect(player.pose[0]!.translation[0]).toBeCloseTo(1);
+  });
+
+  it('evaluates hierarchical joint matrices relative to the mesh node', () => {
+    const pose = createAnimationPose(2);
+    pose[0]!.translation.set([10, 0, 0]);
+    pose[1]!.translation.set([2, 0, 0]);
+    const skin = createAnimationSkin({
+      name: 'single-joint',
+      joints: [1],
+      inverseBindMatrices: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      nodeCount: 2,
+    });
+    const palette = evaluateSkinningMatrices(pose, [null, 0], skin, 0);
+    expect(palette).toHaveLength(16);
+    expect(palette[12]).toBeCloseTo(2);
+    expect(palette[13]).toBeCloseTo(0);
+    expect(palette[14]).toBeCloseTo(0);
+  });
+
+  it('rejects cyclic hierarchies, invalid parent indices and singular mesh transforms', () => {
+    const pose = createAnimationPose(2);
+    const skin = createAnimationSkin({
+      name: 'single-joint',
+      joints: [1],
+      inverseBindMatrices: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+      nodeCount: 2,
+    });
+    expect(() => evaluateSkinningMatrices(pose, [1, 0], skin)).toThrow(/cycle/);
+    expect(() => evaluateSkinningMatrices(pose, [null, 3], skin)).toThrow(/invalid parent/);
+    pose[0]!.scale.set([0, 1, 1]);
+    expect(() => evaluateSkinningMatrices(pose, [null, 0], skin, 0)).toThrow(/singular/);
+  });
+
+  it('advances attached players during the ECS variable-update phase', () => {
+    const world = new World();
+    const entity = world.createEntity();
+    const player = new AnimationPlayer([makeClip('move', 4)], createAnimationPose(1));
+    player.play('move');
+    world.add(entity, AnimationPlayerComponent, { player });
+    const scheduler = new SystemScheduler();
+    scheduler.add(new AnimationPlayerSystem());
+    scheduler.update('variable-update', { world, deltaTime: 0.5, elapsedTime: 0.5 });
+    expect(player.time).toBeCloseTo(0.5);
+    expect(player.pose[0]!.translation[0]).toBeCloseTo(1);
+  });
+
+  it('validates playback names, time deltas, seek and cross-fade durations', () => {
+    const player = new AnimationPlayer([makeClip('move', 4)], createAnimationPose(1));
+    expect(() => player.play('missing')).toThrow(/Unknown animation clip/);
+    expect(() => player.update(-1)).toThrow(/delta/);
+    expect(() => player.seek(1)).toThrow(/before a clip/);
+    expect(() => player.crossFadeTo('move', -1)).toThrow(/Cross-fade duration/);
+    expect(() => player.setSpeed(0)).toThrow(/speed/);
+    expect(() => player.setSpeed(-1)).toThrow(/positive/);
   });
 });

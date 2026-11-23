@@ -18,7 +18,7 @@ Updated: 2026-11-22
 - M2–M5: complete.
 - M6 Physics/Input: functional scope closed; profiling limitations remain deferred.
 - M7 World & Voxels: complete and owner-accepted. See the M7 implementation notes below and exact merge/CI above.
-- M8 Animation & Audio: M8.0 contract baseline established; M8.1 animation data/sampling foundation in progress on `feat/m8-animation-audio-contracts`. `@engine/animation` exports validated track/clip/skin data and keyframe sampling; GLB importer now decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. Playback and renderer integration remain open.
+- M8 Animation & Audio: M8.0 established; M8.1 animation data/import foundation complete; M8.2 playback and skeletal pose evaluation in progress on `feat/m8-animation-audio-contracts`. `@engine/animation` exports validated track/clip/skin data and keyframe sampling; GLB importer now decodes skins, inverse-bind matrices, JOINTS_0/WEIGHTS_0 vertex influences and STEP/LINEAR/CUBICSPLINE translation/rotation/scale channels. M8.2 adds play/pause/seek/loop/speed, cross-fade, defensive local-pose snapshots, hierarchy-aware skinning matrices and ECS variable-update integration; renderer integration remains open. The Fox fixture now runs through Survey playback and verifies deterministic 24-joint palette output; a local 24-joint benchmark baseline is recorded in `M8_EXECUTION_PLAN.md`.
 - M9 Editor MVP, M10 AI Authoring, M11 Runtime & Packaging, M12 Hardening: not started. AI authoring remains M10; do not reorder the roadmap.
 
 ## M8 audit findings at the main baseline
@@ -28,7 +28,7 @@ Updated: 2026-11-22
 - `@engine/renderer` render objects accept geometry/material and TRS or a world matrix; no skinning palette contract exists.
 - `@engine/animation` has been added on the M8 branch with validated track/clip/skin data and sampling. `@engine/audio` does not exist yet.
 - Player/Editor do not yet restore animation/audio components from project documents.
-- Next implementation: finish M8.1 sparse-accessor policy and representative external GLB fixtures, then implement deterministic playback/pose evaluation in M8.2. Follow `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
+- Next implementation: exercise the Khronos Fox fixture through M8.2 playback and verify deterministic pose/palette outputs, then benchmark pose evaluation before M8.3 renderer skinning. Follow `M8_EXECUTION_PLAN.md`; do not start renderer skinning before deterministic pose evaluation passes.
 
 ## M6 implementation and accepted limitations
 
