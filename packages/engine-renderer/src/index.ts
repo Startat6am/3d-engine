@@ -426,6 +426,7 @@ export class ThreeWebGLRendererAdapter implements RendererAdapter {
       const mesh = entry.mesh as THREE.SkinnedMesh;
       mesh.bindMode = THREE.DetachedBindMode;
       mesh.bind(entry.skeleton, new THREE.Matrix4());
+      mesh.frustumCulled = false;
     }
     updateThreeSkinningSkeleton(entry.skeleton, skinning);
   }
