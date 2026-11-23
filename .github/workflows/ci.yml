@@ -23,6 +23,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      - name: Animation pose evaluation benchmark
+        run: pnpm --filter @engine/animation bench:pose
       - name: GLB import stress benchmark (geometry)
         env:
           GLB_STRESS_MAX_PEAK_RSS_DELTA_MIB: 128
