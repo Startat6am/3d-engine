@@ -48,6 +48,7 @@ import {
   type GltfTextureTransform,
 } from '@engine/gltf-importer';
 import { attachFpsCounter } from './fps-counter.js';
+import foxFixtureUrl from '../../../packages/engine-gltf-importer/src/fixtures/Fox.glb?url';
 
 interface DirectoryPickerWindow extends Window {
   showDirectoryPicker?: (options?: { readonly mode?: 'read' }) => Promise<DirectoryHandleLike>;
@@ -183,6 +184,8 @@ interface ActiveAnimationInstance {
   readonly player: AnimationPlayer;
   readonly parents: readonly (number | null)[];
   readonly bindings: readonly ActiveAnimationBinding[];
+  readonly clipNames: readonly string[];
+  clipIndex: number;
 }
 
 const activeAnimations: ActiveAnimationInstance[] = [];
@@ -364,6 +367,13 @@ function decodeBase64(value: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+function encodeBase64(value: ArrayBuffer): string {
+  const bytes = new Uint8Array(value);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]!);
+  return btoa(binary);
+}
+
 async function prepareWorldEntities(document: WorldDocument) {
   const prepared: PreparedRenderable[] = [];
   const animations: ActiveAnimationInstance[] = [];
@@ -485,7 +495,13 @@ async function prepareWorldEntities(document: WorldDocument) {
       };
       for (const root of roots) visit(root, rootTransform);
       if (player && animationBindings.length > 0) {
-        animations.push({ player, parents, bindings: animationBindings });
+        animations.push({
+          player,
+          parents,
+          bindings: animationBindings,
+          clipNames: asset.animations.map((clip) => clip.name),
+          clipIndex: 0,
+        });
       }
       if (roots.length === 0 && asset.nodes.length > 0) unsupported += 1;
     } catch {
@@ -1058,6 +1074,81 @@ let streamAnchor: readonly [number, number, number] | null = null;
 
 async function preloadSampleVoxelScene(): Promise<void> {
   try {
+    if (new URLSearchParams(window.location.search).get('fixture') === 'fox') {
+      setProjectProgress(8, 'Loading Khronos Fox animation fixture');
+      await yieldToBrowser();
+      const response = await fetch(foxFixtureUrl);
+      if (!response.ok) throw new Error(`Fox fixture request failed: ${response.status}`);
+      const fixtureDocument = {
+        assets: [
+          {
+            id: 'fox-fixture',
+            name: 'Khronos Fox',
+            kind: 'model',
+            uri: 'fixtures/Fox.glb',
+            contentHash: '0'.repeat(64),
+            importer: { id: glbImporter.id, version: '0.1.0', settings: {} },
+            dependencies: [],
+            metadata: {},
+          },
+        ],
+        assetPayloads: [
+          {
+            assetId: 'fox-fixture',
+            encoding: 'base64',
+            data: encodeBase64(await response.arrayBuffer()),
+          },
+        ],
+        world: {
+          name: 'Khronos Fox Animation Fixture',
+          entities: [
+            {
+              id: 'fox-fixture',
+              components: {
+                Transform: {
+                  position: [0, 0, 0],
+                  rotation: [0, 0, 0, 1],
+                  scale: [1, 1, 1],
+                },
+                MeshRenderer: { primitive: 'GLB', assetId: 'fox-fixture' },
+              },
+            },
+          ],
+        },
+      } as unknown as WorldDocument;
+      const world = await prepareWorldEntities(fixtureDocument);
+      if (pageDisposed || projectDirectorySelected) return;
+      for (const entity of sampleEntities) runtime.world.destroyEntity(entity);
+      voxelStream?.dispose();
+      voxelStream = null;
+      for (const entity of activeProjectEntities) runtime.world.destroyEntity(entity);
+      activeProjectEntities.length = 0;
+      activeAnimations.splice(0, activeAnimations.length, ...world.animations);
+      for (const entity of world.prepared) {
+        activeProjectEntities.push(
+          addMeshRenderable(
+            entity.position,
+            entity.geometry,
+            entity.material,
+            entity.rotation,
+            entity.scale,
+            entity.skinning,
+          ),
+        );
+      }
+      const target: readonly [number, number, number] = [0, 0.8, 0];
+      const position: readonly [number, number, number] = [3, 2, 3];
+      camera = {
+        ...createDefaultCamera(),
+        position,
+        rotation: lookAtQuaternion(position, target),
+      };
+      setProjectProgress(100, 'Fox fixture ready');
+      setProjectStatus(
+        `Fox animation fixture ready · ${world.prepared.length} mesh parts · ${world.animations.length} animation instances · press [ or ] to cross-fade clips`,
+      );
+      return;
+    }
     setProjectProgress(8, 'Preparing built-in voxel test scene');
     await yieldToBrowser();
     const sample = createSampleVoxelScene();
@@ -1110,6 +1201,22 @@ window.addEventListener('keydown', (event) => {
 });
 window.addEventListener('keyup', (event) => cameraPanKeys.delete(event.key.toLowerCase()));
 window.addEventListener('blur', () => cameraPanKeys.clear());
+window.addEventListener('keydown', (event) => {
+  if (event.key !== '[' && event.key !== ']') return;
+  const activeClipNames: string[] = [];
+  for (const animation of activeAnimations) {
+    if (animation.clipNames.length < 2) continue;
+    const direction = event.key === ']' ? 1 : -1;
+    animation.clipIndex =
+      (animation.clipIndex + direction + animation.clipNames.length) % animation.clipNames.length;
+    const clipName = animation.clipNames[animation.clipIndex]!;
+    animation.player.crossFadeTo(clipName, 0.35);
+    activeClipNames.push(clipName);
+  }
+  if (activeClipNames.length > 0) {
+    setProjectStatus(`Cross-fading to ${activeClipNames.join(', ')} · press [ or ] to switch clips`);
+  }
+});
 const updateFps = attachFpsCounter(canvas);
 let previousFrame = 0;
 let animationFrame = 0;
