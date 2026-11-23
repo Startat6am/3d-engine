@@ -11,7 +11,7 @@ M8 adds reusable, renderer-independent animation and audio capabilities to Chore
 Planned packages:
 
 - `@engine/animation`: validated animation data, playback state, sampling, blending, skeletal pose evaluation and ECS-facing systems. It depends on `@engine/core`; it must not depend on Three.js, React, DOM or a particular renderer.
-- `@engine/audio`: audio source/listener contracts, playback state, spatial parameters and service lifecycle. It depends on `@engine/core`; browser Web Audio is an adapter, not the public contract.
+- `@engine/audio`: implemented backend-neutral clip/voice/listener contracts, bounded decode queue, source state and lifecycle. It currently has no dependency on renderer or UI; browser Web Audio is an adapter, not the public contract.
 - `@engine/gltf-importer`: extends the existing GLB import result with validated skin, inverse-bind and animation channel data.
 - `@engine/renderer`: consumes evaluated skeletal pose through an explicit backend-neutral render contract; Three.js remains an adapter detail.
 - Player composes the services and binds audio listener/source transforms to world transforms. Editor UI authoring is M9 unless a narrow acceptance fixture requires otherwise.
@@ -117,7 +117,7 @@ Expected failures are typed and actionable:
 - `ANIMATION_INVALID_DATA`, `ANIMATION_UNSUPPORTED_FEATURE`, `ANIMATION_RESOURCE_LIMIT`, `ANIMATION_DISPOSED`, `ANIMATION_UNKNOWN_CLIP`.
 - `AUDIO_UNAVAILABLE`, `AUDIO_PERMISSION_REQUIRED`, `AUDIO_DECODE_FAILED`, `AUDIO_RESOURCE_LIMIT`, `AUDIO_DISPOSED`, `AUDIO_UNKNOWN_CLIP`.
 
-Limits must cover source bytes, decoded audio bytes/duration, clip/channel/key counts, joints per skin, animation duration and concurrent voices. Initial numeric defaults are to be selected from representative fixtures and recorded in code/spec; do not invent performance guarantees before benchmarks.
+AudioRuntime defaults: 32 concurrent voices, 64 MiB maximum encoded clip size, 600-second maximum decoded duration, two concurrent decodes and eight queued decodes. Source defaults are gain 1, pitch 1, non-looping, fully spatial, 1 m reference distance, 100 m max distance and rolloff 1. These are resource/behavior limits, not performance guarantees; tune only with measured fixtures.
 
 ## 9. Verification and acceptance
 
@@ -141,7 +141,7 @@ Integration/acceptance:
 
 At the M8 implementation checkpoint:
 
-- `@engine/animation` exports validated track/clip/skin data, STEP/LINEAR/CUBICSPLINE sampling, play/pause/stop/seek/loop/once/positive-speed controls, two-clip cross-fade, local TRS pose evaluation, defensive pose snapshots, hierarchy-aware mesh-local skinning matrices and an ECS variable-update system. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI #45208613537 passes on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Three.js renderer and Player palette integration are complete; Chromium Fox visual, Survey-to-Walk cross-fade and skinning-resource teardown acceptance pass. `@engine/audio` does not exist.
+- `@engine/animation` exports validated track/clip/skin data, STEP/LINEAR/CUBICSPLINE sampling, play/pause/stop/seek/loop/once/positive-speed controls, two-clip cross-fade, local TRS pose evaluation, defensive pose snapshots, hierarchy-aware mesh-local skinning matrices and an ECS variable-update system. The Khronos Fox fixture verifies deterministic 24-joint palette output. Exact-head CI #45208613537 passes on Node 22.23.5 and Chromium; the 24-joint / 48-channel benchmark recorded 13,018 evaluations/s (runner-specific, informational). Three.js renderer and Player palette integration are complete; Chromium Fox visual, Survey-to-Walk cross-fade and skinning-resource teardown acceptance pass. `@engine/audio` is implemented with bounded decoding/voices and a Web Audio adapter; exact-head CI #45241932301 passed 335 unit tests and 32 Chromium E2E tests.
 - `GlbAsset` exposes validated skins, ordered joints, inverse-bind matrices, per-vertex JOINTS_0/WEIGHTS_0 influences and translation/rotation/scale animation channels with bounded accessor decoding. Player now creates a bind pose and hierarchy from imported nodes, starts the first clip and updates mesh-local palettes each frame. Only the first JOINTS_0/WEIGHTS_0 influence set is supported.
 - Sparse accessors and `JOINTS_1`/`WEIGHTS_1` are rejected as unsupported rather than partially decoded. The importer regression suite includes the attributed Khronos Fox sample (162,852 bytes; 24 joints; Survey/Walk/Run clips); see [fixture attribution](../packages/engine-gltf-importer/src/fixtures/README.md).
 - `AnimationPlayerSystem` advances animation components in ECS `variable-update`; it publishes pose snapshots and does not mutate physics-owned entity transforms. `AudioRuntime` is composed in Player with explicit user-gesture activation, spatial voice playback and camera-follow listener updates.
