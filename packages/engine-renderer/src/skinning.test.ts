@@ -34,6 +34,7 @@ describe('Three.js skinning bridge', () => {
   it('maps the engine mesh-local palette to the Three.js skeleton matrices', () => {
     const skeleton = createThreeSkinningSkeleton(skinning);
     expect(skeleton.bones).toHaveLength(2);
+    expect(skeleton.boneTexture).not.toBeNull();
     expect(Array.from(skeleton.boneMatrices)).toEqual(Array.from(palette));
 
     const nextPalette = palette.slice();
