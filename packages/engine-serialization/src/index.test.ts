@@ -200,8 +200,9 @@ describe('world serialization', () => {
     expect(migrated.assets).toEqual(original.assets);
     expect(migrated.assetPayloads).toEqual(original.assetPayloads);
     expect(migrated.extensions).toEqual(original.extensions);
-    expect((migrated.world.entities[0] as { components: Record<string, unknown> }).components)
-      .not.toHaveProperty('AudioSource');
+    expect(
+      (migrated.world.entities[0] as { components: Record<string, unknown> }).components,
+    ).not.toHaveProperty('AudioSource');
   });
 
   it('accepts a transformed audio-only entity with a typed audio asset reference', () => {
