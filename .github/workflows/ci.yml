@@ -18,6 +18,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Temporary inspect of schema formatter output
+        run: |
+          pnpm exec prettier --write packages/engine-project-storage/src/index.test.ts packages/engine-serialization/src/index.test.ts packages/engine-serialization/src/index.ts packages/engine-serialization/src/schemas/world-v1.1.schema.json
+          git diff -- packages/engine-project-storage/src/index.test.ts packages/engine-serialization/src/index.test.ts packages/engine-serialization/src/index.ts packages/engine-serialization/src/schemas/world-v1.1.schema.json
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
