@@ -26,7 +26,6 @@ describe('renderer-independent camera and material contracts', () => {
   });
 });
 
-
 describe('renderer-independent skinning contracts', () => {
   const geometry = {
     positions: new Float32Array([0, 0, 0, 1, 0, 0]),
@@ -36,9 +35,7 @@ describe('renderer-independent skinning contracts', () => {
   const validSkinning = () => ({
     jointIndices: new Uint16Array([0, 0, 0, 0, 0, 0, 0, 0]),
     jointWeights: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0]),
-    jointMatrices: new Float32Array([
-      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1,
-    ]),
+    jointMatrices: new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
   });
 
   it('accepts four normalized influences and a finite mesh-local palette', () => {

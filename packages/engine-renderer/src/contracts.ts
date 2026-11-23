@@ -78,11 +78,7 @@ export function validateRenderSkinning(
     throw new RangeError('Skinning attributes must contain four influences per vertex');
   }
   const jointCount = skinning.jointMatrices.length / 16;
-  if (
-    !Number.isSafeInteger(jointCount) ||
-    jointCount < 1 ||
-    jointCount > MAX_SKIN_JOINTS
-  ) {
+  if (!Number.isSafeInteger(jointCount) || jointCount < 1 || jointCount > MAX_SKIN_JOINTS) {
     throw new RangeError(`Skinning palette must contain 1..${MAX_SKIN_JOINTS} joints`);
   }
   for (let joint = 0; joint < jointCount; joint++) {
