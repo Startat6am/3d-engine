@@ -4,14 +4,7 @@
   "title": "Choreon World Document v1.1",
   "description": "Stable persisted envelope for a Choreon world. AudioSource components have a versioned portable contract; other component payloads and extension values remain extensible JSON.",
   "type": "object",
-  "required": [
-    "format",
-    "schemaVersion",
-    "engineVersion",
-    "world",
-    "assets",
-    "extensions"
-  ],
+  "required": ["format", "schemaVersion", "engineVersion", "world", "assets", "extensions"],
   "properties": {
     "$schema": {
       "type": "string"
@@ -28,12 +21,7 @@
     },
     "world": {
       "type": "object",
-      "required": [
-        "id",
-        "name",
-        "settings",
-        "entities"
-      ],
+      "required": ["id", "name", "settings", "entities"],
       "properties": {
         "id": {
           "type": "string",
@@ -49,9 +37,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": [
-              "id"
-            ],
+            "required": ["id"],
             "properties": {
               "id": {
                 "type": "string",
@@ -61,10 +47,7 @@
                 "type": "string"
               },
               "parent": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "components": {
                 "type": "object",
@@ -124,9 +107,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "properties": {
           "id": {
             "type": "string",
@@ -168,12 +149,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": [
-          "assetId",
-          "mimeType",
-          "encoding",
-          "data"
-        ],
+        "required": ["assetId", "mimeType", "encoding", "data"],
         "properties": {
           "assetId": {
             "type": "string",
